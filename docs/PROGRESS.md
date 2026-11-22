@@ -138,3 +138,5 @@ CI menjalankan lifecycle timer systemd pada akun fixture sementara. Tes menjalan
 Binari publik juga lulus benchmark CLI baca dan tulis 1 MiB pada file sementara, termasuk riwayat dan pembersihan file hasil tulis. Perbaikan ext4 melalui rencana bertanda tangan lulus pada partisi loop terisolasi di Ubuntu. [Job Linux](https://github.com/christiandoxa/whwmpc/actions/runs/45007448130/job/137162074979)
 
 Lifecycle systemd user lulus pada akun sementara Ubuntu amd64. Fixture juga memeriksa bahwa service menulis satu observasi ke riwayat sebelum unit dilepas. Matriks native mencakup Ubuntu amd64 dan arm64 untuk uji loop ext4 dan daemon pada kedua arsitektur. [Hasil Ubuntu amd64](https://github.com/christiandoxa/whwmpc/actions/runs/45007833793/job/137163307354)
+
+Manifest image Fedora terpin menyediakan amd64 dan arm64. Workflow cache menjalankan skenario DNF5 di kedua runner native.
