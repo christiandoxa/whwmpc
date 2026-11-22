@@ -1,0 +1,47 @@
+{
+  "release": "v0.3.6",
+  "source_commit": "18dab57b42dc144d2e716615c228d9f78c95f529",
+  "linux_amd64_archive_sha256": "2d13908589d3a8b2391dbbb51f6dde7a8ad767487029d90129c2ce0eee4c2018",
+  "linux_amd64_executable_sha256": "8152ac1df0e9312040de5079daba5d5a5c957cba857664919e5dba0f318d4104",
+  "fwupd_package": "2.0.20-1ubuntu2~24.04.2",
+  "scope": "Native fwupd in rootless network and mount namespaces. Synthetic LVFS, private certificates and system bus, dummy EFI variables, temporary ESP, simulated boot.",
+  "fwupd_history_has_modified": true,
+  "resume_before_simulated_boot": {
+    "state": "reboot_required",
+    "installed": "0.1.50",
+    "fwupd_state": 4,
+    "history_statuses": ["partial"],
+    "verify_after_restart": true
+  },
+  "target_version_seen_without_new_boot": {
+    "state": "reboot_required",
+    "installed": "0.1.51"
+  },
+  "resume_after_simulated_boot": {
+    "state": "verified",
+    "installed": "0.1.51",
+    "fwupd_state": 2,
+    "capsule_cleaned_up": true,
+    "repeated_resume_state": "verified",
+    "history_statuses_for_plan_after_repeat": ["verified", "partial"],
+    "history_verify_after_restart": false,
+    "report_statuses": ["verified", "partial"]
+  },
+  "unmatched_active_version_after_native_success": {
+    "state": "unknown",
+    "availability": "partial",
+    "installed": "0.1.50"
+  },
+  "v0.3.5_regression": {
+    "resume_state": "verified",
+    "history_statuses_for_plan": ["partial"],
+    "verify_after_restart": true,
+    "report_statuses": ["partial"]
+  },
+  "pty_fixture": {
+    "sizes": ["80x24", "120x36"],
+    "verified_version": "0.1.51",
+    "escape_reloads_history": true,
+    "terminal_restored": true
+  }
+}
