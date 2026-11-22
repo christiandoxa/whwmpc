@@ -8,14 +8,15 @@
 
 ## Mulai
 
-Gunakan Go 1.27.4 atau ambil arsip Linux amd64/arm64 dari [halaman rilis](https://github.com/christiandoxa/whwmpc/releases) ketika tersedia. Arsip menyertakan checksum. [Panduan distribusi](docs/RELEASE.md)
+Pasang rilis standalone terbaru di Linux amd64 atau arm64. Installer memeriksa SHA-256 arsip dan memasang binari ke `~/.local/bin` tanpa sudo atau Go.
 
 ```sh
-go build ./cmd/whwmpc
-./whwmpc
-./whwmpc --demo
-./whwmpc demo animations
+curl -fsSL https://raw.githubusercontent.com/christiandoxa/whwmpc/main/install.sh | sh
+~/.local/bin/whwmpc
+~/.local/bin/whwmpc --demo
 ```
+
+Jika `~/.local/bin` sudah ada di `PATH`, gunakan `whwmpc` atau `whwmpc demo animations`. Jalankan ulang installer untuk memperbarui binari. Checksum diambil dari rilis GitHub yang sama. [Unduhan manual](https://github.com/christiandoxa/whwmpc/releases/latest) · [Build dari sumber](docs/RELEASE.md)
 
 Coba **“Kenapa PC terasa lambat?”** untuk melihat bukti CPU, RAM, disk, proses, dan daya. **“SSD atau TRIM?”** meminta klarifikasi. **“Rekomendasi”** menanyakan konteks penggunaan dan mengingat pilihan yang kamu simpan.
 
@@ -33,13 +34,13 @@ Demo memakai data fixture dan mengunci tindakan sistem. Di galeri, `m` memilih m
 ## CLI
 
 ```sh
-./whwmpc check --json
-./whwmpc doctor
-./whwmpc trim
-./whwmpc power
-./whwmpc clean --dry-run
-./whwmpc report --format markdown --output pc.md
-./whwmpc history
+whwmpc check --json
+whwmpc doctor
+whwmpc trim
+whwmpc power
+whwmpc clean --dry-run
+whwmpc report --format markdown --output pc.md
+whwmpc history
 ```
 
 `check --json` dan `report --format json` menghasilkan laporan berskema dengan sumber `live` atau `demo`. Laporan menyaring nama pengguna, hostname, serial, label perangkat, path pribadi, dan nama proses. Riwayat menyimpan ringkasan hingga 100 entri. Pilih **Simpan ringkasan** atau gunakan `check --record` jika ingin menyimpan hasil scan. Hasil aksi yang diajukan dicatat otomatis. Laporan tanpa `--output` ditulis ke stdout.
@@ -51,8 +52,8 @@ Status pemeriksaan yang tidak lengkap muncul sebagai data. Exit code **0** berar
 Jalankan aplikasi sebagai user biasa. Preview mencantumkan cakupan, operasi, risiko, privilege, dan expiry. Sesudah konfirmasi Piko menampilkan pemeriksaan ulang, tahap aksi, dan verifikasi. Rencana lama atau target yang berubah perlu ditinjau ulang.
 
 ```sh
-./whwmpc power --plan balanced --write-plan power-plan.json
-./whwmpc apply --file power-plan.json --confirm ID_DARI_PREVIEW
+whwmpc power --plan balanced --write-plan power-plan.json
+whwmpc apply --file power-plan.json --confirm ID_DARI_PREVIEW
 ```
 
 Gunakan `trim --mount /mountpoint`, `trim --enable-timer`, atau `clean --dry-run` dengan `--write-plan` untuk menghasilkan rencana CLI. Setelah operasi konfigurasi yang sah dan terverifikasi, `history` menampilkan ID untuk `restore --action ID --write-plan restore-plan.json`. Pastikan lokasi file yang dipilih privat jika rencana memuat path. [Model tindakan dan batas verifikasi](docs/ACTIONS.md)
