@@ -33,13 +33,31 @@ func firmwarePage(ctx context.Context, m *workflow.Maintenance, req Request) Pag
 		return firmwareVerificationPage(firmware.Outcome(ctx, sysrun.Native{}, target), req.Language)
 	}
 	updates := req.Choice.Kind == "firmware-cache"
-	snap := firmware.Collect(ctx, sysrun.Native{}, updates)
-	page := Page{Availability: snap.Availability, Found: []string{l("Firmware terpasang", "Installed firmware"),
-		fmt.Sprintf("%d · %s", len(snap.Devices), statusNames[snap.Availability].Text(req.Language))}}
-	if updates {
-		page.Found = append(page.Found, l("Katalog lokal", "Cached catalog")+" · "+statusNames[snap.Updates].Text(req.Language))
+	return firmwareInventoryPage(firmware.Collect(ctx, sysrun.Native{}, updates), req.Language, updates, m.Available() == nil)
+}
+
+func firmwareInventoryPage(snap firmware.Snapshot, lang string, updates, canPlan bool) Page {
+	l := translator(lang)
+	status := statusNames[snap.Availability].Text(lang)
+	if snap.Availability == domain.Available {
+		status = fmt.Sprintf("%d · %s", len(snap.Devices), status)
 	}
-	page.Evidence = append(page.Evidence, snap.Detail)
+	page := Page{Availability: snap.Availability, Found: []string{l("Firmware terpasang", "Installed firmware"), status}}
+	page.Snapshot = maintenanceSnapshot(snap.Availability, "firmware", "fwupd inventory", status)
+	if snap.Availability == domain.DependencyMissing {
+		page.Advice = []string{l("Pemeriksaan firmware memerlukan fwupdmgr.", "Firmware checks require fwupdmgr.")}
+		return page
+	}
+	if snap.Availability == domain.Unsupported {
+		page.Advice = []string{l("Pemeriksaan dengan fwupd tersedia di Linux.", "Firmware checks with fwupd are available on Linux.")}
+		return page
+	}
+	if updates && snap.Updates != "" {
+		page.Found = append(page.Found, l("Katalog lokal", "Cached catalog")+" · "+statusNames[snap.Updates].Text(lang))
+	}
+	if snap.Detail != "" {
+		page.Evidence = append(page.Evidence, snap.Detail)
+	}
 	var candidates []Choice
 	for _, d := range snap.Devices {
 		page.Evidence = append(page.Evidence, fmt.Sprintf("%s · %s · %s", d.Name, d.Vendor, d.Version))
@@ -51,11 +69,10 @@ func firmwarePage(ctx context.Context, m *workflow.Maintenance, req Request) Pag
 			candidates = append(candidates, Choice{l("Tinjau", "Review") + " " + domain.SafeText(d.Name) + " " + r.Version, actions.FirmwareUpdate, target})
 		}
 	}
-	if m.Available() == nil {
+	if canPlan {
 		page.Choices = append(page.Choices, candidates...)
 		page.Choices = append(page.Choices, Choice{l("Tinjau refresh LVFS lewat jaringan", "Review online LVFS refresh"), actions.FirmwareRefresh, firmware.LVFS})
 	}
-	page.Snapshot = maintenanceSnapshot(snap.Availability, "firmware", "fwupd inventory", page.Found[1])
 	if !updates {
 		page.Choices = append([]Choice{{l("Cari kandidat di katalog lokal", "Check cached updates"), "firmware-cache", ""}}, page.Choices...)
 	}

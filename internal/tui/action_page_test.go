@@ -118,6 +118,29 @@ func TestFirmwareHandoffOnlyCelebratesVerifiedOutcome(t *testing.T) {
 	}
 }
 
+func TestFirmwareInventoryUnavailableKeepsHonestStatus(t *testing.T) {
+	for _, test := range []struct {
+		status domain.Availability
+		label  string
+		detail string
+	}{
+		{domain.DependencyMissing, "Missing dependency", "fwupdmgr"},
+		{domain.Unsupported, "Unsupported", "Linux"},
+	} {
+		t.Run(string(test.status), func(t *testing.T) {
+			page := firmwareInventoryPage(firmware.Snapshot{Availability: test.status}, "en", true, true)
+			if page.Availability != test.status || len(page.Found) != 2 || page.Found[1] != test.label || len(page.Choices) != 0 ||
+				!strings.Contains(strings.Join(page.Advice, " "), test.detail) || replyPose(page) != mascot.Unknown {
+				t.Fatalf("unexpected unavailable firmware page: %+v", page)
+			}
+		})
+	}
+	page := firmwareInventoryPage(firmware.Snapshot{Availability: domain.Available}, "en", false, true)
+	if page.Found[1] != "0 · Available" || len(page.Choices) != 2 || page.Choices[1].Kind != actions.FirmwareRefresh {
+		t.Fatalf("empty inventory lost a valid refresh choice: %+v", page)
+	}
+}
+
 func TestLongReviewBlocksApplyUntilRead(t *testing.T) {
 	ctx := context.Background()
 	m := New(ctx, platform.Demo{}, nil, Options{Language: "en"})

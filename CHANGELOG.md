@@ -1,8 +1,10 @@
 # Changelog
 
-## Belum dirilis
+## 0.3.5
 
 - Pemeriksaan CPU macOS mempertahankan interval yang selesai sebagai data parsial ketika `top` mencapai batas waktu.
+- Unduhan CAB mengikuti pengalihan LVFS ke `r2.fwupd.org` untuk nama arsip yang sama. Pemeriksaan digest dan tanda tangan tetap berlaku.
+- Layar firmware menjelaskan saat `fwupdmgr` hilang atau platform belum didukung. Jumlah perangkat tampil ketika inventaris berhasil dibaca.
 
 ## 0.3.4
 

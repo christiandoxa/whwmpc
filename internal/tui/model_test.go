@@ -56,11 +56,12 @@ func TestHomeAndQuestionReturn(t *testing.T) {
 		t.Fatal("Back did not restore Home selection")
 	}
 	m = step(m, keyPress("/"))
-	for _, r := range "ssd trim q?d" {
+	const question = "ssd trim q?d"
+	for _, r := range question {
 		m = step(m, keyPress(string(r)))
 	}
-	if m.input.Value() != "ssd trim q?d" {
-		t.Fatal("shortcut intercepted text")
+	if m.input.Value() != question || !strings.Contains(m.View().Content, question) {
+		t.Fatal("typed question was altered or not rendered")
 	}
 	m = step(m, tea.KeyPressMsg{Code: tea.KeyEnter})
 	if m.screen != taskQuestion || len(m.page.Choices) != 2 {

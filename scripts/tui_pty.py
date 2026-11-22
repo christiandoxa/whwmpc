@@ -172,10 +172,11 @@ def smoke(terminal):
     press(terminal, b"\x1b")
     press(terminal, b"/")
     terminal.expect("Apa yang ingin kamu tanyakan?")
-    terminal.key(b"ssd trim q?d")
-    terminal.expect("ssd trim q?d")
-    terminal.key(b"\r")
-    terminal.expect("beberapa kemungkinan.")
+    # Incremental input frames can advance over a blank cell without printing a space.
+    offset = len(terminal.output)
+    terminal.key(b"ssd trim q?d\r")
+    terminal.expect("beberapa kemungkinan.", offset)
+    terminal.expect("Pertanyaan · ssd trim q?d", offset)
 
 
 def main():

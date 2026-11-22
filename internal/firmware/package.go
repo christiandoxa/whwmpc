@@ -9,6 +9,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
+	"path"
 	"slices"
 	"time"
 
@@ -21,15 +23,25 @@ const maxCabinetSize = 128 << 20
 // Download downloads only the official CAB recorded in the plan and hashes its exact bytes.
 func Download(ctx context.Context, release Release, dst io.Writer) error {
 	client := &http.Client{
-		Timeout: 12 * time.Minute,
-		CheckRedirect: func(req *http.Request, via []*http.Request) error {
-			if len(via) > 3 || !officialURI(req.URL.String(), true) {
-				return errors.New("pengalihan unduhan firmware di luar LVFS resmi")
-			}
-			return nil
-		},
+		Timeout:       12 * time.Minute,
+		CheckRedirect: checkCabinetRedirect,
 	}
 	return download(ctx, client, release, dst)
+}
+
+func checkCabinetRedirect(req *http.Request, via []*http.Request) error {
+	if len(via) > 0 && len(via) <= 3 {
+		target := req.URL.String()
+		if officialURI(target, true) {
+			return nil
+		}
+		// LVFS mirrors popular cabinets in its production R2 bucket under the same name.
+		mirror := url.URL{Scheme: "https", Host: "r2.fwupd.org", Path: "/lvfs-prod/" + path.Base(via[0].URL.Path)}
+		if target == mirror.String() {
+			return nil
+		}
+	}
+	return errors.New("pengalihan unduhan firmware di luar LVFS resmi")
 }
 
 func download(ctx context.Context, client *http.Client, release Release, dst io.Writer) error {

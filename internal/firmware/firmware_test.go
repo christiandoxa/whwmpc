@@ -198,6 +198,47 @@ type transport func(*http.Request) (*http.Response, error)
 
 func (f transport) RoundTrip(r *http.Request) (*http.Response, error) { return f(r) }
 
+func TestCabinetRedirectMatchesOfficialMirrorAndName(t *testing.T) {
+	const original = "https://fwupd.org/downloads/example.cab"
+	const mirror = "https://r2.fwupd.org/lvfs-prod/example.cab"
+	if officialURI(mirror, true) {
+		t.Fatal("mirror accepted as the starting URL")
+	}
+	cabinet := []byte("fixture cabinet data")
+	sum := sha256.Sum256(cabinet)
+	release := Release{URL: original, SHA256: hex.EncodeToString(sum[:])}
+	for _, test := range []struct {
+		name, location string
+		allowed        bool
+	}{
+		{"R2 production mirror", mirror, true},
+		{"existing LVFS CDN", testURL, true},
+		{"different cabinet", "https://r2.fwupd.org/lvfs-prod/other.cab", false},
+		{"different bucket", "https://r2.fwupd.org/lvfs-testing/example.cab", false},
+		{"reserved query", mirror + "?download=1", false},
+		{"unrelated host", "https://r2.fwupd.org.invalid/lvfs-prod/example.cab", false},
+		{"plain HTTP", "http://r2.fwupd.org/lvfs-prod/example.cab", false},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			requests := 0
+			client := &http.Client{
+				CheckRedirect: checkCabinetRedirect,
+				Transport: transport(func(req *http.Request) (*http.Response, error) {
+					requests++
+					if req.URL.String() == original {
+						return &http.Response{StatusCode: http.StatusFound, Header: http.Header{"Location": {test.location}}}, nil
+					}
+					return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(bytes.NewReader(cabinet))}, nil
+				}),
+			}
+			err := download(t.Context(), client, release, io.Discard)
+			if test.allowed && (err != nil || requests != 2) || !test.allowed && (err == nil || requests != 1) {
+				t.Fatalf("requests=%d, error=%v", requests, err)
+			}
+		})
+	}
+}
+
 func TestPackageDigestAndTargetBinding(t *testing.T) {
 	ctx := context.Background()
 	cab := []byte("fixture cabinet data")
