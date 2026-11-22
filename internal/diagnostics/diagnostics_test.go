@@ -70,6 +70,17 @@ func hasAction(f Finding, kind, target string) bool {
 	return slices.ContainsFunc(f.Actions, func(a Action) bool { return a.Kind == kind && a.Target == target })
 }
 
+func TestTemperatureUsesItsOwnSampleTime(t *testing.T) {
+	a := Analyzer{Now: fixtureTime, Language: "en"}
+	o := domain.Overview{OS: "linux", CapturedAt: fixtureTime.Add(-time.Minute), Temperature: domain.Temperature{
+		Availability: domain.Available, Celsius: new(54.0), CapturedAt: fixtureTime,
+	}}
+	f := byID(t, a.Overview(o), "overview.temperature")
+	if !f.At.Equal(fixtureTime) || f.Availability != domain.Available || !strings.Contains(f.Observation, "54 °C") {
+		t.Fatalf("fresh temperature reused the earlier overview time: %+v", f)
+	}
+}
+
 func TestOverviewCorrelatesPressureAcrossSamples(t *testing.T) {
 	o := overviewFixture()
 	a := Analyzer{Now: fixtureTime, Language: "en"}

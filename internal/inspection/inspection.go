@@ -49,6 +49,9 @@ func (s *Scanner) withTemperature(ctx context.Context, o domain.Overview) domain
 func (s *Scanner) PrivilegedTemperature(ctx context.Context) (domain.Temperature, bool) {
 	var reading domain.Temperature
 	ok := s.read(ctx, privread.Temperature, &reading)
+	if ok && reading.Celsius != nil && reading.CapturedAt.IsZero() {
+		reading.CapturedAt = s.Now()
+	}
 	return reading, ok
 }
 

@@ -32,7 +32,7 @@ func (Native) CPUTemperatureProbe() func(context.Context) *float64 {
 }
 
 func (Native) Temperature() domain.Temperature {
-	return (linuxProvider{fs: os.DirFS("/")}).temperature()
+	return (linuxProvider{fs: os.DirFS("/"), now: time.Now}).temperature()
 }
 
 type linuxProvider struct {
@@ -335,6 +335,9 @@ func (p linuxProvider) readTemperatures(inputs []temperatureInput, requireAll bo
 		if got.Celsius == nil || reading > *got.Celsius {
 			got = domain.Temperature{Availability: domain.Available, Celsius: &reading, Source: input.source}
 		}
+	}
+	if got.Celsius != nil && p.now != nil {
+		got.CapturedAt = p.now().UTC()
 	}
 	return got
 }

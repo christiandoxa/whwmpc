@@ -856,9 +856,6 @@ func (m Model) stalePage() bool {
 			}
 		}
 	}
-	if stamp.IsZero() {
-		return false
-	}
 	var age time.Duration
 	switch m.active {
 	case assistant.Overview, assistant.Slow:
@@ -870,5 +867,26 @@ func (m Model) stalePage() bool {
 	case assistant.Trim:
 		age = 15 * time.Minute
 	}
-	return age != 0 && m.now().Sub(stamp) > age
+	if m.screen == detail && m.page.Snapshot != nil {
+		in := m.page.Snapshot.Input
+		switch m.component {
+		case "ssd":
+			if in.SMART != nil {
+				stamp, age = in.SMART.CapturedAt, 30*time.Minute
+			}
+		case "trim":
+			if in.Trim != nil {
+				stamp, age = in.Trim.CapturedAt, 15*time.Minute
+			}
+		case "power", "recommendation":
+			if in.Power != nil {
+				stamp, age = in.Power.At, time.Minute
+			}
+		case "temperature":
+			if in.Overview != nil && !in.Overview.Temperature.CapturedAt.IsZero() {
+				stamp = in.Overview.Temperature.CapturedAt
+			}
+		}
+	}
+	return !stamp.IsZero() && age != 0 && m.now().Sub(stamp) > age
 }

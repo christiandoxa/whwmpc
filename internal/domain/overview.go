@@ -51,6 +51,7 @@ type Temperature struct {
 	Availability Availability `json:"availability"`
 	Celsius      *float64     `json:"celsius,omitempty"`
 	Source       string       `json:"source,omitempty"`
+	CapturedAt   time.Time    `json:"captured_at,omitzero"`
 }
 
 type Process struct {

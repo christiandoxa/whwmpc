@@ -107,7 +107,7 @@ func projectOverview(o domain.Overview, private map[string]bool) *domain.Overvie
 		Memory: domain.Memory{Availability: availability(o.Memory.Availability), TotalBytes: o.Memory.TotalBytes,
 			FreeBytes: o.Memory.FreeBytes, SwapStatus: availability(o.Memory.SwapStatus), SwapBytes: o.Memory.SwapBytes, SwapUsed: o.Memory.SwapUsed, Use: percent(o.Memory.Use)},
 		DiskStatus: availability(o.DiskStatus),
-		Temperature: domain.Temperature{Availability: availability(o.Temperature.Availability), Celsius: numeric(o.Temperature.Celsius, -30, 150),
+		Temperature: domain.Temperature{Availability: availability(o.Temperature.Availability), Celsius: numeric(o.Temperature.Celsius, -30, 150), CapturedAt: o.Temperature.CapturedAt.UTC(),
 			Source: allowed(o.Temperature.Source, "coretemp", "k10temp", "zenpower", "k8temp", "cpu_thermal", "x86_pkg_temp", "soc_thermal")},
 		PowerStatus: availability(o.PowerStatus), OnAC: o.OnAC, Battery: numeric(o.Battery, 0, 100),
 		ProcessStatus: availability(o.ProcessStatus),

@@ -3,12 +3,30 @@
 package platform
 
 import (
+	"context"
 	"os"
 	"runtime"
 	"testing"
+	"time"
 
 	"github.com/christiandoxa/whwmpc/internal/domain"
 )
+
+func TestNativeObservationWindow(t *testing.T) {
+	if os.Getenv("WHWMPC_TEST_NATIVE") != "1" {
+		t.Skip("native CI explicitly requests live read-only telemetry")
+	}
+	ctx, cancel := context.WithTimeout(t.Context(), 25*time.Second)
+	defer cancel()
+	start := time.Now()
+	o := (Native{}).Observe(ctx, 4*time.Second)
+	elapsed := time.Since(start)
+	if ctx.Err() != nil || elapsed < 11500*time.Millisecond || len(o.CPU.Samples) < 2 || len(o.Memory.Use.Samples) < 2 {
+		t.Fatalf("native observation elapsed=%s CPU=%d RAM=%d cancellation=%v", elapsed, len(o.CPU.Samples), len(o.Memory.Use.Samples), ctx.Err())
+	}
+	t.Logf("%s/%s read-only observation elapsed=%s CPU=%d RAM=%d processes=%d power=%s",
+		o.OS, o.Arch, elapsed.Round(time.Millisecond), len(o.CPU.Samples), len(o.Memory.Use.Samples), len(o.Processes), o.PowerStatus)
+}
 
 func TestNativeOverview(t *testing.T) {
 	if os.Getenv("WHWMPC_TEST_NATIVE") != "1" {

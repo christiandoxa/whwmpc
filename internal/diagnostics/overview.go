@@ -172,8 +172,15 @@ func (a Analyzer) disks(o domain.Overview) []Finding {
 }
 
 func (a Analyzer) cpuTemperature(o domain.Overview) Finding {
-	f := finding("overview.temperature", "temperature", "Linux hwmon / thermal zones", o.CapturedAt,
-		a.status(o.Temperature.Availability, o.CapturedAt, overviewAge))
+	at := o.Temperature.CapturedAt
+	if at.IsZero() {
+		at = o.CapturedAt
+	}
+	source := ""
+	if o.OS == "linux" {
+		source = "Linux hwmon / thermal zones"
+	}
+	f := finding("overview.temperature", "temperature", source, at, a.status(o.Temperature.Availability, at, overviewAge))
 	component := a.text("Suhu CPU", "CPU temperature")
 	if !usable(f.Availability) {
 		return a.unavailable(f, component)

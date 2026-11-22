@@ -72,7 +72,7 @@ func (Demo) Overview(context.Context) domain.Overview {
 			CapturedAt: DemoTime, Samples: []float64{54, 55, 56}}}
 	o.Disks = []domain.Disk{{Mount: "/", Root: true, FSType: "ext4", Availability: domain.Available,
 		TotalBytes: 512 << 30, FreeBytes: 148 << 30, UsedPercent: 71}}
-	o.Temperature = domain.Temperature{Availability: domain.Available, Celsius: &temp, Source: "coretemp"}
+	o.Temperature = domain.Temperature{Availability: domain.Available, Celsius: &temp, Source: "coretemp", CapturedAt: DemoTime}
 	o.OnAC, o.Battery = &ac, &battery
 	o.Processes = []domain.Process{
 		{Name: "build-worker", CPU: 14, RSS: 720 << 20},
