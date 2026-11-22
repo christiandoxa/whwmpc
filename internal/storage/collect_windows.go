@@ -3,6 +3,7 @@ package storage
 import (
 	"context"
 	"errors"
+	"fmt"
 	"path/filepath"
 	"time"
 
@@ -12,6 +13,7 @@ import (
 )
 
 // Static, local inspection through the system's Storage module. No device-supplied string enters the command.
+// The selection limit matches windowsSMARTDriveLimit.
 const windowsStorageRead = `
 [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)
 $ErrorActionPreference = 'Stop'
@@ -75,8 +77,14 @@ func (c Collector) InspectSMART(ctx context.Context) SMARTAudit {
 	audit.Drives, err = parseWindowsSMART(result.Output, audit.CapturedAt)
 	if err != nil {
 		audit.Availability = domain.Error
-	} else {
-		audit.Availability = nativeDriveStatus(audit.Drives)
+		return audit
+	}
+	audit.Availability = nativeDriveStatus(audit.Drives)
+	if len(audit.Drives) == windowsSMARTDriveLimit {
+		if audit.Availability == domain.Available {
+			audit.Availability = domain.Partial
+		}
+		audit.Detail = fmt.Sprintf("Pemeriksaan mencapai batas %d drive. Jumlah drive yang terlihat mungkin lebih besar.", windowsSMARTDriveLimit)
 	}
 	return audit
 }

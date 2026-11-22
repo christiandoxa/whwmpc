@@ -226,3 +226,7 @@ Tes regresi telemetry Windows memakai snapshot proses native, membatalkan contex
 ## Validasi rentang clock AMDGPU
 
 Fixture SMU 13.0.7 mereproduksi preview clock pada rentang teks 500–3000 MHz dengan minimum Fmax driver 2000 MHz. Versi sebelum guard menerima preview 1000 MHz meski driver akan menolak nilai tersebut. Guard baru menolak preview sebelum penulisan dan mempertahankan kontrol voltase dengan batasnya sendiri. Pada Renoir fisik MP1 12.0.0, preview 1900 → 1899 MHz tetap tersedia. Mode auto dan tabel OverDrive tetap sama sesudah preview baca-saja. [Matriks AMDGPU](HARDWARE.md)
+
+## Cakupan inventaris storage Windows
+
+Fixture respons Storage berisi 65 drive mereproduksi galat yang sebelumnya menyembunyikan seluruh health dan counter. Audit sekarang mempertahankan 65 record, termasuk status `unhealthy` dan tujuh galat baca tak terkoreksi pada record terakhir, serta melaporkan cakupan parsial. Parser menguji batas 64, 65, dan 66 record. [Provider native](NATIVE.md)

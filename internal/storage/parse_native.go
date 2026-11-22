@@ -186,10 +186,12 @@ type windowsDisk struct {
 	Counters      *windowsReliability `json:"counters"`
 }
 
+const windowsSMARTDriveLimit = 65
+
 func parseWindowsSMART(data []byte, now time.Time) ([]Drive, error) {
 	data = bytes.TrimPrefix(bytes.TrimSpace(data), []byte{0xef, 0xbb, 0xbf})
 	var rows []windowsDisk
-	if err := json.Unmarshal(data, &rows); err != nil || rows == nil || len(rows) > 64 {
+	if err := json.Unmarshal(data, &rows); err != nil || rows == nil || len(rows) > windowsSMARTDriveLimit {
 		return nil, errors.New("invalid Windows storage response")
 	}
 	buses := map[uint16]string{1: "SCSI", 3: "ATA", 7: "USB", 8: "RAID", 10: "SAS", 11: "SATA", 15: "Virtual", 16: "Storage Spaces", 17: "NVMe"}

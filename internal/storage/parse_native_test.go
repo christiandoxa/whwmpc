@@ -43,6 +43,28 @@ func TestNativeStorageParsers(t *testing.T) {
 	}
 }
 
+func windowsSMARTFixture(count int) []byte {
+	const healthy = `{"health":0,"counterStatus":"available","counters":{"read":0}}`
+	const unhealthy = `{"health":2,"counterStatus":"available","counters":{"read":7}}`
+	return []byte("[" + strings.Repeat(healthy+",", count-1) + unhealthy + "]")
+}
+
+func TestWindowsSMARTInventoryLimit(t *testing.T) {
+	for _, count := range []int{windowsSMARTDriveLimit - 1, windowsSMARTDriveLimit} {
+		drives, err := parseWindowsSMART(windowsSMARTFixture(count), time.Now())
+		if err != nil || len(drives) != count {
+			t.Fatalf("%d valid records returned %d drives, error %v", count, len(drives), err)
+		}
+		last := drives[len(drives)-1]
+		if last.HealthStatus != "unhealthy" || last.Health == nil || last.Health.ReadErrorsUncorrected != "7" {
+			t.Fatalf("last drive measurement lost: %+v", last)
+		}
+	}
+	if drives, err := parseWindowsSMART(windowsSMARTFixture(windowsSMARTDriveLimit+1), time.Now()); err == nil || len(drives) != 0 {
+		t.Fatalf("accepted %d records beyond the collector limit", len(drives))
+	}
+}
+
 func TestNativeTrimIsOnlyPolicy(t *testing.T) {
 	got := parseWindowsTrim("NTFS DisableDeleteNotify = 0  (Disabled)\r\nReFS DisableDeleteNotify = 1  (Enabled)\r\n")
 	if len(got) != 2 || !got[0].Enabled || got[1].Enabled {

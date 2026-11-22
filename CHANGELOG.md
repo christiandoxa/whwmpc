@@ -3,6 +3,7 @@
 ## Unreleased
 
 - Rencana baru untuk batas clock AMDGPU memerlukan rentang yang terverifikasi untuk slot maksimum. Driver yang memakai batas minimum terpisah dapat tetap menyediakan metrik dan kontrol voltase yang valid.
+- Audit storage Windows mempertahankan health dan counter yang sudah terbaca saat inventaris mencapai batas 65 drive, dengan cakupan parsial.
 
 ## 0.3.8
 
