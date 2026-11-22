@@ -7,7 +7,7 @@ if [[ ${GITHUB_ACTIONS:-} != true || ${RUNNER_ENVIRONMENT:-} != github-hosted ||
 fi
 
 source_binary=$(realpath -- "${1:?pass the built whwmpc executable}")
-fixture=$(mktemp -d "${RUNNER_TEMP:?}/whwmpc-daemon.XXXXXXXX")
+fixture=$(mktemp -d /tmp/whwmpc-daemon.XXXXXXXX)
 nonce=${fixture##*.}
 account="whwmpc-${nonce,,}"
 fixture_home="$fixture/home"
@@ -25,6 +25,7 @@ cleanup() {
 trap cleanup EXIT
 
 sudo install -o "$account" -m 0755 "$source_binary" "$binary"
+sudo -u "$account" "$binary" --version
 uid_dir="/run/user/$account_uid"
 sudo systemctl start "$manager"
 for _ in {1..40}; do
