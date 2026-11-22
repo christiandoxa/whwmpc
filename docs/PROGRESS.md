@@ -217,9 +217,11 @@ Apache License 2.0 dan hak cipta 2026 Christian Doxa Hamasiah terpasang di repos
 
 ## Installer Windows
 
-`install.ps1` memilih paket amd64 atau arm64, memverifikasi SHA-256, dan mendukung upgrade atau pemilihan tag tanpa Administrator. Workflow native memasang rilis publik pada Windows x64 dan ARM64 dengan Windows PowerShell dan PowerShell 7, lalu memeriksa bahwa checksum salah mempertahankan executable yang sudah terpasang. [Panduan instalasi](../README.md#windows)
+`install.ps1` dari `9248960` memilih paket amd64 atau arm64, memverifikasi SHA-256, dan mendukung upgrade atau pemilihan tag tanpa Administrator. Windows PowerShell 5.1 dan PowerShell 7 lulus instalasi `v0.3.6` serta upgrade ke `v0.3.8` pada runner Windows x64 dan ARM64. Checksum salah mempertahankan executable yang sudah terpasang. [Panduan instalasi](../README.md#windows) · [CI installer](https://github.com/christiandoxa/whwmpc/actions/runs/45031573263)
 
 Tes regresi telemetry Windows memakai snapshot proses native, membatalkan context pada awal interval sampling, dan memastikan daftar proses kosong dengan status `unknown`. CPU proses baru dihitung bila snapshot pembanding benar-benar diambil. [Provider native](NATIVE.md)
+
+`v0.3.8` terbit dari `bad320e` setelah enam uji paket searsitektur. Manifest SHA-256 rilis publik, artefak GitHub Actions, dan build lokal identik. Keenam paket memuat teks lisensi dan atribusi proyek. Binari Linux amd64 lulus PTY 80×24 dan 120×36. `install.sh` publik lulus upgrade `v0.1.0` → `v0.3.8` sebagai pengguna biasa di lingkungan Linux amd64 terisolasi. Pemeriksaan modul dan govulncheck lulus. [Rilis](https://github.com/christiandoxa/whwmpc/releases/tag/v0.3.8) · [Workflow rilis](https://github.com/christiandoxa/whwmpc/actions/runs/45030845144) · [CI](https://github.com/christiandoxa/whwmpc/actions/runs/45030460021) · [CI native](https://github.com/christiandoxa/whwmpc/actions/runs/45030460078)
 
 ## Validasi rentang clock AMDGPU
 
