@@ -64,3 +64,5 @@
 Checkpoint awal di `main` mencakup `db4f687` (fondasi), `01f01ca` (asisten), `a5f0342` (motion), `854f9b3` (collector), `675c36b` (diagnostik), `8a478ab` (tindakan), dan `038667f` (laporan).
 
 Audit akhir menguji pembatas subprocess dengan keluaran yang melampaui kuota pada stdout dan stderr. Buffer penyimpanan memakai field bernama agar fast path `io.Copy` tidak melewati pembatas.
+
+Pemeriksaan ulang overview melalui pilihan tindakan dan tombol `r` memakai jalur yang sama. Esc menghentikan scan dan mempertahankan snapshot terakhir. Diagnosis lambat mengambil sampel baru saat diminta ulang.

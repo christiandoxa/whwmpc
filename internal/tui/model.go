@@ -170,10 +170,21 @@ func (m Model) Init() tea.Cmd {
 	return tea.Batch(m.sample(), m.nextRefresh())
 }
 
-func (m Model) sample() tea.Cmd {
-	return func() tea.Msg {
-		return overviewMsg{m.source.Overview(m.ctx)}
+func (m Model) sample() tea.Cmd { return m.sampleWith(m.ctx) }
+
+func (m Model) sampleWith(ctx context.Context) tea.Cmd {
+	return func() tea.Msg { return overviewMsg{m.source.Overview(ctx)} }
+}
+
+func (m *Model) rescanOverview() tea.Cmd {
+	if m.busy || m.refreshing {
+		return nil
 	}
+	ctx, cancel := context.WithCancel(m.ctx)
+	m.cancelJob, m.busy = cancel, true
+	m.activity = mascot.Scanning
+	m.show(m.activity, "", true)
+	return m.sampleWith(ctx)
 }
 
 func (m Model) nextRefresh() tea.Cmd {
@@ -248,6 +259,9 @@ func (m *Model) start(intent assistant.Intent, choice Choice) tea.Cmd {
 	if i := slices.Index(assistant.Menu, intent); i >= 0 {
 		m.selected = i
 	}
+	if choice.Kind == "rescan" && intent == assistant.Overview {
+		return m.rescanOverview()
+	}
 	if choice.Kind == "" && intent == assistant.Overview {
 		m.page = m.overviewFindingPage(m.overview)
 		m.showReply()
@@ -286,6 +300,24 @@ func (m *Model) start(intent assistant.Intent, choice Choice) tea.Cmd {
 func (m *Model) updateOverview(data domain.Overview) tea.Cmd {
 	wasInitial := m.overview.CapturedAt.IsZero()
 	wasRefreshing := m.refreshing
+	if !wasRefreshing && m.cancelJob != nil {
+		m.cancelJob()
+		m.cancelJob = nil
+		if m.cancelling {
+			m.busy, m.cancelling, m.workName, m.queued = false, false, "", ""
+			if m.quitPending {
+				return m.quit()
+			}
+			m.page = Page{
+				Availability: domain.Unknown, Pose: mascot.Cancelled,
+				Found:   []string{m.tr(Words{"Pemeriksaan dihentikan. Kartu masih memakai sampel terakhir.", "Scan stopped. Cards still show the previous sample."})},
+				Choices: []Choice{{Label: m.tr(Words{"Periksa ulang", "Scan again"}), Kind: "rescan"}},
+			}
+			m.scroll, m.choice = 0, 0
+			m.showReply()
+			return nil
+		}
+	}
 	m.overview, m.refreshing = data, false
 	if wasRefreshing {
 		if m.active == assistant.Overview && !m.busy && m.page.Availability != domain.Unknown {
@@ -498,16 +530,18 @@ func (m *Model) key(msg tea.KeyPressMsg) tea.Cmd {
 			return m.start(m.active, Choice{Kind: "save-scan"})
 		}
 	case "r":
-		if m.active == assistant.Overview && !m.busy && !m.refreshing {
-			m.busy = true
-			m.activity = mascot.Scanning
-			m.show(m.activity, "", true)
-			return m.sample()
+		if m.options.Gallery {
+			m.show(m.visual.pose, "", false)
+			return nil
 		}
-		if m.active == assistant.Storage {
+		switch m.active {
+		case assistant.Overview:
+			return m.rescanOverview()
+		case assistant.Slow, assistant.Storage, assistant.Trim, assistant.Power:
 			return m.start(m.active, Choice{Kind: "rescan"})
+		default:
+			return m.start(m.active, Choice{})
 		}
-		return m.start(m.active, Choice{})
 	case "up", "k", "down", "j", "pgup", "pgdown":
 		step := 1
 		if msg.String() == "up" || msg.String() == "k" || msg.String() == "pgup" {

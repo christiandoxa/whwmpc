@@ -171,3 +171,24 @@ func TestStalePageShowsAgeWithoutChangingData(t *testing.T) {
 		t.Fatal("actual measurement was changed to animate its age")
 	}
 }
+
+func TestOverviewChoiceRescansAndCanCancel(t *testing.T) {
+	ctx := context.Background()
+	provider := platform.Demo{}
+	m := New(ctx, provider, nil, Options{Demo: true, Motion: "off"})
+	m = step(m, overviewMsg{provider.Overview(ctx)})
+	m.focus = pageFocus
+	if len(m.page.Choices) == 0 || m.page.Choices[0].Kind != "rescan" {
+		t.Fatal("overview has no displayed rescan")
+	}
+	updated, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	m = updated.(Model)
+	if cmd == nil || !m.busy || m.cancelJob == nil {
+		t.Fatal("overview Enter did not start a cancellable scan")
+	}
+	m = step(m, tea.KeyPressMsg{Code: tea.KeyEsc})
+	m = step(m, cmd())
+	if m.busy || m.page.Pose != mascot.Cancelled {
+		t.Fatal("overview cancellation was not reported")
+	}
+}

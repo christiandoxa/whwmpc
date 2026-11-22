@@ -6,6 +6,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/christiandoxa/whwmpc/internal/actions"
 	"github.com/christiandoxa/whwmpc/internal/assistant"
@@ -60,7 +61,13 @@ func Inspector(scanner *inspection.Scanner, store state.Store, maintenance *work
 		case assistant.Cleanup:
 			return cleanupPage(ctx, maintenance, req.Language)
 		case assistant.Slow:
-			return withFindings(overviewPage(req.Overview, req.Language), a.Slow(req.Overview, scanner.Power(ctx)), req.Language)
+			o := req.Overview
+			if req.Choice.Kind == "rescan" || o.CapturedAt.IsZero() || a.Now.Sub(o.CapturedAt) > 15*time.Second {
+				o = scanner.Overview(ctx)
+			}
+			p := scanner.Power(ctx)
+			a.Now = scanner.Now()
+			return withFindings(overviewPage(o, req.Language), a.Slow(o, p), req.Language)
 		case assistant.Recommend:
 			workload := req.Workload
 			if req.Choice.Kind == "context" {
