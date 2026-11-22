@@ -60,7 +60,7 @@ func (m Model) split() (nav, session, evidence int) {
 	if w < 74 || h < 22 {
 		return 0, max(1, w), 0
 	}
-	nav = 25
+	nav = 26
 	if w >= 102 {
 		evidence = min(32, w/4)
 	}
@@ -175,6 +175,9 @@ func (m Model) header(w int) []string {
 	if !m.overview.CapturedAt.IsZero() {
 		status += "  " + m.palette.muted.Render(m.overview.CapturedAt.Format("15:04:05"))
 	}
+	if m.critical {
+		status = m.palette.alert.Render(m.tr(Words{"KRITIS", "CRITICAL"})) + "  " + status
+	}
 	sub := m.palette.muted.Render(m.tr(copy.tagline))
 	if m.options.Demo {
 		sub = m.palette.secondary.Render(m.tr(copy.demo))
@@ -212,11 +215,11 @@ func (m Model) cards(w int) string {
 	cpuTrail := m.spark(m.overview.CPU.Samples)
 	memTrail := m.tr(copy.missing)
 	if m.overview.Memory.Availability == domain.Available {
-		memTrail = fmt.Sprintf("%s / %s", bytesText(m.overview.Memory.TotalBytes-m.overview.Memory.FreeBytes), bytesText(m.overview.Memory.TotalBytes))
+		memTrail = m.tr(Words{"total", "total"}) + " " + bytesText(m.overview.Memory.TotalBytes)
 	}
 	diskTrail := m.tr(copy.missing)
 	if diskOK {
-		diskTrail = fmt.Sprintf("%s %s", bytesText(disk.FreeBytes), m.tr(Words{"tersedia", "free"}))
+		diskTrail = fmt.Sprintf("%s %s", bytesText(disk.FreeBytes), m.tr(Words{"bebas", "free"}))
 	}
 	labels := []string{"CPU", m.tr(copy.memory), m.tr(copy.disk), m.tr(copy.temp)}
 	values := []string{percent(cpu, cpuOK), percent(mem, memOK), percent(disk.UsedPercent, diskOK), temp}
@@ -385,6 +388,9 @@ func (m Model) sessionLines(w int) []string {
 		}
 		if m.busy && m.page.Availability == "" {
 			add(m.palette.secondary.Render(displayStage(m.activity, m.options.Language)))
+		}
+		if m.page.Priority != "" {
+			add(m.palette.alert.Render(domain.SafeText(m.page.Priority)))
 		}
 		section(copy.found, m.page.Found)
 		section(copy.meaning, m.page.Meaning)

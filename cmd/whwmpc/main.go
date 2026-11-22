@@ -12,6 +12,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/term"
 
+	"github.com/christiandoxa/whwmpc/internal/assistant"
 	"github.com/christiandoxa/whwmpc/internal/inspection"
 	"github.com/christiandoxa/whwmpc/internal/state"
 	"github.com/christiandoxa/whwmpc/internal/tui"
@@ -103,7 +104,7 @@ func run(ctx context.Context, args []string, stdin *os.File, stdout *os.File, st
 		return 0
 	}
 	store, err := state.Default()
-	if err == nil && !options.Gallery {
+	if err == nil && !options.Demo {
 		if options.Motion == "" {
 			saved, err := store.Preference("motion")
 			if err != nil {
@@ -112,10 +113,13 @@ func run(ctx context.Context, args []string, stdin *os.File, stdout *os.File, st
 			options.Motion = motion.Mode(saved)
 		}
 		options.SaveMotion = func(mode motion.Mode) error { return store.SetPreference("motion", string(mode)) }
+		if saved, err := store.Preference("workload"); err == nil {
+			options.Workload = assistant.Context(saved)
+		}
 	}
 	scheduler := motion.NewScheduler()
 	options.Scheduler = scheduler
-	p := tea.NewProgram(tui.New(ctx, source, tui.Inspector(source), options), tea.WithContext(ctx), tea.WithInput(stdin), tea.WithOutput(stdout))
+	p := tea.NewProgram(tui.New(ctx, source, tui.Inspector(source, store, options.Demo), options), tea.WithContext(ctx), tea.WithInput(stdin), tea.WithOutput(stdout))
 	motionCtx, stopMotion := context.WithCancel(ctx)
 	defer stopMotion()
 	go scheduler.Run(motionCtx, func(tick motion.Tick) { p.Send(tick) })

@@ -3,31 +3,113 @@ package tui
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/christiandoxa/whwmpc/internal/assistant"
+	"github.com/christiandoxa/whwmpc/internal/diagnostics"
 	"github.com/christiandoxa/whwmpc/internal/domain"
 	"github.com/christiandoxa/whwmpc/internal/inspection"
 	"github.com/christiandoxa/whwmpc/internal/power"
+	"github.com/christiandoxa/whwmpc/internal/state"
 	"github.com/christiandoxa/whwmpc/internal/storage"
 	"github.com/christiandoxa/whwmpc/internal/tui/mascot"
 )
 
-func Inspector(scanner *inspection.Scanner) Inspect {
+func Inspector(scanner *inspection.Scanner, store state.Store, demo bool) Inspect {
 	return func(ctx context.Context, req Request) Page {
+		a := diagnostics.Analyzer{Language: req.Language, Now: scanner.Now()}
 		switch req.Intent {
 		case assistant.Storage:
-			return storagePage(scanner.SMART(ctx, req.Choice.Kind == "rescan"), req.Language)
+			snapshot := scanner.SMART(ctx, req.Choice.Kind == "rescan")
+			return withFindings(storagePage(snapshot, req.Language), a.SMART(snapshot), req.Language)
 		case assistant.Trim:
-			return trimPage(scanner.TRIM(ctx), req.Language)
+			snapshot := scanner.TRIM(ctx)
+			return withFindings(trimPage(snapshot, req.Language), a.TRIM(snapshot), req.Language)
 		case assistant.Power:
-			return powerPage(scanner.Power(ctx), req.Language)
+			snapshot := scanner.Power(ctx)
+			return withFindings(powerPage(snapshot, req.Language), a.Power(snapshot), req.Language)
 		case assistant.Slow:
-			return overviewPage(req.Overview, req.Language)
+			return withFindings(overviewPage(req.Overview, req.Language), a.Slow(req.Overview, scanner.Power(ctx)), req.Language)
+		case assistant.Recommend:
+			workload := req.Workload
+			if req.Choice.Kind == "context" {
+				workload = ""
+			}
+			var snapshot power.Snapshot
+			if slices.Contains(assistant.Workloads, workload) {
+				snapshot = scanner.Power(ctx)
+			}
+			page := withFindings(Page{}, a.Recommend(req.Overview, snapshot, workload), req.Language)
+			l := translator(req.Language)
+			if workload != "" {
+				page.Choices = append(page.Choices, Choice{Label: l("Ubah konteks", "Change context"), Kind: "context"})
+			}
+			if req.Choice.Kind == "workload" && !demo && workload != "" {
+				if err := store.SetPreference("workload", string(workload)); err != nil {
+					page.Advice = append(page.Advice, l("Preferensi hanya tersimpan untuk sesi ini.", "Preference is available for this session only."))
+				}
+			}
+			return page
 		default:
 			return Page{Availability: domain.Unsupported, Found: []string{copy.needsData.Text(req.Language)}}
 		}
 	}
+}
+
+func withFindings(page Page, findings []diagnostics.Finding, lang string) Page {
+	l := translator(lang)
+	page.Findings = findings
+	base := page.Found
+	evidence := page.Evidence
+	page.Found, page.Meaning, page.Advice, page.Evidence = nil, nil, nil, nil
+	if page.Availability == "" && len(findings) > 0 {
+		page.Availability = findings[0].Availability
+	}
+	for i, f := range findings {
+		label := statusNames[f.Availability].Text(lang)
+		switch f.Severity {
+		case diagnostics.Critical:
+			label = l("Kritis", "Critical") + " · " + label
+			page.Pose = mascot.Critical
+		case diagnostics.Warning:
+			label = l("Peringatan", "Warning") + " · " + label
+			if page.Pose != mascot.Critical {
+				page.Pose = mascot.Warning
+			}
+		}
+		if i < 2 {
+			page.Found = append(page.Found, "["+label+"] "+f.Observation)
+			page.Meaning = append(page.Meaning, f.Meaning)
+			page.Advice = append(page.Advice, f.Recommendation)
+		}
+		page.Evidence = append(page.Evidence, f.ID+" · "+label, f.Observation, f.Meaning, f.Recommendation,
+			l("Batas", "Limits")+" · "+f.Limits, f.Source+" · "+f.At.Format("2006-01-02 15:04 MST"))
+		for _, action := range f.Actions {
+			switch action.Kind {
+			case "navigate", "workload", "rescan":
+				page.Choices = appendChoice(page.Choices, Choice{Label: action.Label, Kind: action.Kind, Value: action.Target})
+			}
+		}
+	}
+	if len(findings) > 0 {
+		page.Evidence = append(page.Evidence, base...)
+	}
+	page.Evidence = append(page.Evidence, evidence...)
+	if len(findings) == 0 {
+		page.Found = base
+	}
+	if page.Pose == mascot.Critical && len(page.Advice) > 0 {
+		page.Priority = page.Advice[0]
+	}
+	return page
+}
+
+func appendChoice(choices []Choice, next Choice) []Choice {
+	if slices.ContainsFunc(choices, func(c Choice) bool { return c.Kind == next.Kind && c.Value == next.Value }) {
+		return choices
+	}
+	return append(choices, next)
 }
 
 func storagePage(audit storage.SMARTAudit, lang string) Page {

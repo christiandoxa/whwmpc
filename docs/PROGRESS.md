@@ -29,3 +29,10 @@
 - Probe baca-saja di Linux amd64 dengan smartctl 7.4, systemd 255, dan util-linux 2.39.3 menemukan SMART perlu izin, CPUFreq dan PPD tersedia, serta bukti timer/jurnal TRIM. Driver PPD yang terdeteksi ialah `fake`.
 - Gate snapshot mencakup gofmt, vet, test, race, build, dan smoke CLI demo. Fixture mencakup parser dan kondisi yang tidak tersedia.
 - Berikutnya temuan berbasis aturan, rekomendasi berdasarkan konteks, dan tindakan terikat preview.
+
+## 4 · Temuan dan rekomendasi
+
+- Aturan deterministik memisahkan ketersediaan, severity, bukti, interpretasi, batas, dan saran. Diagnosis lambat memakai beberapa sampel; SMART kritis mendahulukan backup. Temuan dan detail sumber tampil di asisten.
+- Preferensi penggunaan bisa dipilih dengan keyboard atau input bebas, dipakai ulang, dan diubah di Rekomendasi. Demo memakai timestamp fixture dan preferensi sesi.
+- Gate lokal mencakup gofmt, vet, test, race, build, serta fixture sehat, kritis, konflik, baterai/AC, unknown dan stale.
+- Berikutnya preview tindakan, revalidasi, eksekusi dengan autentikasi OS, dan hasil terverifikasi.

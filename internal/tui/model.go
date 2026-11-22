@@ -12,6 +12,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/christiandoxa/whwmpc/internal/assistant"
+	"github.com/christiandoxa/whwmpc/internal/diagnostics"
 	"github.com/christiandoxa/whwmpc/internal/domain"
 	"github.com/christiandoxa/whwmpc/internal/platform"
 	"github.com/christiandoxa/whwmpc/internal/tui/mascot"
@@ -24,6 +25,7 @@ type Options struct {
 	Motion               motion.Mode
 	Scheduler            *motion.Scheduler
 	SaveMotion           func(motion.Mode) error
+	Workload             assistant.Workload
 }
 
 type Choice struct {
@@ -35,6 +37,8 @@ type Choice struct {
 type Page struct {
 	Availability     domain.Availability
 	Pose             mascot.Pose
+	Findings         []diagnostics.Finding
+	Priority         string
 	Found, Meaning   []string
 	Advice, Evidence []string
 	Choices          []Choice
@@ -44,6 +48,7 @@ type Request struct {
 	Intent   assistant.Intent
 	Choice   Choice
 	Overview domain.Overview
+	Workload assistant.Workload
 	Language string
 }
 
@@ -92,6 +97,7 @@ type Model struct {
 	narrow        bool
 	motionSaving  bool
 	motionPending motion.Mode
+	critical      bool
 }
 
 func New(ctx context.Context, source platform.Provider, inspect Inspect, opts Options) Model {
@@ -188,12 +194,12 @@ func (m *Model) start(intent assistant.Intent, choice Choice) tea.Cmd {
 		m.selected = i
 	}
 	if choice.Kind == "" && intent == assistant.Overview {
-		m.page = overviewPage(m.overview, m.options.Language)
+		m.page = m.overviewFindingPage(m.overview)
 		m.showReply()
 		return nil
 	}
 	if m.inspect == nil && choice.Kind == "" && intent == assistant.Slow {
-		m.page = overviewPage(m.overview, m.options.Language)
+		m.page = m.overviewFindingPage(m.overview)
 		m.showReply()
 		return nil
 	}
@@ -210,7 +216,13 @@ func (m *Model) start(intent assistant.Intent, choice Choice) tea.Cmd {
 	m.activity = poseFor(intent)
 	m.show(m.activity, "", true)
 	m.page = Page{}
-	request := Request{Intent: intent, Choice: choice, Overview: m.overview, Language: m.options.Language}
+	if choice.Kind == "workload" {
+		workload := assistant.Workload(choice.Value)
+		if slices.Contains(assistant.Workloads, workload) {
+			m.options.Workload = workload
+		}
+	}
+	request := Request{Intent: intent, Choice: choice, Overview: m.overview, Language: m.options.Language, Workload: m.options.Workload}
 	return func() tea.Msg { return replyMsg{m.inspect(m.ctx, request)} }
 }
 
@@ -220,7 +232,7 @@ func (m *Model) updateOverview(data domain.Overview) tea.Cmd {
 	m.overview, m.refreshing = data, false
 	if wasRefreshing {
 		if m.active == assistant.Overview && !m.busy && m.page.Availability != domain.Unknown {
-			m.page = overviewPage(data, m.options.Language)
+			m.page = m.overviewFindingPage(data)
 		}
 		return nil
 	}
@@ -240,7 +252,7 @@ func (m *Model) updateOverview(data domain.Overview) tea.Cmd {
 		return m.start(intent, Choice{})
 	}
 	if (wasInitial || m.active == assistant.Overview) && m.page.Availability != domain.Unknown {
-		m.page = overviewPage(data, m.options.Language)
+		m.page = m.overviewFindingPage(data)
 	}
 	return nil
 }
@@ -257,6 +269,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		cmd = m.updateOverview(msg.data)
 	case replyMsg:
 		m.page, m.busy = msg.page, false
+		if m.active == assistant.Storage && msg.page.Availability == domain.Available {
+			m.critical = msg.page.Pose == mascot.Critical
+		} else if msg.page.Pose == mascot.Critical {
+			m.critical = true
+		}
 		m.showReply()
 		if m.queued != "" {
 			intent := m.queued
@@ -420,6 +437,11 @@ func (m *Model) submit() tea.Cmd {
 		return nil
 	}
 	m.help, m.detail, m.scroll, m.choice = false, false, 0, 0
+	if m.active == assistant.Recommend {
+		if workload := assistant.Context(value); workload != "" {
+			return m.start(assistant.Recommend, Choice{Kind: "workload", Value: string(workload)})
+		}
+	}
 	intents := assistant.Route(value)
 	if palette {
 		intents = nil
@@ -504,4 +526,18 @@ func (m *Model) saveMotion(mode motion.Mode) tea.Cmd {
 	}
 	m.motionSaving = true
 	return func() tea.Msg { return motionSavedMsg{mode, save(mode)} }
+}
+
+func (m Model) overviewFindingPage(data domain.Overview) Page {
+	page := overviewPage(data, m.options.Language)
+	if data.CapturedAt.IsZero() {
+		return page
+	}
+	at := m.now()
+	if m.options.Demo {
+		at = platform.DemoTime
+	}
+	a := diagnostics.Analyzer{Language: m.options.Language, Now: at}
+	page = withFindings(page, a.Overview(data), m.options.Language)
+	return page
 }
