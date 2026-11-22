@@ -64,7 +64,7 @@ func (m *Model) scheduleMotion(at time.Time) {
 		p.panelUntil = time.Time{}
 	}
 	next := time.Time{}
-	if m.options.Motion == motion.Full {
+	if m.options.Motion == motion.Full && (m.busy || !m.quitPending) {
 		take := func(candidate time.Time) {
 			if candidate.After(at) && (next.IsZero() || candidate.Before(next)) {
 				next = candidate

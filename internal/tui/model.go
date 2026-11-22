@@ -444,6 +444,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		} else {
 			m.toast = m.tr(Words{"Preferensi disimpan", "Preference saved"})
 		}
+		if m.quitPending && !m.busy && !m.motionSaving {
+			cmd = m.quit()
+		}
 	case tea.KeyPressMsg:
 		previous := m.screen
 		cmd = m.key(msg)
@@ -488,6 +491,9 @@ func (m *Model) updateCritical() {
 }
 
 func (m *Model) key(msg tea.KeyPressMsg) tea.Cmd {
+	if m.quitPending {
+		return nil
+	}
 	m.toast = ""
 	key := msg.String()
 	if key == "ctrl+c" || (key == "q" && !m.typing()) {
@@ -650,9 +656,11 @@ func (m *Model) submit() tea.Cmd {
 }
 
 func (m *Model) quit() tea.Cmd {
+	m.quitPending = true
 	m.show(mascot.Farewell, "", false)
-	if m.scheduler != nil {
-		m.scheduler.Set(m.visual.generation, time.Time{})
+	if m.motionSaving {
+		m.toast = m.tr(Words{"Menyimpan preferensi gerak", "Saving motion preference"})
+		return nil
 	}
 	return tea.Quit
 }

@@ -2,7 +2,7 @@
 
 `whwmpc demo animations` membuka galeri fixture. Gunakan atas/bawah dan Enter untuk memilih pose atau menelusuri skenario langkah demi langkah. `m` mengganti mode, `n` memperagakan layout ringkas, dan Esc kembali ke konteks sebelumnya. Galeri tidak menjalankan probe maupun menyimpan preferensi.
 
-`--motion full|reduced|off` berlaku untuk sesi. `--no-animations` setara dengan `--motion off`. Ubah mode dari Pengaturan untuk menyimpan preferensi lokal. Tombol `m` mencoba mode lain di galeri. Mode reduced memakai pose sederhana dan tidak mengulang gerakan dekoratif. Mode off meniadakan penjadwalan motion. NO_COLOR mengatur palet secara independen. Gunakan `--ascii` untuk pose dan bingkai karakter dasar.
+`--motion full|reduced|off` berlaku untuk sesi. `--no-animations` setara dengan `--motion off`. Ubah mode dari Pengaturan untuk menyimpan preferensi lokal. Saat keluar, penulisan pilihan terakhir diselesaikan dengan timer animasi yang sudah dihentikan. Tombol `m` mencoba mode lain di galeri. Mode reduced memakai pose sederhana dan tidak mengulang gerakan dekoratif. Mode off meniadakan penjadwalan motion. NO_COLOR mengatur palet secara independen. Gunakan `--ascii` untuk pose dan bingkai karakter dasar.
 
 ## Siklus gerak
 

@@ -2,6 +2,7 @@ package tui
 
 import (
 	"context"
+	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
@@ -14,6 +15,7 @@ import (
 	"github.com/christiandoxa/whwmpc/internal/diagnostics"
 	"github.com/christiandoxa/whwmpc/internal/domain"
 	"github.com/christiandoxa/whwmpc/internal/platform"
+	"github.com/christiandoxa/whwmpc/internal/state"
 	"github.com/christiandoxa/whwmpc/internal/tui/mascot"
 	"github.com/christiandoxa/whwmpc/internal/tui/motion"
 )
@@ -246,6 +248,64 @@ func TestMotionPreferencesCoalesceRepeatedPresses(t *testing.T) {
 	m = step(m, last())
 	if !slices.Equal(saved, []motion.Mode{motion.Reduced, motion.Full}) || m.options.Motion != motion.Full || m.motionSaving {
 		t.Fatalf("saved modes = %v, state = %s", saved, m.options.Motion)
+	}
+}
+
+func TestQuitSavesLatestMotionPreference(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		exit tea.Msg
+		scan bool
+	}{
+		{"q", keyPress("q"), false},
+		{"shutdown", ShutdownMsg{}, false},
+		{"q during scan", keyPress("q"), true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			store := state.Store{ConfigDir: filepath.Join(t.TempDir(), "whwmpc")}
+			m := New(t.Context(), platform.Demo{}, nil, Options{SaveMotion: func(mode motion.Mode) error {
+				return store.SetPreference("motion", string(mode))
+			}})
+			m.active, m.screen = assistant.Settings, results
+			m.settingsPage()
+			m.choice = 1
+			updated, saveFirst := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+			m = step(updated.(Model), tea.KeyPressMsg{Code: tea.KeyDown})
+			m = step(m, tea.KeyPressMsg{Code: tea.KeyEnter})
+			var scan tea.Cmd
+			if tc.scan {
+				scan = m.launch(Request{Intent: assistant.Overview}, mascot.Scanning)
+			}
+			updated, quit := m.Update(tc.exit)
+			m = updated.(Model)
+			if quit != nil || !m.quitPending || m.motionPending != motion.Off {
+				t.Fatal("exit interrupted the pending preference")
+			}
+			if step(m, keyPress("/")).screen != m.screen {
+				t.Fatal("a new task opened while exiting")
+			}
+			updated, saveLast := m.Update(saveFirst())
+			if saveLast == nil {
+				t.Fatal("latest preference was dropped")
+			}
+			updated, quit = updated.(Model).Update(saveLast())
+			if scan != nil {
+				if quit != nil || !updated.(Model).cancelling {
+					t.Fatal("preference write interrupted the outstanding scan result")
+				}
+				_, quit = updated.(Model).Update(scan())
+			}
+			if quit == nil {
+				t.Fatal("exit waited after the last write")
+			}
+			msg := quit()
+			if _, ok := msg.(tea.QuitMsg); !ok {
+				t.Fatalf("exit command returned %T", msg)
+			}
+			if value, err := store.Preference("motion"); value != "off" || err != nil {
+				t.Fatalf("saved motion = %q, %v", value, err)
+			}
+		})
 	}
 }
 

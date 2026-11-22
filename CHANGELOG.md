@@ -1,5 +1,9 @@
 # Changelog
 
+## Belum dirilis
+
+- Keluar segera setelah mengganti mode gerak tetap menyimpan pilihan terakhir.
+
 ## 0.3.3
 
 - Piko tampil utuh pada margin prompt yang lebar. Input GPU yang tidak valid menampilkan ekspresi error dan memfokuskan pilihan Kembali.
