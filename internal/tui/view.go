@@ -59,6 +59,14 @@ func (m Model) choices() []Choice {
 	case home, more, gallery, taskQuestion, reviewPlan:
 		return m.page.Choices
 	}
+	if m.screen == results && m.page.Summary != nil {
+		primary := m.page.Summary.Primary
+		choices := []Choice{primary}
+		if primary.Kind != "details" {
+			choices = append(choices, Choice{m.tr(Words{"Lihat semua hasil", "View all results"}), "details", ""})
+		}
+		return append(choices, Choice{m.tr(Words{"Kembali", "Back"}), "back", ""})
+	}
 	choices := slices.Clone(m.page.Choices)
 	if len(m.page.Findings) > 0 || len(m.page.Evidence) > 0 {
 		choices = append(choices, Choice{m.tr(Words{"Lihat semua hasil", "View all results"}), "details", ""})
@@ -111,10 +119,32 @@ func (m Model) body(w int) []string {
 		}
 	case detail:
 		title(l("Semua hasil", "All results"))
+		for _, check := range m.page.Coverage {
+			status := statusNames[check.Status].Text(m.options.Language)
+			if status == "" {
+				status = l("Belum dijalankan", "Not run")
+			}
+			normal(checkNames[check.ID].Text(m.options.Language) + " · " + status)
+		}
+		if len(m.page.Coverage) > 0 {
+			lines = append(lines, "")
+		}
 		for _, s := range m.page.Evidence {
 			normal(s)
 		}
 	default:
+		if m.screen == results && m.page.Summary != nil {
+			s := m.page.Summary
+			title(s.Headline)
+			text(s.Coverage, m.palette.secondary)
+			if m.stalePage() {
+				text(l("Data kedaluwarsa", "Stale data"), m.palette.alert)
+			}
+			for _, line := range s.Highlights {
+				normal("· " + line)
+			}
+			return lines
+		}
 		if len(m.page.Found) > 0 {
 			title(m.page.Found[0])
 		}
@@ -194,7 +224,9 @@ func (m Model) View() tea.View {
 		footer = m.tr(Words{"Esc Minta penghentian", "Esc Request cancellation"})
 	case questionInput, fileInput:
 		footer = m.tr(Words{"Enter Lanjut  ·  Esc Kembali", "Enter Continue  ·  Esc Back"})
-	case detail, help:
+	case detail:
+		footer = m.tr(Words{"↑↓ Gulir  ·  Enter Pilihan lanjutan  ·  Esc Kembali", "↑↓ Scroll  ·  Enter Next steps  ·  Esc Back"})
+	case help:
 		footer = m.tr(Words{"↑↓ Gulir  ·  Esc Kembali", "↑↓ Scroll  ·  Esc Back"})
 	}
 	if m.options.ASCII {

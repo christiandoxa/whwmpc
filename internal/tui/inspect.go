@@ -6,7 +6,6 @@ import (
 	"slices"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/christiandoxa/whwmpc/internal/actions"
 	"github.com/christiandoxa/whwmpc/internal/assistant"
@@ -52,6 +51,7 @@ func Inspector(scanner *inspection.Scanner, store state.Store, maintenance *work
 		case assistant.Power:
 			snapshot := scanner.Power(ctx)
 			page := withFindings(powerPage(snapshot, req.Language), a.Power(snapshot), req.Language)
+			page.Choices = append(page.Choices, Choice{translator(req.Language)("Pilih profil yang cocok", "Choose a suitable profile"), "navigate", string(assistant.Recommend)})
 			if allowActions {
 				page.Choices = actionChoices(page.Choices, page.Findings, nil)
 			}
@@ -60,14 +60,24 @@ func Inspector(scanner *inspection.Scanner, store state.Store, maintenance *work
 			return historyPage(store, maintenance, req.Language)
 		case assistant.Cleanup:
 			return cleanupPage(ctx, maintenance, req.Language)
-		case assistant.Slow:
-			o := req.Overview
-			if req.Choice.Kind == "rescan" || o.CapturedAt.IsZero() || a.Now.Sub(o.CapturedAt) > 15*time.Second {
-				o = scanner.Overview(ctx)
+		case assistant.Overview, assistant.Slow:
+			full := req.Intent == assistant.Overview
+			snapshot, err := workflow.Collect(ctx, scanner, req.Overview, req.Language, maintenance.Demo, full, req.Choice.Kind == "rescan", req.ScanProgress)
+			if err != nil {
+				return Page{Availability: domain.Error, Found: []string{translator(req.Language)("Pemeriksaan belum selesai", "Scan did not finish"), domain.SafeText(err.Error())}}
 			}
-			p := scanner.Power(ctx)
-			a.Now = scanner.Now()
-			return withFindings(overviewPage(o, req.Language), a.Slow(o, p), req.Language)
+			p := overviewPage(*snapshot.Input.Overview, req.Language)
+			p.Evidence = append(p.Evidence, powerPage(*snapshot.Input.Power, req.Language).Evidence...)
+			if full {
+				p.Evidence = append(p.Evidence, storagePage(*snapshot.Input.SMART, req.Language).Evidence...)
+				p.Evidence = append(p.Evidence, trimPage(*snapshot.Input.Trim, req.Language).Evidence...)
+			}
+			page := withFindings(p, snapshot.Input.Findings, req.Language)
+			page.Coverage, page.Snapshot = snapshot.Coverage, &snapshot
+			if full && allowActions {
+				page.Choices = actionChoices(page.Choices, page.Findings, snapshot.Input.Trim.Mounts)
+			}
+			return page
 		case assistant.Recommend:
 			workload := req.Workload
 			if req.Choice.Kind == "context" {
@@ -98,50 +108,32 @@ func Inspector(scanner *inspection.Scanner, store state.Store, maintenance *work
 }
 
 func withFindings(page Page, findings []diagnostics.Finding, lang string) Page {
-	l := translator(lang)
 	page.Findings = findings
-	base := page.Found
-	evidence := page.Evidence
-	page.Sidebar = evidence
-	page.Found, page.Meaning, page.Advice, page.Evidence = nil, nil, nil, nil
 	if page.Availability == "" && len(findings) > 0 {
 		page.Availability = findings[0].Availability
 	}
-	for i, f := range findings {
-		label := statusNames[f.Availability].Text(lang)
+	for _, f := range findings {
 		switch f.Severity {
 		case diagnostics.Critical:
-			label = l("Kritis", "Critical") + " · " + label
 			page.Pose = mascot.Critical
 		case diagnostics.Warning:
-			label = l("Peringatan", "Warning") + " · " + label
 			if page.Pose != mascot.Critical {
 				page.Pose = mascot.Warning
 			}
 		}
-		if i < 2 {
-			page.Found = append(page.Found, "["+label+"] "+f.Observation)
-			page.Meaning = append(page.Meaning, f.Meaning)
-			page.Advice = append(page.Advice, f.Recommendation)
-		}
-		page.Evidence = append(page.Evidence, f.ID+" · "+label, f.Observation, f.Meaning, f.Recommendation,
-			l("Batas", "Limits")+" · "+f.Limits, f.Source+" · "+displayTime(f.At, "2006-01-02 15:04 MST"))
-		for _, action := range f.Actions {
-			switch action.Kind {
+		for _, a := range f.Actions {
+			switch a.Kind {
 			case "navigate", "workload", "rescan":
-				page.Choices = appendChoice(page.Choices, Choice{Label: action.Label, Kind: action.Kind, Value: action.Target})
+				page.Choices = appendChoice(page.Choices, Choice{a.Label, a.Kind, a.Target})
 			}
 		}
 	}
 	if len(findings) > 0 {
-		page.Evidence = append(page.Evidence, base...)
-	}
-	page.Evidence = append(page.Evidence, evidence...)
-	if len(findings) == 0 {
-		page.Found = base
-	}
-	if page.Pose == mascot.Critical && len(page.Advice) > 0 {
-		page.Priority = page.Advice[0]
+		page.Evidence = append(findingEvidence(findings, lang), page.Evidence...)
+		if findings[0].Category == "recommendation" {
+			f := findings[0]
+			page.Found, page.Meaning, page.Advice = []string{f.Observation}, []string{f.Meaning}, []string{f.Recommendation}
+		}
 	}
 	return page
 }

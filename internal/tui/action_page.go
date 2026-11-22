@@ -40,6 +40,11 @@ type authMsg struct {
 	ctx context.Context
 }
 
+type scanMsg struct {
+	job      uint64
+	progress workflow.ScanProgress
+}
+
 type stageMsg struct {
 	job   uint64
 	stage actions.Stage
@@ -77,6 +82,7 @@ func (m *Model) launch(req Request, pose mascot.Pose) tea.Cmd {
 	}
 	sender := m.options.Send
 	if sender != nil {
+		req.ScanProgress = func(progress workflow.ScanProgress) { sender(scanMsg{job, progress}) }
 		req.Progress = func(stage actions.Stage) { sender(stageMsg{job, stage}) }
 		req.Printing = func() { sender(printingMsg{job}) }
 	}
@@ -93,7 +99,7 @@ func (m *Model) launch(req Request, pose mascot.Pose) tea.Cmd {
 
 func (m Model) doRequest(ctx context.Context, job uint64, req Request) tea.Cmd {
 	return func() tea.Msg {
-		if req.Intent == assistant.Overview && (req.Choice.Kind == "" || req.Choice.Kind == "rescan") {
+		if m.inspect == nil && req.Intent == assistant.Overview && (req.Choice.Kind == "" || req.Choice.Kind == "rescan") {
 			return replyMsg{job, m.overviewFindingPage(m.source.Overview(ctx))}
 		}
 		return replyMsg{job, m.inspect(ctx, req)}

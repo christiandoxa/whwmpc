@@ -2,6 +2,7 @@ package tui
 
 import (
 	"context"
+	"fmt"
 	"slices"
 	"strings"
 	"time"
@@ -17,6 +18,7 @@ import (
 	"github.com/christiandoxa/whwmpc/internal/platform"
 	"github.com/christiandoxa/whwmpc/internal/tui/mascot"
 	"github.com/christiandoxa/whwmpc/internal/tui/motion"
+	"github.com/christiandoxa/whwmpc/internal/workflow"
 )
 
 type Options struct {
@@ -37,6 +39,9 @@ type Choice struct {
 }
 
 type Page struct {
+	Snapshot                  *workflow.Snapshot
+	Coverage                  []workflow.Coverage
+	Summary                   *ResultSummary
 	Availability              domain.Availability
 	Pose                      mascot.Pose
 	Findings                  []diagnostics.Finding
@@ -49,16 +54,17 @@ type Page struct {
 }
 
 type Request struct {
-	Output   string
-	Printing func()
-	Findings []diagnostics.Finding
-	Plan     *actions.Plan
-	Progress func(actions.Stage)
-	Intent   assistant.Intent
-	Choice   Choice
-	Overview domain.Overview
-	Workload assistant.Workload
-	Language string
+	ScanProgress func(workflow.ScanProgress)
+	Output       string
+	Printing     func()
+	Findings     []diagnostics.Finding
+	Plan         *actions.Plan
+	Progress     func(actions.Stage)
+	Intent       assistant.Intent
+	Choice       Choice
+	Overview     domain.Overview
+	Workload     assistant.Workload
+	Language     string
 }
 
 type Inspect func(context.Context, Request) Page
@@ -208,13 +214,20 @@ func (m *Model) start(intent assistant.Intent, choice Choice) tea.Cmd {
 	case "more":
 		m.remember()
 		m.screenState = screenState{screen: more}
-		for _, id := range []assistant.Intent{assistant.Storage, assistant.Trim, assistant.Recommend, assistant.History, assistant.Report, assistant.Settings} {
+		for _, id := range []assistant.Intent{assistant.Storage, assistant.Trim, assistant.Power, assistant.History, assistant.Report, assistant.Settings} {
 			m.page.Choices = append(m.page.Choices, Choice{m.tr(menuNames[id]), "navigate", string(id)})
 		}
 		m.page.Choices = append(m.page.Choices, Choice{m.tr(Words{"Tanya sesuatu", "Ask a question"}), "ask", ""})
 		return nil
 	case "ask":
 		return m.ask()
+	case "result-options":
+		m.remember()
+		m.screen, m.choice, m.scroll = taskQuestion, 0, 0
+		m.page.Found = []string{m.tr(Words{"Apa langkah berikutnya?", "What would you like to do next?"})}
+		m.page.Meaning, m.page.Advice = nil, nil
+		m.page.Choices = append(slices.Clone(m.page.Choices), Choice{m.tr(Words{"Kembali", "Back"}), "back", ""})
+		return nil
 	case "details":
 		m.remember()
 		m.screen, m.scroll = detail, 0
@@ -299,6 +312,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				cmd = m.doRequest(msg.ctx, msg.job, msg.req)
 			}
 		}
+	case scanMsg:
+		if m.busy && msg.job == m.job && !m.cancelling {
+			m.workName = fmt.Sprintf(m.tr(Words{"Memeriksa %s · tahap %d/%d", "Checking %s · stage %d/%d"}), m.tr(checkNames[msg.progress.Check]), msg.progress.Step, msg.progress.Total)
+		}
 	case stageMsg:
 		m.updateStage(msg)
 	case printingMsg:
@@ -329,6 +346,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		wasAction := m.screen == executing
 		m.page, m.busy, m.runningAction, m.cancelling, m.workName = msg.page, false, false, false, ""
 		m.screen, m.choice, m.scroll = results, 0, 0
+		if len(m.page.Findings) > 0 && m.active != assistant.Recommend {
+			summary := summarize(m.page, m.active, m.options.Language)
+			m.page.Summary = &summary
+		}
 		if m.page.Plan != nil {
 			m.screen = reviewPlan
 		}
@@ -436,6 +457,9 @@ func (m *Model) key(msg tea.KeyPressMsg) tea.Cmd {
 			}
 		}
 	case "enter":
+		if m.screen == detail {
+			return m.start(m.active, Choice{Kind: "result-options"})
+		}
 		choices := m.choices()
 		if m.choice < len(choices) {
 			return m.start(m.active, choices[m.choice])

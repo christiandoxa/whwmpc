@@ -70,3 +70,7 @@ Pemeriksaan ulang overview melalui pilihan tindakan dan tombol `r` memakai jalur
 ## Revamp UX 1 · Beranda dan navigasi
 
 Beranda dengan tiga tujuan dan Lainnya menggantikan dashboard. Satu kolom, daftar vertikal, layar pertanyaan tersendiri, dan back stack menggantikan perpindahan fokus dan carousel. Job mulai setelah pengguna memilih pemeriksaan. Gate mencakup format, vet, tes model/race, build, dan smoke PTY.
+
+## Revamp UX 2 · Ringkasan dan cakupan
+
+Pemeriksaan kondisi memakai pengumpulan snapshot yang sama dengan laporan lengkap. Empat tahap pemeriksaan mencakup lima ID cakupan. Ringkasan memprioritaskan tiga temuan dan menghitung semua temuan kritis. Detail tersendiri menyimpan temuan lengkap, teknis, dan konteks saat kembali. Pemeriksaan lambat langsung mengukur bukti yang tersedia tanpa menanyakan konteks yang belum memengaruhi aturan.
