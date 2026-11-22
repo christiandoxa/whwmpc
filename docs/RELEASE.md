@@ -1,6 +1,6 @@
 # Build dan rilis
 
-Jalankan dari checkout lokal menggunakan versi Go yang tercantum di `go.mod`. Workflow dan skrip paket memakai Ubuntu dengan GNU tar, sha256sum, dan Python 3. Arsip berisi executable, README, dan pemberitahuan lisensi untuk Go serta dependensi yang masuk ke executable. Build lintas platform memakai `CGO_ENABLED=0` dan paket memakai urutan serta timestamp stabil.
+Jalankan dari checkout lokal menggunakan versi Go yang tercantum di `go.mod`. Workflow dan skrip paket memakai Ubuntu dengan GNU tar, GNU coreutils, dan Python 3. Arsip berisi executable, README, dan pemberitahuan lisensi untuk Go serta dependensi yang masuk ke executable. Build lintas platform memakai `CGO_ENABLED=0`. Arsip memakai urutan serta timestamp stabil, dengan mode `0644` untuk dokumen dan lisensi.
 
 ```sh
 bash scripts/release.sh snapshot
@@ -23,7 +23,7 @@ Unduh arsip platform dan `SHA256SUMS` dari rilis yang sama. Installer README men
 Pada Linux atau macOS, ganti nama arsip sesuai unduhan. Gunakan direktori baru untuk ekstraksi.
 
 ```sh
-archive=whwmpc_v0.3.1_darwin_arm64.tar.gz
+archive=whwmpc_v0.3.2_darwin_arm64.tar.gz
 shasum -a 256 "$archive"
 # Cocokkan hash dengan SHA256SUMS sebelum lanjut.
 tar -xzf "$archive" ./whwmpc
@@ -34,7 +34,7 @@ tar -xzf "$archive" ./whwmpc
 Pada Windows, jalankan di PowerShell.
 
 ```powershell
-$archive = 'whwmpc_v0.3.1_windows_amd64.zip'
+$archive = 'whwmpc_v0.3.2_windows_amd64.zip'
 Get-FileHash -Algorithm SHA256 $archive
 # Cocokkan hash dengan SHA256SUMS sebelum lanjut.
 Expand-Archive $archive -DestinationPath .\whwmpc

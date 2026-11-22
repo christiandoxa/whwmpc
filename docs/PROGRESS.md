@@ -170,3 +170,5 @@ Detail GPU membedakan batas daya yang diminta dan ditegakkan, serta sumber bacaa
 Provider Windows mempertahankan cakupan `GetSystemTimes` untuk mesin dengan lebih dari 64 prosesor logis. Fixture 128 CPU memverifikasi label grup dan pencegahan diagnosis beban seluruh host dari data parsial tersebut. Build Windows amd64 dan arm64 lulus. [Matriks native](NATIVE.md)
 
 Pada fixture NVIDIA terisolasi, TUI produksi lulus review, autentikasi, apply, dan restore pada 80×24 serta 120×36. Pengujian awal menemukan pilihan restore yang masih muncul sesudah pemulihan. Riwayat kini mengaitkan restore terverifikasi dengan tindakan asal. Tes unit memeriksa riwayat lama dan hasil parsial, sedangkan uji CLI membuktikan rencana lain ditolak setelah restore terverifikasi walau nilai fixture kembali cocok. [Uji TUI dan CLI](assets/nvidia-tui-fixture.txt) · [Model tindakan](ACTIONS.md)
+
+Skrip paket menormalkan izin file README dan lisensi. Dua build snapshot dengan mode README input `0444` dan `0644` menghasilkan SHA-256 yang sama untuk keenam arsip. Seluruh dokumen dan lisensi dalam arsip memakai mode `0644`. [Skrip rilis](../scripts/release.sh)

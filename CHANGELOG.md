@@ -1,11 +1,12 @@
 # Changelog
 
-## Belum dirilis
+## 0.3.2
 
 - Riwayat menutup pilihan pemulihan setelah hasilnya terverifikasi. Rencana pemulihan yang sudah ditandatangani diperiksa kembali saat eksekusi.
 - Detail GPU membedakan daya papan, daya SoC, serta batas daya NVIDIA yang diminta dan ditegakkan.
 - Verifikasi firmware dari Riwayat menampilkan status restart, gagal, atau terverifikasi beserta versi aktif yang teramati.
 - Windows melabeli sampel CPU satu grup sebagai parsial pada host dengan lebih dari 64 prosesor logis. Diagnosis menggunakan cakupan yang sesuai.
+- Paket standalone memakai mode file dokumen dan lisensi yang konsisten.
 
 ## 0.3.1
 

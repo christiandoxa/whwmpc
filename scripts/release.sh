@@ -29,11 +29,11 @@ for target in linux/amd64 linux/arm64 darwin/amd64 darwin/arm64 windows/amd64 wi
     mkdir -p "$package/LICENSES"
     go build -mod=readonly -trimpath -buildvcs=false -ldflags="-s -w -X main.version=$version" \
         -o "$package/$executable" ./cmd/whwmpc
-    cp README.md "$package/"
+    install -m 0644 README.md "$package/"
     if [[ -f LICENSE ]]; then
-        cp LICENSE "$package/"
+        install -m 0644 LICENSE "$package/"
     fi
-    cp "$(go env GOROOT)/LICENSE" "$package/LICENSES/Go"
+    install -m 0644 "$(go env GOROOT)/LICENSE" "$package/LICENSES/Go"
 
     go list -mod=readonly -deps -f '{{with .Module}}{{if not .Main}}{{printf "%s\t%s" .Path .Dir}}{{end}}{{end}}' ./cmd/whwmpc \
         | sed '/^$/d' | LC_ALL=C sort -u > "$stage/modules"
@@ -44,7 +44,7 @@ for target in linux/amd64 linux/arm64 darwin/amd64 darwin/arm64 windows/amd64 wi
             exit 1
         fi
         mkdir -p "$package/LICENSES/$module"
-        cp -- "${notices[@]}" "$package/LICENSES/$module/"
+        install -m 0644 -- "${notices[@]}" "$package/LICENSES/$module/"
     done < "$stage/modules"
 
     if [[ "$GOOS" == windows ]]; then
