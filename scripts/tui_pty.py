@@ -120,15 +120,57 @@ class Terminal:
         os.close(self.master)
 
 
+def press(terminal, key):
+    terminal.key(key)
+    terminal.hold(0.22)
+
+
+def task_flow(terminal, flow, resize=False):
+    terminal.expect("Mau dibantu apa?")
+    index = ("condition", "slow", "cleanup").index(flow)
+    for _ in range(index):
+        press(terminal, b"\x1b[B")
+    offset = len(terminal.output)
+    press(terminal, b"\r")
+    if flow == "cleanup":
+        terminal.expect("file teramati", offset)
+        offset = len(terminal.output)
+        press(terminal, b"\r")
+        terminal.expect("Penghapusan permanen pada aksi nyata", offset)
+        if resize:
+            terminal.resize(60, 18)
+            terminal.hold(0.3)
+            terminal.resize(80, 24)
+            terminal.hold(0.3)
+        offset = len(terminal.output)
+        press(terminal, b"\r")
+        terminal.expect("file teramati", offset)
+        return
+    terminal.expect("selesai", offset)
+    if flow == "slow":
+        terminal.expect("Periksa ulang saat gejala muncul", offset)
+        press(terminal, b"\x1b[B")
+    terminal.expect("Lihat semua hasil", offset)
+    offset = len(terminal.output)
+    press(terminal, b"\r")
+    terminal.expect("Semua hasil", offset)
+    if resize:
+        terminal.resize(60, 18)
+        terminal.hold(0.3)
+        terminal.resize(80, 24)
+        terminal.hold(0.3)
+    offset = len(terminal.output)
+    press(terminal, b"\x1b")
+    terminal.expect("Lihat semua hasil", offset)
+
+
 def smoke(terminal):
     terminal.key(b"?")
     terminal.expect("Bantuan keyboard")
-    terminal.key(b"\x1b")
-    terminal.hold(0.2)
-    terminal.resize(60, 18)
-    terminal.hold(0.2)
-    terminal.resize(80, 24)
-    terminal.key(b"/")
+    press(terminal, b"\x1b")
+    task_flow(terminal, "condition", resize=True)
+    press(terminal, b"\x1b")
+    press(terminal, b"/")
     terminal.expect("Apa yang ingin kamu tanyakan?")
     terminal.key(b"ssd trim q?d")
     terminal.expect("ssd trim q?d")
@@ -145,6 +187,7 @@ def main():
     parser.add_argument("--duration", type=float, default=5, help="seconds to capture after startup")
     parser.add_argument("--gallery", action="store_true", help="record the normal fixture flow in the Piko gallery")
     parser.add_argument("--app-arg", action="append", default=[], help="extra demo flag in a recording")
+    parser.add_argument("--flow", choices=("condition", "slow", "cleanup"))
     args = parser.parse_args()
     if not 80 <= args.width <= 240 or not 24 <= args.height <= 80 or not 0.5 <= args.duration <= 30:
         parser.error("use 80–240 columns, 24–80 rows and 0.5–30 seconds")
@@ -163,8 +206,12 @@ def main():
         )
         try:
             terminal.expect("DEMO")
-            if args.record is None:
-                terminal.expect("Mau dibantu apa?")
+            if args.flow:
+                task_flow(terminal, args.flow, resize=args.record is None)
+                if args.record is not None:
+                    terminal.hold(1)
+                    recording = terminal.events[:]
+            elif args.record is None:
                 smoke(terminal)
             else:
                 if args.gallery:
@@ -185,7 +232,7 @@ def main():
             terminal.close()
 
     if args.record is None:
-        print("PTY smoke passed: demo, help, input focus, intent clarification, resize and terminal restoration")
+        print("PTY smoke passed: task navigation and terminal restoration")
         return
     header = {"version": 2, "width": args.width, "height": args.height, "title": "What Happens With My PC · Demo"}
     with args.record.open("x", encoding="utf-8") as output:

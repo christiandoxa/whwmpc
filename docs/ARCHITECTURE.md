@@ -7,10 +7,10 @@
 - `internal/diagnostics` membaca snapshot tanpa I/O. Aturan menghasilkan temuan ber-ID dengan severity dan availability yang terpisah. [Daftar aturan dan sumber](DIAGNOSTICS.md)
 - `internal/actions` menyiapkan operasi dari allowlist. `internal/workflow` mengikatnya ke kunci lokal, konfirmasi, klaim satu kali, verifikasi, dan riwayat. `internal/state` memeriksa lokasi privat, membatasi retensi, dan mempublikasikan file baru secara atomik.
 - `internal/report` memakai proyeksi redaksi untuk JSON dan Markdown. Snapshot mentah hanya dipakai lokal untuk bukti yang diminta pengguna. Tidak ada telemetry.
-- `internal/tui` menerima snapshot, progress, dan hasil sebagai pesan Bubble Tea. Probe dan subprocess berjalan sebagai command asinkron. Refresh overview delapan detik memakai jalur terpisah dari animasi. Satu foreground job dapat dihentikan dan diselesaikan hingga hasilnya jelas. [Siklus motion](MOTION.md)
+- `internal/tui` menerima snapshot, progress, dan hasil sebagai pesan Bubble Tea. Probe dan subprocess berjalan sebagai command asinkron. Pemeriksaan dimulai dari pilihan pengguna. Pengumpulan snapshot dan timer animasi memakai lifecycle terpisah. Satu foreground job dapat dihentikan dan diselesaikan hingga hasilnya jelas. [Siklus motion](MOTION.md)
 
 Pemeriksaan proses membaca nama pendek dan RSS untuk tampilan lokal, dengan sampling delta CPU. Argumen proses tidak dikumpulkan. Batas sampling singkat, sensor yang tidak ada, dan pertentangan antar sumber tercermin dalam temuan.
 
 ## Backlog
 
-Tuning GPU, firmware, overclock/undervolt, perbaikan storage, daemon background, benchmark berat, cleaner Fedora/Arch, dan perluasan metrik macOS/Windows. Pengelolaan toolchain dapat terhubung ke Upkit pada versi berikutnya.
+Status, matriks baseline, dan bukti per item ada di [Backlog](BACKLOG.md). Integrasi Upkit dibatalkan sesuai instruksi pengguna.

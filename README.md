@@ -2,9 +2,9 @@
 
 `whwmpc` adalah asisten terminal lokal untuk memahami kondisi PC. Tanyakan kenapa PC terasa lambat, audit SSD dan TRIM, lihat kebijakan CPU dan daya, atau tinjau pembersihan cache. Piko menemani pemeriksaan di terminal. Semua diagnosis inti berjalan offline.
 
-![Dashboard demo whwmpc pada terminal 120×36](docs/assets/overview.png)
+![Beranda demo whwmpc pada terminal 120×36](docs/assets/ux/after-120.png)
 
-[Rekaman galeri Piko dan alur konfirmasi demo](docs/assets/piko-demo.gif) · [Rekaman terminal asli](docs/assets/piko-demo.cast)
+[Sebelum](docs/assets/ux/before-80.png) · [Sesudah](docs/assets/ux/after-80.png) · [Alur dan rekaman PTY](docs/UX.md)
 
 ## Mulai
 
@@ -18,18 +18,25 @@ curl -fsSL https://raw.githubusercontent.com/christiandoxa/whwmpc/main/install.s
 
 Jika `~/.local/bin` sudah ada di `PATH`, gunakan `whwmpc` atau `whwmpc demo animations`. Jalankan ulang installer untuk memperbarui binari. Checksum diambil dari rilis GitHub yang sama. [Unduhan manual](https://github.com/christiandoxa/whwmpc/releases/latest) · [Build dari sumber](docs/RELEASE.md)
 
-Coba **“Kenapa PC terasa lambat?”** untuk melihat bukti CPU, RAM, disk, proses, dan daya. **“SSD atau TRIM?”** meminta klarifikasi. **“Rekomendasi”** menanyakan konteks penggunaan dan mengingat pilihan yang kamu simpan.
+Beranda menyediakan **Cek kondisi PC**, **PC terasa lambat**, dan **Bersihkan ruang**. Tekan Enter pada pilihan pertama untuk memulai pemeriksaan. Gunakan **Lainnya…** untuk SSD, TRIM, daya, riwayat, laporan, pengaturan, dan pertanyaan bebas.
 
 | Tombol | Fungsi |
 | --- | --- |
-| ↑/↓ atau j/k | Pindah kategori atau gulir temuan |
-| Tab / Shift+Tab | Pindah fokus antara menu, hasil, dan input |
-| ←/→, Enter | Pilih tindakan di panel hasil dan buka pilihan |
-| /, d, r | Cari atau bertanya, buka bukti, periksa ulang |
-| e, m, ? | Ekspor laporan, ganti mode gerak, buka bantuan |
-| Esc, q / Ctrl+C | Kembali atau minta penghentian, keluar |
+| ↑/↓ atau j/k | Pilih dari daftar atau gulir detail |
+| Enter | Buka pilihan yang ditandai |
+| Esc | Kembali atau minta penghentian |
+| / atau ? | Buka pertanyaan bebas atau bantuan |
 
-Demo memakai data fixture dan mengunci tindakan sistem. Di galeri, `m` memilih mode gerak, `n` mencoba layout ringkas, dan Esc kembali ke daftar. Konfigurasi sesi tersedia lewat `--lang id|en`, `--theme dark|light|terminal`, `--ascii`, dan `--motion full|reduced|off`. `--no-animations` setara dengan off. Tema juga menghormati `NO_COLOR`. [Peta motion dan pose](docs/MOTION.md)
+Demo memakai data fixture dan mengunci tindakan sistem. Di galeri, `m` memilih mode gerak dan `n` mencoba layout ringkas. Konfigurasi sesi tersedia lewat `--lang id|en`, `--theme dark|light|terminal`, `--ascii`, dan `--motion full|reduced|off`. `--no-animations` setara dengan off. Tema juga menghormati `NO_COLOR`. [Peta motion dan pose](docs/MOTION.md)
+
+### Mencoba UX terbaru dari sumber
+
+Installer memakai rilis stabil terakhir. Untuk membangun revisi `main` dengan Go 1.27.4, jalankan perintah berikut dari checkout yang sudah diperbarui.
+
+```sh
+go build -o ./whwmpc ./cmd/whwmpc
+./whwmpc --demo
+```
 
 ## CLI
 
@@ -43,7 +50,7 @@ whwmpc report --format markdown --output pc.md
 whwmpc history
 ```
 
-`check --json` dan `report --format json` menghasilkan laporan berskema dengan sumber `live` atau `demo`. Laporan menyaring nama pengguna, hostname, serial, label perangkat, path pribadi, dan nama proses. Riwayat menyimpan ringkasan hingga 100 entri. Pilih **Simpan ringkasan** atau gunakan `check --record` jika ingin menyimpan hasil scan. Hasil aksi yang diajukan dicatat otomatis. Laporan tanpa `--output` ditulis ke stdout.
+`check --json` dan `report --format json` menghasilkan laporan berskema dengan sumber `live` atau `demo`. Laporan menyaring nama pengguna, hostname, serial, label perangkat, path pribadi, dan nama proses. Riwayat menyimpan ringkasan hingga 100 entri. Di detail, Enter membuka pilihan penyimpanan. **Simpan hasil ini** mengekspor data yang sudah terbuka. **Buat laporan lengkap** melakukan pemeriksaan tambahan. Pilih **Simpan ringkasan** atau gunakan `check --record` jika ingin menyimpan hasil scan. Hasil aksi yang diajukan dicatat otomatis. Laporan tanpa `--output` ditulis ke stdout.
 
 Status pemeriksaan yang tidak lengkap muncul sebagai data. Exit code **0** berarti pemeriksaan atau perintah selesai, **1** berarti kegagalan atau aksi belum terverifikasi penuh, dan **2** berarti opsi salah. Non-TTY memakai keluaran plain atau JSON. Tampilan TUI memerlukan stdin dan stdout berupa terminal.
 

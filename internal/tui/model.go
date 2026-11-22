@@ -111,6 +111,8 @@ type Model struct {
 	visual                                       presentation
 	activity, actionPose                         mascot.Pose
 	overview                                     domain.Overview
+	lastChecked                                  time.Time
+	lastCoverage                                 string
 	toast                                        string
 	stage                                        int
 	scenario                                     string
@@ -357,6 +359,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		wasAction := m.screen == executing
 		m.page, m.busy, m.runningAction, m.cancelling, m.workName = msg.page, false, false, false, ""
 		m.screen, m.choice, m.scroll = results, 0, 0
+		if m.page.Snapshot != nil && (m.active == assistant.Overview || m.active == assistant.Slow) {
+			m.lastChecked = m.page.Snapshot.Input.At
+			m.lastCoverage = coverageLine(m.page.Coverage, m.options.Language)
+		}
 		if len(m.page.Findings) > 0 && m.active != assistant.Recommend {
 			summary := summarize(m.page, m.active, m.options.Language)
 			m.page.Summary = &summary

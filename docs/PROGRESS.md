@@ -78,3 +78,7 @@ Pemeriksaan kondisi memakai pengumpulan snapshot yang sama dengan laporan lengka
 ## Revamp UX 3 · Review tindakan dan ekspor
 
 Satu layar review memperlihatkan Kembali sebagai pilihan awal dan aksi spesifik sebagai pilihan kedua. Rencana panjang memerlukan pembacaan dengan gulir sebelum Apply tersedia. ID, expiry, revalidasi, klaim, dan verifikasi tetap memakai backend existing. Demo cleanup dapat ditinjau dan selalu terkunci. Ekspor snapshot memakai data yang sudah dikumpulkan, sedangkan laporan lengkap menyatakan pemeriksaan tambahan. Tes mencakup resize review, Enter berulang, pembatalan, dan ekspor dengan scanner nil.
+
+## Revamp UX 4 · Bukti PTY dan inventaris backlog
+
+Review sebelum/sesudah 80×24, beranda 120×36, dan rekaman tiga alur demo memakai binari yang dibangun dari sumber. Smoke PTY menelusuri pemeriksaan, detail, hasil, diagnosis lambat, serta pembatalan pada review cleanup. Daftar cakupan dan status pekerjaan lanjutan dikelola di [Backlog](BACKLOG.md).

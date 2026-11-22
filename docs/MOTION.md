@@ -1,12 +1,12 @@
 # Piko dan gerak
 
-`whwmpc demo animations` membuka galeri fixture. Gunakan kiri/kanan dan Enter untuk memilih pose atau menelusuri skenario langkah demi langkah. `/` mencari nama pose atau skenario, `m` mengganti mode, `n` memperagakan layout ringkas, dan Esc kembali ke daftar. Galeri tidak menjalankan probe maupun menyimpan preferensi.
+`whwmpc demo animations` membuka galeri fixture. Gunakan atas/bawah dan Enter untuk memilih pose atau menelusuri skenario langkah demi langkah. `m` mengganti mode, `n` memperagakan layout ringkas, dan Esc kembali ke konteks sebelumnya. Galeri tidak menjalankan probe maupun menyimpan preferensi.
 
-`--motion full|reduced|off` berlaku untuk sesi. `--no-animations` setara dengan `--motion off`. Ubah mode dari Pengaturan atau dengan `m` untuk menyimpan preferensi lokal. Mode reduced memakai pose sederhana dan tidak mengulang gerakan dekoratif. Mode off meniadakan penjadwalan motion. NO_COLOR mengatur palet secara independen. Gunakan `--ascii` untuk pose dan bingkai karakter dasar.
+`--motion full|reduced|off` berlaku untuk sesi. `--no-animations` setara dengan `--motion off`. Ubah mode dari Pengaturan untuk menyimpan preferensi lokal. Tombol `m` mencoba mode lain di galeri. Mode reduced memakai pose sederhana dan tidak mengulang gerakan dekoratif. Mode off meniadakan penjadwalan motion. NO_COLOR mengatur palet secara independen. Gunakan `--ascii` untuk pose dan bingkai karakter dasar.
 
 ## Siklus gerak
 
-Satu timer dengan deadline yang dapat diganti memberi pesan Bubble Tea bertanda generasi. Pesan lama dibuang. Frame dihitung dari waktu yang sudah berlalu, sehingga input dan status kerja dapat menggantikan transisi yang tertinggal. Refresh sensor memiliki pesan dan jadwal sendiri.
+Satu timer dengan deadline yang dapat diganti memberi pesan Bubble Tea bertanda generasi. Pesan lama dibuang. Frame dihitung dari waktu yang sudah berlalu, sehingga input dan status kerja dapat menggantikan transisi yang tertinggal. Pemeriksaan pengguna memiliki pesan tersendiri.
 
 | Detail | Durasi |
 | --- | --- |
@@ -17,7 +17,7 @@ Satu timer dengan deadline yang dapat diganti memberi pesan Bubble Tea bertanda 
 | Kedipan idle | Setelah 9 detik idle, satu kedipan |
 | Frame kerja berulang | Selama status kerja masih aktif dan tampilan terlihat |
 
-Layout lebar memakai kanvas 16×6. Layout ringkas memakai wajah mini di header. Pada terminal yang terlalu kecil, label Piko dan petunjuk resize tetap tersedia. Angka metrik dan teks hasil tampil utuh ketika data tiba.
+Semua layout memakai wajah mini Piko dekat label tugas. Pada terminal yang terlalu kecil, label Piko dan petunjuk resize tetap tersedia. Angka metrik dan teks hasil tampil utuh ketika data tiba.
 
 Tambahkan pose di `internal/tui/mascot/piko.go` dengan deskripsi mata, mulut, lengan, lantai, dan aksesori. Daftarkan di galeri agar tes memeriksa lebar sel ASCII dan Unicode. Hubungkan pose dengan aktivitas atau hasil yang benar di `internal/tui/presentation.go`. Gunakan status terverifikasi untuk gestur berhasil.
 
@@ -26,9 +26,9 @@ Tambahkan pose di `internal/tui/mascot/piko.go` dengan deskripsi mata, mulut, le
 | Interaksi | Feedback |
 | --- | --- |
 | Startup dan keluar | Layar Piko menyala, mata terbuka, lalu melambai. Judul dan menu aktif sejak frame pertama. Keluar segera memulihkan terminal. |
-| Menu, fokus, input, dan kirim | Aksen pilihan dan lirikan mengikuti seleksi. Input memakai pose mendengarkan tanpa mengulang animasi per huruf. Pertanyaan terkirim tampil dalam sesi, diikuti pose berpikir dan pekerjaan terkini. |
+| Menu, fokus, input, dan kirim | Aksen pilihan dan lirikan mengikuti seleksi. Input memakai pose mendengarkan tanpa mengulang animasi per huruf. Pertanyaan masuk ke halaman pemeriksaan atau klarifikasi. |
 | Detail bukti, bantuan, dan resize | Aksen panel singkat dengan dimensi yang sama. Resize menghitung ulang layout dan menghentikan frame saat area terlalu kecil. |
-| Overview dan pemindaian ulang | Kaca pembesar dan indikator indeterminate. Label menyatakan pemeriksaan atau sumber bacaan. Grafik kartu memakai sampel aktual. |
+| Overview dan pemindaian ulang | Kaca pembesar dan indikator indeterminate. Label menyatakan pemeriksaan atau sumber bacaan. Progres bertahap berasal dari collector. |
 | SSD, CPU, baterai, dan TRIM | Stetoskop dan drive, kipas CPU, baterai dengan pose pengisian berdasarkan status AC dan Charging, serta checklist blok untuk audit baca-saja. |
 | Cleanup dan preview | Sapu diam saat inventaris ditinjau. Clipboard untuk preview dan pose statis saat konfirmasi. Risiko dan pilihan aksi tetap di posisi yang sama. |
 | Revalidasi, apply, cleanup, dan restore | Aktivitas backend memicu kaca pembesar, roda gigi, sapu dengan partikel lokal, atau rewind. Verifikasi memakai label dan pose pemeriksaan tersendiri. |

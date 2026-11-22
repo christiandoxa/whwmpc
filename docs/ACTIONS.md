@@ -1,6 +1,6 @@
 # Tindakan maintenance
 
-Jalankan aplikasi sebagai user biasa. Pemeriksaan dan preview hanya membaca keadaan host. TUI menampilkan target, kondisi awal, argv persis, izin, dampak, risiko, estimasi, expiry, dan ketersediaan pemulihan. Pilih **Lanjut ke konfirmasi**, lalu pilih **Terapkan rencana ini**. Pilihan awal di kedua langkah adalah **Batalkan**.
+Jalankan aplikasi sebagai user biasa. Pemeriksaan dan preview hanya membaca keadaan host. TUI menampilkan target, kondisi awal dan hasil yang dimaksud, izin, dampak, risiko, estimasi, expiry, dan ketersediaan pemulihan. Rencana CLI mencantumkan argv persis. TUI memakai satu layar review. Pilihan awal adalah **Kembali**. Pilih nama tindakan secara sengaja setelah seluruh cakupan dan risiko terbaca.
 
 CLI memerlukan rencana yang ditulis eksplisit ke file baru dan ID yang disalin setelah meninjau isinya. Rencana berlaku sepuluh menit dan terikat pada host, target, kondisi awal, versi, dan operasi yang diperbolehkan. Aplikasi memverifikasi autentikasi HMAC lokal, mengunci eksekusi per state pengguna, mengklaim ID sekali, lalu menyiapkan operasi kembali dari target yang masih cocok. Rencana tidak mengizinkan argv kustom. Jika revalidasi gagal atau hasil belum diketahui, periksa keadaan dan buat preview baru sebelum mencoba lagi. Aksi dengan sudo memakai autentikasi OS dari terminal yang disuspensi. Pada non-TTY, autentikasi yang sudah tersedia melalui kebijakan sudo/polkit diperlukan.
 

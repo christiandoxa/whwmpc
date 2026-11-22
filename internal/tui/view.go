@@ -111,7 +111,11 @@ func (m Model) body(w int) []string {
 	switch m.screen {
 	case home:
 		title(l("Mau dibantu apa?", "What can I help with?"))
-		text(l("Belum diperiksa", "No checks yet"), m.palette.muted)
+		if m.lastChecked.IsZero() {
+			text(l("Belum diperiksa", "No checks yet"), m.palette.muted)
+		} else {
+			text(l("Pemeriksaan terakhir", "Last check")+" · "+m.lastChecked.Local().Format("02 Jan 15:04")+" · "+m.lastCoverage, m.palette.muted)
+		}
 	case more:
 		title(l("Apa yang ingin dibuka?", "What would you like to open?"))
 	case questionInput:
@@ -179,7 +183,7 @@ func (m Model) body(w int) []string {
 
 func (m Model) maxScroll() int {
 	w, h := m.bounds()
-	return max(0, len(m.body(w))-max(1, h-7-min(8, len(m.choices()))))
+	return max(0, len(m.body(w))-m.bodyRoom(h, len(m.choices())))
 }
 
 func (m Model) View() tea.View {
@@ -226,6 +230,11 @@ func (m Model) View() tea.View {
 				}
 			}
 			label := c.Label
+			if m.screen == home && h >= 20 && i < 3 {
+				desc := []Words{{"Ringkasan kondisi dan saran", "Condition and next steps"},
+					{"Cari tanda penyebabnya", "Look for likely causes"}, {"Tinjau yang bisa dibersihkan", "Review what can be cleaned"}}
+				label += "  ·  " + m.tr(desc[i])
+			}
 			if m.screen == reviewPlan && c.Kind == "apply" {
 				switch {
 				case m.options.Demo:
