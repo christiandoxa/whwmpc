@@ -87,7 +87,7 @@ func TestResultLayoutAndMotionKeepTheSnapshot(t *testing.T) {
 			for _, size := range []tea.WindowSizeMsg{{Width: 80, Height: 24}, {Width: 120, Height: 36}, {Width: 48, Height: 18}} {
 				m = step(m, size)
 				view := ansi.Strip(m.View().Content)
-				if !strings.Contains(view, "View all results") || !strings.Contains(view, "24%") || !strings.Contains(view, "[##") || strings.ContainsAny(view, "█░") {
+				if !strings.Contains(view, "Done") || !strings.Contains(view, "Component details") || !strings.Contains(view, "24%") || !strings.Contains(view, "[##") || strings.ContainsAny(view, "█░") {
 					t.Fatalf("%s/%s at %dx%d lost data or fallback: %s", theme, mode, size.Width, size.Height, view)
 				}
 				lines := strings.Split(view, "\n")
@@ -126,7 +126,7 @@ func TestComponentSummariesKeepIndependentMeasurements(t *testing.T) {
 	s := summarize(p, m.active, "en")
 	m.page.Summary = &s
 	view := ansi.Strip(m.View().Content)
-	for _, want := range []string{"1 critical", "Affected drive", "0x02", "127%", "above 100%", "9007199254740993", "Other drives", "View critical findings"} {
+	for _, want := range []string{"CRITICAL", "Affected drive", "0x02", "127%", "above 100%", "9007199254740993", "Other drives", "View critical findings"} {
 		if !strings.Contains(view, want) {
 			t.Fatalf("SSD missing %q in\n%s", want, view)
 		}
@@ -211,8 +211,8 @@ func TestCoverageAndCriticalSummary(t *testing.T) {
 		page.Findings = append(page.Findings, diagnostics.Finding{Category: "ssd", Availability: domain.Available, Severity: diagnostics.Critical})
 	}
 	got := summarize(page, assistant.Overview, "en")
-	if got.Coverage != "1 complete · 1 partial · 1 failed · 1 unavailable · 1 not run" || !strings.Contains(got.Headline, "5 critical") ||
-		len(got.Highlights) != 3 || got.Primary.Kind != "details" {
+	if got.Coverage != "1 complete · 1 partial · 1 failed · 1 unavailable · 1 not run" ||
+		got.Priority != diagnostics.Critical || got.Primary.Kind != "component" || got.Primary.Value != "ssd" {
 		t.Fatalf("unexpected summary %+v", got)
 	}
 	for _, status := range []domain.Availability{domain.Unknown, domain.DependencyMissing, domain.PermissionRequired, domain.Partial, domain.Stale, domain.Error} {
@@ -222,6 +222,39 @@ func TestCoverageAndCriticalSummary(t *testing.T) {
 		if strings.Contains(got.Headline, "No warnings") || !strings.Contains(got.Highlights[0], statusNames[status].EN) {
 			t.Fatalf("%s produced %+v", status, got)
 		}
+	}
+}
+
+func TestTRIMWarningOpensOnlyTheRelatedPlan(t *testing.T) {
+	at := platform.DemoTime
+	audit := storage.TrimAudit{CapturedAt: at, Availability: domain.Available, Manual: domain.Available,
+		Mounts: []storage.Mount{{Point: "/", Discard: domain.Available}},
+		Timer: storage.Timer{Availability: domain.Available, ActiveState: "inactive", UnitFileState: "disabled",
+			LoadState: "loaded", Unit: "fstrim.service", ServiceLoadState: "loaded"}}
+	findings := (diagnostics.Analyzer{Language: "en", Now: at}).TRIM(audit)
+	page := Page{Availability: domain.Partial, Findings: findings,
+		Coverage: []workflow.Coverage{{ID: workflow.TRIMCheck, Status: domain.Available}, {ID: workflow.SSDCheck, Status: domain.PermissionRequired}}}
+	page.Choices = actionChoices([]Choice{{"Unrelated power setting", actions.PowerProfile, "performance"}}, findings, audit.Mounts)
+	var checked []Choice
+	m := New(t.Context(), platform.Demo{}, func(_ context.Context, req Request) Page {
+		checked = append(checked, req.Choice)
+		if req.Choice.Kind == "" {
+			return page
+		}
+		return planPage(actions.Plan{ID: "fixture-plan", Kind: req.Choice.Kind, Target: req.Choice.Value}, "en")
+	}, Options{Language: "en", Motion: "off"})
+	enter := tea.KeyPressMsg{Code: tea.KeyEnter}
+	next, cmd := m.Update(enter)
+	m = step(next.(Model), cmd())
+	s := m.page.Summary
+	if s.NextFinding != "trim.scheduler" || s.Primary.Kind != actions.EnableTrimTimer || s.Primary.Value != "fstrim.timer" ||
+		!strings.Contains(s.Headline, "schedule is not active") || !strings.Contains(s.Coverage, "1 unavailable") {
+		t.Fatalf("warning, target, or partial coverage hidden: %+v", s)
+	}
+	next, cmd = m.Update(enter)
+	m = step(next.(Model), cmd())
+	if m.screen != reviewPlan || m.page.Plan.Target != "fstrim.timer" || m.choice != 0 || len(checked) != 2 || checked[1].Kind != actions.EnableTrimTimer {
+		t.Fatal("the warning did not open its own review directly with Back selected")
 	}
 }
 
@@ -238,27 +271,50 @@ func TestQuickScanThenDetailsKeepsResultAndSelection(t *testing.T) {
 		t.Fatal("not scanning")
 	}
 	m = step(m, cmd())
-	if m.screen != results || len(m.page.Coverage) != 5 || !strings.Contains(m.View().Content, "Lihat semua hasil") {
+	if m.screen != results || len(m.page.Coverage) != 5 || m.choices()[0].Kind != "finish" {
 		t.Fatalf("quick results missing: %+v", m.page.Summary)
 	}
 	for _, size := range []tea.WindowSizeMsg{{Width: 80, Height: 24}, {Width: 120, Height: 36}} {
 		m = step(m, size)
 		view := ansi.Strip(m.View().Content)
-		for _, want := range []string{"5 selesai", "22 Nov 09:41", "24%", "8 sampel / 800ms · 13–38%", "56%", "7.0 GiB / 16.0 GiB", "71%", "148.0 GiB", "54 °C", "SMART lolos 1/1", "Jadwal aktif", "balanced · AC", "Lihat semua hasil"} {
+		for _, want := range []string{"5 selesai", "22 Nov 09:41", "24%", "8 sampel / 800ms · 13–38%", "56%", "7.0 GiB / 16.0 GiB", "71%", "148.0 GiB", "54 °C", "SMART lolos 1/1", "Jadwal aktif", "balanced · AC", "Detail komponen"} {
 			if !strings.Contains(view, want) {
 				t.Fatalf("%dx%d missing %q in\n%s", size.Width, size.Height, want, view)
 			}
 		}
 	}
 	s := m.page.Summary
-	m = step(m, tea.KeyPressMsg{Code: tea.KeyEnter})
-	if m.screen != detail {
-		t.Fatal("detail expected")
-	}
+	snapshot := m.page.Snapshot
 	m = step(m, tea.KeyPressMsg{Code: tea.KeyDown})
+	m = step(m, tea.KeyPressMsg{Code: tea.KeyEnter})
+	if m.screen != components {
+		t.Fatal("component selection expected")
+	}
+	for i, c := range m.choices() {
+		if c.Value == "ssd" {
+			m.choice = i
+			break
+		}
+	}
+	componentChoice := m.choice
+	m = step(m, tea.KeyPressMsg{Code: tea.KeyEnter})
+	if m.screen != detail || m.component != "ssd" || !strings.Contains(m.View().Content, "Cek kondisi PC · SSD") ||
+		!strings.Contains(m.View().Content, "Sumber dan waktu") {
+		t.Fatal("SSD detail lost the task or evidence source")
+	}
+	m = step(m, tea.KeyPressMsg{Code: tea.KeyPgDown})
 	m = step(m, tea.KeyPressMsg{Code: tea.KeyEsc})
-	if m.screen != results || m.page.Summary != s || m.choice != 0 || calls != 1 {
+	if m.screen != components || m.choice != componentChoice || m.page.Snapshot != snapshot {
+		t.Fatal("component selection was not restored")
+	}
+	m = step(m, tea.KeyPressMsg{Code: tea.KeyEsc})
+	if m.screen != results || m.page.Summary != s || m.choice != 1 || calls != 1 {
 		t.Fatal("back changed snapshot or selection")
+	}
+	m = step(m, tea.KeyPressMsg{Code: tea.KeyUp})
+	m = step(m, tea.KeyPressMsg{Code: tea.KeyEnter})
+	if m.screen != home || len(m.back) != 0 || !strings.Contains(m.View().Content, "Pemeriksaan terakhir") || calls != 1 {
+		t.Fatal("Done failed to close the task with its latest check summary")
 	}
 }
 

@@ -54,20 +54,6 @@ func (m Model) summaryBody(s ResultSummary, w, room int) []string {
 	for _, line := range headline[:min(2, len(headline))] {
 		add(line, m.palette.accent, 0)
 	}
-	coverage := l("Cakupan", "Coverage") + "  " + s.Coverage
-	if !s.At.IsZero() {
-		stamp := s.At.Format("02 Jan 15:04:05 MST")
-		if m.stalePage() {
-			stamp += " · " + l("KEDALUWARSA", "STALE")
-		}
-		if ansi.StringWidth(m.visualText(coverage+"  ·  "+stamp)) <= w {
-			coverage += "  ·  " + stamp
-		} else {
-			add(coverage, m.palette.secondary, 0)
-			coverage = stamp
-		}
-	}
-	add(coverage, m.palette.secondary, 0)
 	for i, exception := range s.Highlights {
 		parts := wrap("!  " + exception)
 		add(parts[0], m.palette.alert, 1+min(i, 1))
@@ -151,6 +137,22 @@ func (m Model) summaryBody(s ResultSummary, w, room int) []string {
 		for i, line := range wrap(s.Advice) {
 			add(line, m.palette.text, 1+i)
 		}
+	}
+	if s.Coverage != "" {
+		coverage := l("Cakupan", "Coverage") + "  " + s.Coverage
+		if !s.At.IsZero() {
+			stamp := s.At.Format("02 Jan 15:04:05 MST")
+			if m.stalePage() {
+				stamp += " · " + l("KEDALUWARSA", "STALE")
+			}
+			if ansi.StringWidth(m.visualText(coverage+"  ·  "+stamp)) <= w {
+				coverage += "  ·  " + stamp
+			} else {
+				add(coverage, m.palette.secondary, 1)
+				coverage = stamp
+			}
+		}
+		add(coverage, m.palette.secondary, 1)
 	}
 	if m.question != "" {
 		add(l("Pertanyaan", "Question")+" · "+m.question, m.palette.muted, 5)

@@ -33,6 +33,7 @@ type Options struct {
 	Privilege            *privread.Session
 	Send                 func(tea.Msg)
 	Workload             assistant.Workload
+	DemoCleanupResult    bool
 }
 
 type Choice struct {
@@ -56,20 +57,21 @@ type Page struct {
 }
 
 type Request struct {
-	Snapshot     *workflow.Snapshot
-	ScanProgress func(workflow.ScanProgress)
-	Output       string
-	Printing     func()
-	Findings     []diagnostics.Finding
-	Plan         *actions.Plan
-	Progress     func(actions.Stage)
-	Intent       assistant.Intent
-	Choice       Choice
-	Overview     domain.Overview
-	Workload     assistant.Workload
-	Language     string
-	Complete     privread.Operation
-	ObserveFor   time.Duration
+	Snapshot        *workflow.Snapshot
+	ScanProgress    func(workflow.ScanProgress)
+	Output          string
+	Printing        func()
+	Findings        []diagnostics.Finding
+	Plan            *actions.Plan
+	Progress        func(actions.Stage)
+	Intent          assistant.Intent
+	Choice          Choice
+	Overview        domain.Overview
+	Workload        assistant.Workload
+	Language        string
+	Complete        privread.Operation
+	ObserveFor      time.Duration
+	SimulateCleanup bool
 }
 
 type Inspect func(context.Context, Request) Page
@@ -90,6 +92,8 @@ const (
 	help
 	gallery
 	taskQuestion
+	components
+	resultOptions
 )
 
 type screenState struct {
@@ -105,6 +109,7 @@ type screenState struct {
 	access         *readAccess
 	readErr        error
 	request        *Request
+	component      string
 }
 
 type Model struct {
@@ -126,6 +131,7 @@ type Model struct {
 	accessChosen                                 bool
 	lastChecked                                  time.Time
 	lastCoverage                                 string
+	lastConclusion                               string
 	toast                                        string
 	stage                                        int
 	scenario                                     string
@@ -191,6 +197,7 @@ func (m *Model) remember() {
 
 func (m *Model) returnTo() tea.Cmd {
 	refreshHistory := m.screen == results && m.page.refreshHistory
+	fromOutcome := m.screen == outcome
 	m.input.Blur()
 	m.input.Reset()
 	if len(m.back) > 0 {
@@ -204,6 +211,9 @@ func (m *Model) returnTo() tea.Cmd {
 	}
 	if refreshHistory && m.active == assistant.History {
 		return m.start(assistant.History, Choice{Kind: "rescan"})
+	}
+	if fromOutcome && m.screen == results {
+		m.toast = m.tr(Words{"Ringkasan sebelum tindakan", "Summary from before the action"})
 	}
 	if m.typing() {
 		m.show(mascot.Listening, "", false)
@@ -246,14 +256,27 @@ func (m *Model) start(intent assistant.Intent, choice Choice) tea.Cmd {
 		return m.authorizeReads()
 	case "back", "cancel-plan":
 		return m.returnTo()
+	case "finish":
+		m.back = nil
+		m.homePage()
+		m.showReply()
+		return nil
 	case "more":
 		m.remember()
 		m.screenState = screenState{screen: more}
-		for _, id := range []assistant.Intent{assistant.Storage, assistant.Trim, assistant.Power, assistant.History, assistant.Report, assistant.Settings} {
+		for _, id := range []assistant.Intent{assistant.Storage, assistant.Trim, assistant.Power} {
 			m.page.Choices = append(m.page.Choices, Choice{m.tr(menuNames[id]), "navigate", string(id)})
 		}
-		m.page.Choices = append(m.page.Choices, Choice{m.tr(Words{"Tanya sesuatu", "Ask a question"}), "ask", ""},
-			Choice{m.tr(Words{"Tugas lanjutan", "Advanced tasks"}), "advanced", ""})
+		m.page.Choices = append(m.page.Choices, Choice{m.tr(Words{"Pemeriksaan lanjutan", "Advanced checks"}), "advanced", ""},
+			Choice{m.tr(Words{"Alat bantu", "Utilities"}), "utilities", ""})
+		return nil
+	case "utilities":
+		m.remember()
+		m.screenState = screenState{screen: taskQuestion, page: Page{Found: []string{m.tr(Words{"Alat bantu", "Utilities"})}}}
+		for _, id := range []assistant.Intent{assistant.History, assistant.Report, assistant.Settings} {
+			m.page.Choices = append(m.page.Choices, Choice{m.tr(menuNames[id]), "navigate", string(id)})
+		}
+		m.page.Choices = append(m.page.Choices, Choice{m.tr(Words{"Tanya sesuatu", "Ask a question"}), "ask", ""})
 		return nil
 	case "advanced":
 		m.remember()
@@ -274,22 +297,26 @@ func (m *Model) start(intent assistant.Intent, choice Choice) tea.Cmd {
 		return m.ask()
 	case "result-options":
 		m.remember()
-		m.screen, m.choice, m.scroll = taskQuestion, 0, 0
-		m.page.Found = []string{m.tr(Words{"Apa langkah berikutnya?", "What would you like to do next?"})}
-		m.page.Meaning, m.page.Advice = nil, nil
-		if m.page.Snapshot != nil {
-			m.page.Choices = append([]Choice{{m.tr(Words{"Simpan hasil ini", "Save these results"}), "save-snapshot", ""}}, m.page.Choices...)
-		}
-		m.page.Choices = append(slices.Clone(m.page.Choices), Choice{m.tr(Words{"Kembali", "Back"}), "back", ""})
+		m.screen, m.choice, m.scroll = resultOptions, 0, 0
 		return nil
 	case "details":
 		m.remember()
-		m.screen, m.scroll = detail, 0
+		m.screen, m.component, m.choice, m.scroll = components, "", 0, 0
+		switch choices := m.componentChoices(); len(choices) {
+		case 0:
+			m.screen = detail
+		case 1:
+			m.screen, m.component = detail, choices[0].Value
+		}
+		return nil
+	case "component", "evidence":
+		m.remember()
+		m.screen, m.component, m.choice, m.scroll = detail, choice.Value, 0, 0
 		return nil
 	case "motion":
 		return m.setMotion(motion.Mode(choice.Value))
 	case "apply":
-		if m.screen != reviewPlan || m.options.Demo || plan == nil || choice.Value != plan.ID ||
+		if m.screen != reviewPlan || plan == nil || m.options.Demo && !m.demoCleanupAllowed(plan) || choice.Value != plan.ID ||
 			m.choice != 1 || !m.reviewReady() {
 			return nil
 		}
@@ -359,6 +386,9 @@ func (m *Model) start(intent assistant.Intent, choice Choice) tea.Cmd {
 	}
 	req := Request{Intent: intent, Choice: choice, Output: m.pendingOutput, Overview: m.overview, Plan: plan, Findings: m.page.Findings,
 		Language: m.options.Language, Workload: m.options.Workload}
+	if choice.Kind == "apply" && m.demoCleanupAllowed(plan) {
+		req.SimulateCleanup = true
+	}
 	if choice.Kind == "slow-observe" {
 		req.ObserveFor = workflow.ObservationWindow
 	}
@@ -480,10 +510,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		wasAction := m.screen == executing
 		m.page, m.busy, m.runningAction, m.cancelling, m.workName = msg.page, false, false, false, ""
 		m.screen, m.choice, m.scroll = results, 0, 0
-		if m.page.Snapshot != nil && (m.active == assistant.Overview || m.active == assistant.Slow) {
-			m.lastChecked = m.page.Snapshot.Input.At
-			m.lastCoverage = coverageLine(m.page.Coverage, m.options.Language)
-		}
 		if m.page.Plan != nil {
 			m.screen = reviewPlan
 			m.reviewThrough = 0
@@ -499,8 +525,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			summary := summarize(m.page, m.active, m.options.Language)
 			m.summarizeReads(&summary)
 			m.page.Summary = &summary
+			if !summary.At.IsZero() && (m.screen == outcome || m.request != nil && startsInspection(*m.request)) {
+				m.lastChecked, m.lastCoverage = summary.At, summary.Coverage
+				m.lastConclusion = m.tr(menuNames[m.active]) + " · " + summary.Headline
+			}
 		}
 		if previousRead != nil {
+			m.updateResultContext(*previousRead)
 			m.toast = m.tr(Words{"Pemeriksaan ulang selesai", "Repeat check finished"})
 		}
 		m.updateCritical()
@@ -643,7 +674,7 @@ func (m *Model) key(msg tea.KeyPressMsg) tea.Cmd {
 			m.recordReview()
 			return nil
 		}
-		if m.screen == detail || m.screen == help || key == "pgup" || key == "pgdown" || len(m.choices()) == 0 {
+		if m.screen == help || key == "pgup" || key == "pgdown" || len(m.choices()) == 0 {
 			m.scroll = max(0, min(m.scroll+step, m.maxScroll()))
 		} else {
 			previous := m.choice
@@ -663,9 +694,6 @@ func (m *Model) key(msg tea.KeyPressMsg) tea.Cmd {
 			}
 		}
 	case "enter":
-		if m.screen == detail {
-			return m.start(m.active, Choice{Kind: "result-options"})
-		}
 		choices := m.choices()
 		if m.choice < len(choices) {
 			return m.start(m.active, choices[m.choice])
@@ -725,12 +753,15 @@ func (m *Model) submit() tea.Cmd {
 	message := m.tr(copy.clarify)
 	if len(intents) == 0 {
 		message = m.tr(copy.unknown)
-		intents = assistant.Menu
+		intents = []assistant.Intent{assistant.Overview, assistant.Slow, assistant.Cleanup}
 	}
 	m.page = Page{Availability: domain.Unknown, Found: []string{message}}
 	m.question = domain.SafeText(value)
 	for _, id := range intents {
 		m.page.Choices = append(m.page.Choices, Choice{m.tr(menuNames[id]), "navigate", string(id)})
+	}
+	if message == m.tr(copy.unknown) {
+		m.page.Choices = append(m.page.Choices, Choice{m.tr(Words{"Pemeriksaan lain", "Other checks"}), "more", ""})
 	}
 	if m.options.Motion == motion.Full && m.canAnimate() {
 		m.show(mascot.Nod, mascot.Thinking, false)

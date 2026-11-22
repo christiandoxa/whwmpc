@@ -2,6 +2,7 @@ package tui
 
 import (
 	"fmt"
+	"slices"
 	"time"
 
 	tea "charm.land/bubbletea/v2"
@@ -48,6 +49,7 @@ func summarizeObservation(s *ResultSummary, snap workflow.Snapshot, lang string)
 	s.Advice = fmt.Sprintf(l("Pengamatan %d dtk. Perubahan beban menjadi petunjuk selama gejala.", "%d s observed. Load changes provide clues during the slowdown."), snap.ObservedFor.Round(time.Second)/time.Second)
 	mem := o.Memory.Use
 	if latest, ok := mem.Latest(); ok && validPercent(latest) && len(mem.Samples) > 1 {
+		s.Metrics = slices.Clone(s.Metrics)
 		low, high := latest, latest
 		for _, sample := range mem.Samples {
 			if validPercent(sample) {

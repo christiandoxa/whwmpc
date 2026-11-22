@@ -76,7 +76,7 @@ func Inspector(scanner *inspection.Scanner, store state.Store, maintenance *work
 			page.Summary = powerSummary(snapshot, req.Language)
 			page.Snapshot = &workflow.Snapshot{Input: report.Input{At: scanner.Now(), Demo: maintenance.Demo, Power: &snapshot, Findings: page.Findings}}
 			if snapshot.LinuxInterfaces() {
-				page.Choices = append(page.Choices, Choice{translator(req.Language)("Pilih profil yang cocok", "Choose a suitable profile"), "navigate", string(assistant.Recommend)})
+				page.Choices = append(page.Choices, Choice{menuNames[assistant.Recommend].Text(req.Language), "navigate", string(assistant.Recommend)})
 			}
 			if allowActions {
 				page.Choices = actionChoices(page.Choices, page.Findings, nil)
@@ -176,7 +176,6 @@ func withFindings(page Page, findings []diagnostics.Finding, lang string) Page {
 		}
 	}
 	if len(findings) > 0 {
-		page.Evidence = append(findingEvidence(findings, lang), page.Evidence...)
 		if findings[0].Category == "recommendation" {
 			f := findings[0]
 			page.Found, page.Meaning, page.Advice = []string{f.Observation}, []string{f.Meaning}, []string{f.Recommendation}
@@ -408,7 +407,7 @@ func actionChoices(choices []Choice, findings []diagnostics.Finding, mounts []st
 			case actions.PowerProfile:
 				choices = appendChoice(choices, Choice{Label: a.Label, Kind: a.Kind, Value: a.Target})
 			case actions.EnableTrimTimer:
-				choices = appendChoice(choices, Choice{Label: a.Label, Kind: a.Kind})
+				choices = appendChoice(choices, Choice{Label: a.Label, Kind: a.Kind, Value: a.Target})
 			case actions.TrimMount:
 				id, err := strconv.ParseUint(a.Target, 10, 64)
 				if err != nil {

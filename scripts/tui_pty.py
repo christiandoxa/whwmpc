@@ -138,7 +138,7 @@ def choose_level(terminal, deep, scope="SMART"):
     return offset
 
 
-def task_flow(terminal, flow, resize=False, deep=False, observe=False):
+def task_flow(terminal, flow, resize=False, deep=False, observe=False, cleanup_result=False):
     terminal.expect("Mau dibantu apa?")
     index = ("condition", "slow", "cleanup", "ssd").index(flow)
     for _ in range(index):
@@ -149,7 +149,6 @@ def task_flow(terminal, flow, resize=False, deep=False, observe=False):
         press(terminal, b"\r")
         offset = choose_level(terminal, False)
         terminal.expect("Lengkapi pemeriksaan SSD", offset)
-        press(terminal, b"\x1b[B")
         press(terminal, b"\r")
         terminal.expect("Kembali ke hasil")
         terminal.expect("SSD / SMART")
@@ -163,6 +162,7 @@ def task_flow(terminal, flow, resize=False, deep=False, observe=False):
         terminal.expect("Lolos", offset)
         if terminal.output.count(ENTER_ALT) < 2 or LEAVE_ALT not in terminal.output:
             raise RuntimeError("SSD authorization did not restore the alternate screen")
+        done(terminal, offset)
         return
     if flow == "slow":
         terminal.expect("Apakah kelambatannya sedang terjadi?")
@@ -184,6 +184,18 @@ def task_flow(terminal, flow, resize=False, deep=False, observe=False):
         offset = len(terminal.output)
         press(terminal, b"\r")
         terminal.expect("file teramati", offset)
+        if cleanup_result:
+            offset = len(terminal.output)
+            press(terminal, b"\r")
+            terminal.expect("Simulasikan pembersihan", offset)
+            press(terminal, b"\x1b[6~")
+            press(terminal, b"\x1b[B")
+            offset = len(terminal.output)
+            press(terminal, b"\r")
+            terminal.expect("Pembersihan cache terverifikasi", offset)
+            terminal.expect("Teramati terhapus", offset)
+            terminal.expect("Selisih ruang bebas", offset)
+            done(terminal, offset)
         return
     if observe:
         terminal.expect("Memantau CPU, RAM, proses", offset)
@@ -193,15 +205,19 @@ def task_flow(terminal, flow, resize=False, deep=False, observe=False):
     terminal.expect("selesai", offset)
     for measurement in (("41%", "59%") if observe else ("24%", "56%")) + ("71%", "148.0 GiB"):
         terminal.expect(measurement, offset)
-    if flow == "slow":
+    if flow == "slow" and not observe:
         terminal.expect("Pantau saat PC lambat", offset)
-        if not observe:
-            terminal.expect("Kondisi awal", offset)
-        press(terminal, b"\x1b[B")
-    terminal.expect("Lihat semua hasil", offset)
+        terminal.expect("Kondisi awal", offset)
+    else:
+        terminal.expect("Selesai", offset)
+    terminal.expect("Detail komponen", offset)
+    press(terminal, b"\x1b[B")
     offset = len(terminal.output)
     press(terminal, b"\r")
-    terminal.expect("Semua hasil", offset)
+    terminal.expect("Pilih komponen", offset)
+    offset = len(terminal.output)
+    press(terminal, b"\r")
+    terminal.expect("Sumber dan waktu", offset)
     if resize:
         offset = len(terminal.output)
         terminal.resize(40, 14)
@@ -212,7 +228,20 @@ def task_flow(terminal, flow, resize=False, deep=False, observe=False):
         terminal.hold(0.3)
     offset = len(terminal.output)
     press(terminal, b"\x1b")
-    terminal.expect("Lihat semua hasil", offset)
+    terminal.expect("Pilih komponen", offset)
+    offset = len(terminal.output)
+    press(terminal, b"\x1b")
+    terminal.expect("Detail komponen", offset)
+    if flow != "slow" or observe:
+        press(terminal, b"\x1b[A")
+        done(terminal, offset)
+
+
+def done(terminal, offset):
+    terminal.expect("Selesai", offset)
+    offset = len(terminal.output)
+    press(terminal, b"\r")
+    terminal.expect("Pemeriksaan terakhir", offset)
 
 
 def smoke(terminal):
@@ -242,11 +271,14 @@ def main():
     parser.add_argument("--flow", choices=("condition", "slow", "cleanup", "ssd"))
     parser.add_argument("--deep", action="store_true", help="choose deep inspection using fixtures")
     parser.add_argument("--observe", action="store_true", help="observe a slowdown in real time")
+    parser.add_argument("--cleanup-result", action="store_true", help="confirm the fixture-only cleanup")
     args = parser.parse_args()
     if not 80 <= args.width <= 240 or not 24 <= args.height <= 80 or not 0.5 <= args.duration <= 30:
         parser.error("use 80–240 columns, 24–80 rows and 0.5–30 seconds")
     if args.observe and args.flow != "slow":
         parser.error("--observe requires --flow slow")
+    if args.cleanup_result and args.flow != "cleanup":
+        parser.error("--cleanup-result requires --flow cleanup")
     if args.app_arg and (args.record is None or any(
         not arg.startswith("--") or arg == "--" or arg.startswith("--demo") for arg in args.app_arg
     )):
@@ -257,6 +289,8 @@ def main():
         args.app_arg.extend(["demo", "animations"])
     if args.flow == "ssd":
         args.app_arg.append("--demo-scenario=ssd-permission")
+    if args.cleanup_result:
+        args.app_arg.append("--demo-scenario=cleanup-result")
 
     with tempfile.TemporaryDirectory(prefix="whwmpc-pty-") as tempdir:
         terminal = Terminal(
@@ -265,7 +299,8 @@ def main():
         try:
             terminal.expect("DEMO")
             if args.flow:
-                task_flow(terminal, args.flow, resize=args.record is None, deep=args.deep, observe=args.observe)
+                task_flow(terminal, args.flow, resize=args.record is None, deep=args.deep, observe=args.observe,
+                          cleanup_result=args.cleanup_result)
                 if args.record is not None:
                     terminal.hold(1)
                     recording = terminal.events[:]

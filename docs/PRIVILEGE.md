@@ -1,6 +1,6 @@
 # Pemeriksaan mendalam
 
-Mulai `whwmpc` dari terminal sebagai pengguna biasa dan pilih tujuan. Sebelum tugas pertama, **Mulai tanpa administrator** menjadi pilihan awal. Pilihan administrator menampilkan cakupan yang dapat dibaca oleh backend untuk tujuan itu. Setelah autentikasi, tugas langsung berjalan dengan akses yang tersedia. Piko menampilkan mode aktif di judul. Gunakan **Pemeriksaan lain → Pengaturan → Tingkat pemeriksaan** untuk mengganti mode.
+Mulai `whwmpc` dari terminal sebagai pengguna biasa dan pilih tujuan. Sebelum tugas pertama, **Mulai tanpa administrator** menjadi pilihan awal. Pilihan administrator menampilkan cakupan yang dapat dibaca oleh backend untuk tujuan itu. Setelah autentikasi, tugas langsung berjalan dengan akses yang tersedia. Piko menampilkan mode aktif di judul. Buka **Pemeriksaan lain → Alat bantu → Pengaturan → Tingkat pemeriksaan** untuk mengganti mode. Pengaturan juga tersedia dari **Pilihan lain** pada hasil pemeriksaan.
 
 | Platform | Autentikasi | Cakupan baca tambahan |
 | --- | --- | --- |

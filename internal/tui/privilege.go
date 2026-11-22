@@ -278,6 +278,15 @@ func (m *Model) summarizeReads(s *ResultSummary) {
 			m.page.Choices = appendChoice(m.page.Choices, m.retryReadChoice(op))
 		}
 	}
+	if s.RetryRead != "" && s.Priority == "" {
+		s.Primary = m.retryReadChoice(s.RetryRead)
+		for _, f := range m.page.Findings {
+			if f.Availability == domain.PermissionRequired && componentKey(f.Category) == readComponent(s.RetryRead) {
+				s.NextFinding, s.Advice = f.ID, findingAdvice(f)
+				break
+			}
+		}
+	}
 }
 
 var retryLabels = map[privread.Operation]Words{
@@ -292,8 +301,14 @@ var retryLabels = map[privread.Operation]Words{
 
 func (m Model) retryReadChoice(op privread.Operation) Choice {
 	label := m.tr(retryLabels[op])
-	if st := m.options.Privilege.State(); errors.Is(st.Err, privread.ErrExpired) {
+	err := m.readErr
+	if err == nil {
+		err = m.options.Privilege.State().Err
+	}
+	if errors.Is(err, privread.ErrExpired) {
 		label += m.tr(Words{" · izin habis", " · access expired"})
+	} else if err != nil {
+		label += m.tr(Words{" · coba lagi", " · try again"})
 	}
 	return Choice{Label: label, Kind: "complete-read", Value: string(op)}
 }

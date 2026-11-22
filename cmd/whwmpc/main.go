@@ -54,7 +54,7 @@ func run(ctx context.Context, args []string, stdin *os.File, stdout *os.File, st
 	flags.SetOutput(stderr)
 	options := tui.Options{}
 	flags.BoolVar(&options.Demo, "demo", false, "pakai data contoh tanpa tindakan sistem")
-	demoScenario := flags.String("demo-scenario", "", "skenario demo: ssd-permission")
+	demoScenario := flags.String("demo-scenario", "", "skenario demo: ssd-permission atau cleanup-result")
 	flags.StringVar(&options.Language, "lang", "id", "bahasa: id atau en")
 	flags.StringVar(&options.Theme, "theme", "dark", "tema: dark, light, terminal")
 	flags.BoolVar(&options.ASCII, "ascii", false, "pakai simbol ASCII")
@@ -89,8 +89,8 @@ func run(ctx context.Context, args []string, stdin *os.File, stdout *os.File, st
 		options.Demo, options.Gallery = true, true
 		args = nil
 	}
-	if *demoScenario != "" && (!options.Demo || options.Gallery || *demoScenario != "ssd-permission") {
-		fmt.Fprintln(stderr, "Gunakan --demo --demo-scenario ssd-permission.")
+	if *demoScenario != "" && (!options.Demo || options.Gallery || (*demoScenario != "ssd-permission" && *demoScenario != "cleanup-result")) {
+		fmt.Fprintln(stderr, "Gunakan --demo --demo-scenario dengan ssd-permission atau cleanup-result.")
 		return 2
 	}
 	options.Motion = motion.Mode(*motionMode)
@@ -105,6 +105,7 @@ func run(ctx context.Context, args []string, stdin *os.File, stdout *os.File, st
 	}
 	source := inspection.New(options.Demo)
 	source.DemoSMARTPermission = *demoScenario == "ssd-permission"
+	options.DemoCleanupResult = *demoScenario == "cleanup-result"
 	access := privread.New(privread.Native(), options.Demo)
 	source.Privilege = access
 	defer access.Disable()

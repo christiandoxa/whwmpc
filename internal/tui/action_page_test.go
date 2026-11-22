@@ -2,6 +2,8 @@ package tui
 
 import (
 	"context"
+	"io"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -14,9 +16,54 @@ import (
 	"github.com/christiandoxa/whwmpc/internal/firmware"
 	"github.com/christiandoxa/whwmpc/internal/inspection"
 	"github.com/christiandoxa/whwmpc/internal/platform"
+	"github.com/christiandoxa/whwmpc/internal/state"
 	"github.com/christiandoxa/whwmpc/internal/tui/mascot"
 	"github.com/christiandoxa/whwmpc/internal/workflow"
 )
+
+func TestDemoCleanupReviewExercisesVerificationWithoutSystemAccess(t *testing.T) {
+	store := state.Store{StateDir: t.TempDir()}
+	scanner := inspection.New(true)
+	inspect := Inspector(scanner, store, workflow.NewMaintenance(store, true))
+	var stages []actions.Stage
+	m := New(t.Context(), scanner, inspect, Options{Demo: true, DemoCleanupResult: true, Language: "en", Motion: "off",
+		Authenticate: func(context.Context, actions.Plan, string, io.Reader, io.Writer, io.Writer) error {
+			t.Fatal("demo tried to authenticate a system action")
+			return nil
+		}, Send: func(msg tea.Msg) {
+			if stage, ok := msg.(stageMsg); ok {
+				stages = append(stages, stage.stage)
+			}
+		}})
+	cmd := m.start(assistant.Cleanup, Choice{})
+	m = step(m, cmd())
+	enter := tea.KeyPressMsg{Code: tea.KeyEnter}
+	next, cmd := m.Update(enter)
+	m = step(next.(Model), cmd())
+	if m.screen != reviewPlan || m.choice != 0 || m.page.Plan.ID != demoCleanupID {
+		t.Fatal("review did not open with Back selected")
+	}
+	m = step(m, enter)
+	if m.screen != results || len(stages) != 0 {
+		t.Fatal("leaving the preview ran cleanup")
+	}
+	next, cmd = m.Update(enter)
+	m = step(next.(Model), cmd())
+	m = step(m, tea.KeyPressMsg{Code: tea.KeyPgDown})
+	m = step(m, tea.KeyPressMsg{Code: tea.KeyDown})
+	next, cmd = m.Update(enter)
+	m = step(next.(Model), cmd())
+	r := m.page.Snapshot.Input.Actions[0]
+	if m.screen != outcome || !m.page.Snapshot.Input.Demo || r.Status != actions.Verified || r.RemovedBytes == nil || *r.RemovedBytes != 376<<20 ||
+		r.FreeSpaceDelta == nil || *r.FreeSpaceDelta == int64(*r.RemovedBytes) ||
+		!slices.Equal(stages, []actions.Stage{actions.Revalidating, actions.Executing, actions.Verifying}) {
+		t.Fatalf("demo verification or accounting did not match the fixture: %+v", r)
+	}
+	m = step(m, enter)
+	if m.screen != home || !strings.Contains(m.lastConclusion, "Cache cleanup verified") {
+		t.Fatal("completing cleanup lost the verified outcome")
+	}
+}
 
 func TestApplyRequiresDisplayedPlanAndConfirmation(t *testing.T) {
 	ctx := context.Background()

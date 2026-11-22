@@ -6,7 +6,7 @@
 
 [Sebelum](docs/assets/ux/before-80.png) · [Sesudah](docs/assets/ux/after-80.png) · [Demo Piko](docs/assets/piko-demo.gif) · [Alur dan rekaman PTY](docs/UX.md)
 
-Ringkasan hasil menampilkan bar CPU, RAM, dan disk, suhu terbaca, serta status SSD, TRIM, dan profil daya. Gunakan Enter untuk melihat detail dan Esc untuk kembali. [Cek kondisi pada 80×24](docs/assets/ux/results/overview-80x24.after.png) · [Rekaman](docs/assets/ux/results/overview-80x24.cast) · [Perbandingan layar hasil](docs/UX.md#bukti-dari-pty)
+Ringkasan menampilkan kesimpulan, bar CPU, RAM, dan disk, suhu terbaca, serta status SSD, TRIM, dan profil daya. Pilih **Selesai** untuk kembali ke beranda, atau buka **Detail komponen** untuk melihat bukti. [Perjalanan dari PTY](docs/UX.md)
 
 ## Mulai
 
@@ -60,13 +60,14 @@ Untuk instalasi dari arsip di Linux, macOS, atau Windows, pilih paket yang cocok
 
 Pilih tujuan lebih dulu. Layar akses muncul sebelum pemeriksaan pertama dengan **Mulai tanpa administrator** sebagai pilihan awal. Pilihan administrator memakai prompt sistem operasi dan melanjutkan tujuan yang sudah dipilih. Dari hasil yang terhalang izin, **Lengkapi pemeriksaan** membaca ulang komponen terkait. Ganti tingkat akses sesi dari Pengaturan. [Cakupan Linux, macOS, dan Windows](docs/PRIVILEGE.md)
 
-Beranda menyediakan **Cek kondisi PC**, **Cari penyebab PC lambat**, dan **Bersihkan ruang**. Gunakan **Pemeriksaan lain** untuk SSD, TRIM, daya, riwayat, laporan, pengaturan, dan pertanyaan bebas. **Tugas lanjutan** membuka GPU, firmware, filesystem, benchmark, dan status observasi terjadwal.
+Beranda menyediakan **Cek kondisi PC**, **Cari penyebab PC lambat**, dan **Bersihkan ruang**. **Pemeriksaan lain** membuka SSD, TRIM, dan daya. Dari sana, **Pemeriksaan lanjutan** membuka GPU, firmware, filesystem, uji kinerja, dan observasi terjadwal. **Alat bantu** memuat riwayat, laporan, pengaturan, serta pertanyaan bebas.
 
 Di **Cari penyebab PC lambat**, pilih apakah gejalanya sedang terjadi. **Ya, pantau sekarang** mengukur CPU, RAM, dan proses sekitar 12 detik serta membaca konteks daya. **Belum, ambil kondisi awal** mengambil sampel pembanding. Tekan Esc untuk menghentikan pengamatan.
 
 | Tombol | Fungsi |
 | --- | --- |
-| ↑/↓ atau j/k | Pilih dari daftar atau gulir detail |
+| ↑/↓ atau j/k | Pilih dari daftar |
+| PgUp/PgDn | Gulir bukti atau rencana |
 | Enter | Buka pilihan yang ditandai |
 | Esc | Kembali atau minta penghentian |
 | / atau ? | Buka pertanyaan bebas atau bantuan |

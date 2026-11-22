@@ -58,32 +58,28 @@ func (m Model) bounds() (int, int) {
 
 func (m Model) choices() []Choice {
 	switch m.screen {
-	case scanning, executing, questionInput, fileInput, detail, help:
+	case scanning, executing, questionInput, fileInput, help:
 		return nil
 	case home, more, gallery, taskQuestion, reviewPlan:
 		return m.page.Choices
+	case components:
+		return append(m.componentChoices(), m.evidenceChoice(), m.backChoice())
+	case detail:
+		return m.detailChoices()
+	case resultOptions:
+		return m.additionalResultChoices()
 	}
 	if (m.screen == results || m.screen == outcome) && m.page.Summary != nil {
-		primary := m.page.Summary.Primary
-		choices := []Choice{primary}
-		if primary.Kind == "details" && m.page.Summary.RetryRead != "" {
-			choices = append(choices, m.retryReadChoice(m.page.Summary.RetryRead))
-		} else if primary.Kind == "details" && m.page.Snapshot != nil {
-			choices = append(choices, Choice{m.tr(Words{"Simpan hasil ini", "Save these results"}), "save-snapshot", ""})
-		}
-		if primary.Kind != "details" {
-			choices = append(choices, Choice{m.tr(Words{"Lihat semua hasil", "View all results"}), "details", ""})
-		}
-		return append(choices, Choice{m.tr(Words{"Kembali", "Back"}), "back", ""})
+		return m.resultChoices()
 	}
 	choices := slices.Clone(m.page.Choices)
 	if m.page.Snapshot != nil {
-		choices = append(choices, Choice{m.tr(Words{"Simpan hasil ini", "Save these results"}), "save-snapshot", ""})
+		choices = append(choices, m.saveChoice())
 	}
 	if len(m.page.Findings) > 0 || len(m.page.Evidence) > 0 {
-		choices = append(choices, Choice{m.tr(Words{"Lihat semua hasil", "View all results"}), "details", ""})
+		choices = append(choices, detailsChoice(m.options.Language))
 	}
-	return append(choices, Choice{m.tr(Words{"Kembali", "Back"}), "back", ""})
+	return append(choices, m.backChoice())
 }
 
 func (m Model) bodyRoom(h, options int) int {
@@ -109,7 +105,7 @@ func (m Model) body(w int) []string {
 	var lines []string
 	l := translator(m.options.Language)
 	text := func(s string, style lipgloss.Style) {
-		for _, line := range strings.Split(ansi.Wrap(domain.SafeText(s), w, ""), "\n") {
+		for _, line := range strings.Split(ansi.Wrap(m.visualText(s), w, ""), "\n") {
 			for _, part := range strings.Split(ansi.Hardwrap(line, w, false), "\n") {
 				lines = append(lines, style.Render(part))
 			}
@@ -131,6 +127,7 @@ func (m Model) body(w int) []string {
 			text(l("Belum diperiksa", "No checks yet"), m.palette.muted)
 		} else {
 			text(l("Pemeriksaan terakhir", "Last check")+" · "+m.lastChecked.Local().Format("02 Jan 15:04")+" · "+m.lastCoverage, m.palette.muted)
+			text(m.lastConclusion, m.palette.text)
 		}
 		if m.options.Privilege != nil {
 			if st := m.options.Privilege.State(); st.Requested && !st.Active {
@@ -139,9 +136,14 @@ func (m Model) body(w int) []string {
 		}
 	case more:
 		title(l("Apa yang ingin dibuka?", "What would you like to open?"))
+	case components:
+		title(l("Pilih komponen", "Choose a component"))
+	case resultOptions:
+		title(l("Pilihan untuk hasil ini", "Options for these results"))
 	case questionInput:
 		title(l("Apa yang ingin kamu tanyakan?", "What would you like to ask?"))
 		text(m.input.View(), m.palette.text)
+		text(l("Coba “cek SSD” atau “kenapa PC terasa lambat?”", "Try “check SSD” or “why is my PC slow?”"), m.palette.muted)
 	case fileInput:
 		switch m.exportType {
 		case "read":
@@ -172,12 +174,18 @@ func (m Model) body(w int) []string {
 			normal(line)
 		}
 	case detail:
-		title(l("Semua hasil", "All results"))
-		if s := m.page.Summary; s != nil && !s.At.IsZero() {
-			normal(l("Sampel", "Sample") + " · " + s.At.Format("2006-01-02 15:04:05 MST"))
-		}
+		title(m.detailTitle())
 		if m.stalePage() {
 			text(l("Data kedaluwarsa", "Stale data"), m.palette.alert)
+		}
+		if m.component != "" {
+			for _, line := range m.componentEvidence() {
+				normal(line)
+			}
+			break
+		}
+		if s := m.page.Summary; s != nil && !s.At.IsZero() {
+			normal(l("Sampel", "Sample") + " · " + s.At.Format("2006-01-02 15:04:05 MST"))
 		}
 		for _, check := range m.page.Coverage {
 			status := statusNames[check.Status].Text(m.options.Language)
@@ -189,16 +197,8 @@ func (m Model) body(w int) []string {
 		if len(m.page.Coverage) > 0 {
 			lines = append(lines, "")
 		}
-		if len(m.page.Findings) == 0 {
-			for _, s := range m.page.Found {
-				normal(s)
-			}
-		}
-		for _, s := range m.page.Evidence {
-			normal(s)
-		}
-		for _, s := range append(slices.Clone(m.page.Meaning), m.page.Advice...) {
-			normal(s)
+		for _, line := range distinctEvidence(slices.Concat(m.page.Found, findingEvidence(m.page.Findings, m.options.Language), m.page.Evidence, m.page.Meaning, m.page.Advice)) {
+			normal(line)
 		}
 	default:
 		if (m.screen == results || m.screen == outcome) && m.page.Summary != nil {
@@ -330,6 +330,11 @@ func (m Model) View() tea.View {
 			}
 			if m.screen == reviewPlan && c.Kind == "apply" {
 				switch {
+				case m.demoCleanupAllowed(m.page.Plan):
+					label = m.tr(Words{"Simulasikan pembersihan · DEMO", "Simulate cleanup · DEMO"})
+					if !m.reviewReady() {
+						label += " · " + m.tr(Words{"baca dulu", "review first"})
+					}
 				case m.options.Demo:
 					label += " · DEMO"
 				case !m.reviewReady():
@@ -349,7 +354,7 @@ func (m Model) View() tea.View {
 		}
 	case reviewPlan:
 		switch {
-		case m.options.Demo:
+		case m.options.Demo && !m.demoCleanupAllowed(m.page.Plan):
 			footer = m.tr(Words{"DEMO · Aksi terkunci · Esc Kembali", "DEMO · Actions locked · Esc Back"})
 		case !m.reviewReady():
 			footer = m.tr(Words{"↓ Baca seluruh rencana · Esc Kembali", "↓ Read the full plan · Esc Back"})
@@ -361,7 +366,7 @@ func (m Model) View() tea.View {
 	case questionInput, fileInput:
 		footer = m.tr(Words{"Enter Lanjut  ·  Esc Kembali", "Enter Continue  ·  Esc Back"})
 	case detail:
-		footer = m.tr(Words{"↑↓ Gulir  ·  Enter Pilihan lanjutan  ·  Esc Kembali", "↑↓ Scroll  ·  Enter Next steps  ·  Esc Back"})
+		footer = m.tr(Words{"↑↓ Pilih · PgUp/PgDn Gulir · Esc Kembali", "↑↓ Select · PgUp/PgDn Scroll · Esc Back"})
 	case help:
 		footer = m.tr(Words{"↑↓ Gulir  ·  Esc Kembali", "↑↓ Scroll  ·  Esc Back"})
 	}
@@ -371,7 +376,7 @@ func (m Model) View() tea.View {
 	if ansi.StringWidth(footer) > w && m.screen != reviewPlan {
 		switch m.screen {
 		case detail:
-			footer = m.tr(Words{"Enter Pilihan  /  Esc Kembali", "Enter Options  /  Esc Back"})
+			footer = m.tr(Words{"PgUp/PgDn Gulir / Esc Kembali", "PgUp/PgDn Scroll / Esc Back"})
 		case home:
 			footer = m.tr(Words{"Enter Buka  /  ? Bantuan  /  q Keluar", "Enter Open  /  ? Help  /  q Quit"})
 		default:
@@ -447,14 +452,20 @@ func overviewPage(o domain.Overview, lang string) Page {
 	for _, disk := range o.Disks {
 		page.Evidence = append(page.Evidence, fmt.Sprintf("%s · %s · %s", disk.Mount, disk.FSType, percent(disk.UsedPercent, disk.Availability == domain.Available)))
 	}
+	page.Evidence = append(page.Evidence, processEvidence(o, lang)...)
+	return page
+}
+
+func processEvidence(o domain.Overview, lang string) []string {
 	processCPU := "CPU"
 	if o.CPU.Scope == domain.PrimaryProcessorGroup {
-		processCPU = l("CPU host", "host CPU")
+		processCPU = (Words{"CPU host", "host CPU"}).Text(lang)
 	}
+	var lines []string
 	for _, process := range o.Processes {
-		page.Evidence = append(page.Evidence, fmt.Sprintf("%s · %s %.1f%% · RSS %s", process.Name, processCPU, process.CPU, bytesText(process.RSS)))
+		lines = append(lines, fmt.Sprintf("%s · %s %.1f%% · RSS %s", process.Name, processCPU, process.CPU, bytesText(process.RSS)))
 	}
-	return page
+	return lines
 }
 
 func percent(value float64, known bool) string {

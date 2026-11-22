@@ -16,6 +16,8 @@ import (
 
 type ResultSummary struct {
 	Headline, Coverage, Advice string
+	NextFinding                string
+	Priority                   diagnostics.Severity
 	At                         time.Time
 	Metrics                    []resultMetric
 	Statuses                   []resultStatus
@@ -175,7 +177,7 @@ func summarize(page Page, intent assistant.Intent, lang string) ResultSummary {
 		}
 	}
 	findings := sortedFindings(page.Findings)
-	critical, warning := 0, 0
+	var priority, missing *diagnostics.Finding
 	incomplete := len(page.Coverage) == 0 && page.Availability != domain.Available
 	incomplete = incomplete || slices.ContainsFunc(summary.Metrics, func(metric resultMetric) bool {
 		return !metric.Secondary && metric.Availability != domain.Available
@@ -183,12 +185,12 @@ func summarize(page Page, intent assistant.Intent, lang string) ResultSummary {
 	for _, check := range page.Coverage {
 		incomplete = incomplete || check.Status != domain.Available
 	}
-	for _, f := range findings {
-		if f.Severity == diagnostics.Critical {
-			critical++
+	for i, f := range findings {
+		if priority == nil && (f.Severity == diagnostics.Critical || f.Severity == diagnostics.Warning) {
+			priority = &findings[i]
 		}
-		if f.Severity == diagnostics.Warning {
-			warning++
+		if missing == nil && f.Availability != domain.Available {
+			missing = &findings[i]
 		}
 		incomplete = incomplete || f.Availability != domain.Available
 		if len(summary.Highlights) < 3 && (f.Severity == diagnostics.Critical || f.Severity == diagnostics.Warning ||
@@ -197,47 +199,68 @@ func summarize(page Page, intent assistant.Intent, lang string) ResultSummary {
 		}
 	}
 	switch {
-	case critical > 0:
-		summary.Headline = fmt.Sprintf(l("%d temuan kritis perlu perhatian", "%d critical findings need attention"), critical)
-	case warning > 0:
-		summary.Headline = fmt.Sprintf(l("Ada %d peringatan untuk ditinjau", "%d warnings to review"), warning)
-	case summary.Headline != "":
+	case priority != nil:
+		f := *priority
+		summary.Headline = highlight(f, lang)
+		if len(summary.Highlights) > 0 && summary.Highlights[0] == summary.Headline {
+			summary.Highlights = summary.Highlights[1:]
+		}
+		summary.NextFinding, summary.Priority = f.ID, f.Severity
+		summary.Advice = strings.TrimSpace(summary.Advice + " " + findingAdvice(f))
+		summary.Primary = findingDetail(f, lang)
+		if f.Severity == diagnostics.Warning {
+			for _, c := range findingChoices(page, f) {
+				if c.Kind != "rescan" {
+					summary.Primary = c
+					break
+				}
+			}
+		}
+		return summary
+	case summary.Headline != "" && (page.Summary == nil || intent != assistant.Storage && intent != assistant.Trim && intent != assistant.Power):
 	case incomplete:
-		summary.Headline = l("Sebagian pemeriksaan perlu ditinjau", "Some checks need review")
+		summary.Headline = l("Data pemeriksaan belum lengkap", "Some check data is unavailable")
 	case intent == assistant.Slow:
 		summary.Headline = l("Belum terlihat tanda beban berlebih", "No signs of sustained load in this sample")
 	default:
 		summary.Headline = l("Tidak ada peringatan pada sampel ini", "No warnings in this sample")
 	}
-	if summary.Primary.Kind == "" {
-		summary.Primary = Choice{l("Lihat semua hasil", "View all results"), "details", ""}
-	}
-	if critical > 0 {
-		summary.Primary = Choice{l("Lihat temuan kritis", "View critical findings"), "details", ""}
+	if summary.Primary.Kind != "" {
 		return summary
 	}
-	for _, c := range page.Choices {
-		switch c.Kind {
-		case actions.EnableTrimTimer, actions.PowerProfile, actions.TrimMount:
-			summary.Primary = c
-			return summary
+	summary.Primary = finishChoice(lang)
+	switch intent {
+	case assistant.Overview, assistant.Storage, assistant.Trim, assistant.Power, assistant.Slow:
+		if missing != nil {
+			summary.NextFinding = missing.ID
+			summary.Primary = findingDetail(*missing, lang)
+			if summary.Advice == "" {
+				summary.Advice = findingAdvice(*missing)
+			}
+		} else if incomplete {
+			summary.Primary = detailsChoice(lang)
+		} else if summary.Advice == "" {
+			summary.Advice = l("Belum ada perubahan yang disarankan dari sampel ini.", "This sample calls for no changes at present.")
 		}
-		if c.Kind == "navigate" && (warning > 0 || intent == assistant.Power) {
-			summary.Primary = c
+		if intent == assistant.Slow && (page.Snapshot == nil || page.Snapshot.ObservedFor == 0) {
+			summary.Primary = observeChoice(lang)
 		}
-	}
-	if summary.Primary.Kind == "details" && intent != assistant.Overview && intent != assistant.Slow && intent != assistant.Storage {
+	default:
 		for _, c := range page.Choices {
-			if c.Kind != "save-scan" {
+			if c.Kind != "save-scan" && c.Kind != "rescan" {
 				summary.Primary = c
 				break
 			}
 		}
 	}
-	if intent == assistant.Slow && summary.Primary.Kind == "details" {
-		summary.Primary = observeChoice(lang)
-	}
 	return summary
+}
+
+func findingAdvice(f diagnostics.Finding) string {
+	if f.Recommendation != "" {
+		return f.Recommendation
+	}
+	return f.Meaning
 }
 
 func represented(s ResultSummary, f diagnostics.Finding) bool {
@@ -252,10 +275,21 @@ func findingEvidence(findings []diagnostics.Finding, lang string) []string {
 	l := translator(lang)
 	var lines []string
 	for _, f := range sortedFindings(findings) {
-		lines = append(lines, highlight(f, lang), f.Observation, f.Meaning,
-			l("Saran", "Advice")+" · "+f.Recommendation,
-			l("Sumber", "Source")+" · "+f.Source+" · "+displayTime(f.At, "2006-01-02 15:04 MST"),
-			l("Batas", "Limits")+" · "+f.Limits, "")
+		data := f.Observation
+		if data == "" {
+			data = highlight(f, lang)
+		}
+		for _, item := range []struct{ label, value string }{
+			{l("Data", "Data"), data},
+			{l("Makna", "Meaning"), f.Meaning},
+			{l("Sumber dan waktu", "Source and time"), evidenceSource(f)},
+			{l("Batas", "Limits"), f.Limits},
+			{l("Saran", "Advice"), f.Recommendation},
+		} {
+			if item.value != "" {
+				lines = append(lines, item.label+" · "+item.value)
+			}
+		}
 	}
 	return lines
 }

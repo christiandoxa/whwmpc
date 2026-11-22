@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"strings"
-	"time"
 
 	tea "charm.land/bubbletea/v2"
 
@@ -13,6 +12,8 @@ import (
 	"github.com/christiandoxa/whwmpc/internal/assistant"
 	"github.com/christiandoxa/whwmpc/internal/domain"
 	"github.com/christiandoxa/whwmpc/internal/hardware"
+	"github.com/christiandoxa/whwmpc/internal/platform"
+	"github.com/christiandoxa/whwmpc/internal/report"
 	"github.com/christiandoxa/whwmpc/internal/tui/mascot"
 	"github.com/christiandoxa/whwmpc/internal/workflow"
 )
@@ -105,13 +106,19 @@ func (m *Model) launch(req Request, pose mascot.Pose) tea.Cmd {
 	}
 	if req.Choice.Kind == "apply" {
 		m.runningAction = true
-		if req.Plan.Privilege == actions.Sudo && m.options.Authenticate != nil {
+		if !req.SimulateCleanup && req.Plan.Privilege == actions.Sudo && m.options.Authenticate != nil {
 			m.workName = m.tr(Words{"Autentikasi sudo di terminal", "Authenticate with sudo in the terminal"})
 			adapter := &foregroundAuth{run: m.options.Authenticate, ctx: ctx, plan: *req.Plan, id: req.Choice.Value}
 			return tea.Exec(adapter, func(err error) tea.Msg { return authMsg{job, err, req, ctx} })
 		}
 	}
 	return m.doRequest(ctx, job, req)
+}
+
+const demoCleanupID = "demo-cleanup"
+
+func (m Model) demoCleanupAllowed(p *actions.Plan) bool {
+	return m.options.Demo && m.options.DemoCleanupResult && m.active == assistant.Cleanup && p != nil && p.ID == demoCleanupID && p.Kind == actions.CleanAPT
 }
 
 func (m *Model) repeatCheck(req Request) tea.Cmd {
@@ -208,10 +215,12 @@ func aimFor(intent assistant.Intent, choice Choice, plan *actions.Plan) mascot.P
 
 func previewAction(ctx context.Context, m *workflow.Maintenance, req Request) (Page, bool) {
 	if m.Demo && req.Choice.Kind == actions.CleanAPT {
-		estimate := uint64(376) << 20
-		return planPage(actions.Plan{ID: "demo-cleanup", Kind: actions.CleanAPT, Target: "Cache APT (fixture)",
-			Initial: "/var/cache/apt/archives dan indeks cache (fixture)", Privilege: actions.Sudo,
-			Impact: "Berkas cache akan diunduh lagi saat diperlukan.", Risk: "Penghapusan permanen pada aksi nyata. Demo terkunci.", EstimatedBytes: &estimate}, req.Language), true
+		l := translator(req.Language)
+		inv, _ := m.Cleanup(ctx)
+		return planPage(actions.Plan{ID: demoCleanupID, Kind: actions.CleanAPT, Target: inv.Category,
+			Initial: strings.Join(inv.Scope, ", "),
+			Impact:  l("Paket yang diperlukan akan diunduh lagi.", "Packages will be downloaded again as needed."),
+			Risk:    l("Penghapusan permanen pada aksi nyata. DEMO memakai fixture.", "Real actions permanently delete cache. DEMO uses fixtures."), EstimatedBytes: &inv.KnownBytes}, req.Language), true
 	}
 
 	switch req.Choice.Kind {
@@ -231,11 +240,46 @@ func previewAction(ctx context.Context, m *workflow.Maintenance, req Request) (P
 		if req.Plan == nil {
 			return unavailableAction(fmt.Errorf("rencana belum siap"), req.Language), true
 		}
-		outcome, _ := m.Execute(ctx, *req.Plan, req.Choice.Value, req.Progress)
-		return resultPage(outcome, req.Language, req.Intent), true
+		var outcome workflow.Outcome
+		if m.Demo {
+			if !req.SimulateCleanup || req.Intent != assistant.Cleanup || req.Plan.Kind != actions.CleanAPT || req.Plan.ID != demoCleanupID || req.Choice.Value != demoCleanupID {
+				return unavailableAction(m.Available(), req.Language), true
+			}
+			outcome = demoCleanupOutcome(ctx, req, m)
+		} else {
+			outcome, _ = m.Execute(ctx, *req.Plan, req.Choice.Value, req.Progress)
+		}
+		page := resultPage(outcome, req.Language, req.Intent)
+		page.Snapshot = &workflow.Snapshot{Input: report.Input{At: outcome.Result.FinishedAt, Demo: m.Demo, Actions: []actions.Result{outcome.Result}}}
+		return page, true
 	default:
 		return Page{}, false
 	}
+}
+
+func demoCleanupOutcome(ctx context.Context, req Request, maintenance *workflow.Maintenance) workflow.Outcome {
+	l := translator(req.Language)
+	r := actions.Result{Plan: *req.Plan, FinishedAt: platform.DemoTime, Status: actions.NotStarted}
+	before, _ := maintenance.Cleanup(ctx)
+	if req.Plan.EstimatedBytes == nil || *req.Plan.EstimatedBytes != before.KnownBytes || req.Plan.Initial != strings.Join(before.Scope, ", ") {
+		r.Message = l("DEMO · Cakupan fixture berubah. Tinjau ulang.", "DEMO · Fixture scope changed. Review it again.")
+		return workflow.Outcome{Result: r}
+	}
+	for _, stage := range []actions.Stage{actions.Revalidating, actions.Executing, actions.Verifying} {
+		if ctx.Err() != nil {
+			r.CancellationRequested = true
+			r.Message = l("Simulasi dihentikan.", "Simulation stopped.")
+			return workflow.Outcome{Result: r}
+		}
+		if req.Progress != nil {
+			req.Progress(stage)
+		}
+	}
+	after := actions.Cleanup{Availability: domain.Available, Scope: before.Scope}
+	r.Status, r.Started, r.Changed = actions.Verified, true, new(before.KnownFiles != after.KnownFiles)
+	r.RemovedBytes, r.FreeSpaceDelta = new(before.KnownBytes-after.KnownBytes), new(int64(344<<20))
+	r.Message = l("DEMO · Cakupan cache fixture diperiksa setelah simulasi.", "DEMO · Fixture cache scope was checked after simulation.")
+	return workflow.Outcome{Result: r}
 }
 
 func unavailableAction(err error, lang string) Page {
@@ -296,7 +340,9 @@ func planPage(plan actions.Plan, lang string) Page {
 	action := actionLabel(plan.Kind, lang)
 	after := plan.Target
 	permission := l("Administrator melalui kebijakan sistem", "Administrator through system policy")
-	if plan.Privilege == actions.Sudo {
+	if plan.ID == demoCleanupID {
+		permission = l("DEMO · izin sistem tidak diminta", "DEMO · no system authorization prompt")
+	} else if plan.Privilege == actions.Sudo {
 		permission = l("Administrator melalui sudo", "Administrator through sudo")
 	}
 	restore := l("Tidak bisa dipulihkan", "Cannot be undone")
@@ -369,7 +415,10 @@ func resultPage(outcome workflow.Outcome, lang string, intent assistant.Intent) 
 		page.Availability, page.Pose = domain.Unknown, mascot.Warning
 	}
 	page.Found = []string{state + " · " + actionLabel(result.Plan.Kind, lang), result.Message}
-	s := &ResultSummary{Headline: page.Found[0], At: result.FinishedAt}
+	s := &ResultSummary{Headline: page.Found[0], At: result.FinishedAt, Primary: finishChoice(lang)}
+	if result.Status == actions.Verified && intent == assistant.Cleanup {
+		s.Headline = l("Pembersihan cache terverifikasi", "Cache cleanup verified")
+	}
 	page.Summary = s
 	if result.Message != "" {
 		s.Statuses = append(s.Statuses, resultStatus{Label: l("Verifikasi", "Verification"), Value: result.Message, Availability: page.Availability})
@@ -416,15 +465,17 @@ func resultPage(outcome workflow.Outcome, lang string, intent assistant.Intent) 
 	}
 	if result.Status == actions.Unknown || result.Status == actions.Partial {
 		page.Advice = append(page.Advice, l("Periksa bukti aktual sebelum mempertimbangkan tindakan baru.", "Check current evidence before considering another action."))
+		s.Advice = page.Advice[len(page.Advice)-1]
 	}
 	page.Evidence = []string{"ID · " + result.Plan.ID, result.FinishedAt.Format("2006-01-02 15:04:05 MST")}
-	page.Choices = []Choice{{Label: l("Periksa ulang", "Scan again"), Kind: "navigate", Value: string(intent)}}
+	page.Choices = []Choice{{Label: l("Kembali ke ringkasan", "Return to summary"), Kind: "back"}}
 	if result.Plan.Kind == actions.FirmwareUpdate && result.Started && (result.Status == actions.Partial || result.Status == actions.Unknown) {
 		choice := Choice{l("Periksa versi setelah restart", "Verify version after restart"), "firmware-verify", result.Plan.Target}
 		if outcome.HistoryErr == nil {
 			choice.Kind, choice.Value = "firmware-resume", result.Plan.ID
 		}
 		page.Choices = append([]Choice{choice}, page.Choices...)
+		s.Primary = choice
 	}
 	if result.Receipt != "" && outcome.HistoryErr == nil {
 		page.Choices = append(page.Choices, Choice{Label: l("Tinjau pemulihan", "Preview restore"), Kind: "restore", Value: result.Plan.ID})
@@ -439,7 +490,7 @@ func cleanupPage(ctx context.Context, m *workflow.Maintenance, lang string) Page
 	if page.Availability == "" {
 		page.Availability = domain.Error
 	}
-	s := &ResultSummary{Headline: l("Inventaris pembersihan", "Cleanup inventory")}
+	s := &ResultSummary{Headline: l("Belum ada cache terukur untuk dibersihkan", "No measurable cache to clean yet"), Primary: finishChoice(lang)}
 	page.Summary = s
 	page.Found = []string{fmt.Sprintf("%s · %s", inv.Category, statusNames[page.Availability].Text(lang))}
 	if err != nil {
@@ -458,7 +509,11 @@ func cleanupPage(ctx context.Context, m *workflow.Maintenance, lang string) Page
 		}
 		page.Meaning = []string{inv.Impact, l("Paket yang sudah terpasang tetap tersedia. Isi cache yang dihapus perlu diunduh ulang.", "Installed packages stay available. Removed cache contents may need to be downloaded again.")}
 		page.Advice = []string{l("Seluruh kategori cache yang ditawarkan. Penghapusan permanen.", "Entire displayed cache category. Permanent deletion.")}
+		s.Advice = l("Cache yang dihapus permanen akan diunduh lagi saat diperlukan.", "Permanently removed cache can be downloaded again as needed.")
 		page.Evidence = append(page.Evidence, inv.Scope...)
+	}
+	if inv.KnownBytes > 0 && inv.KnownFiles > 0 {
+		s.Headline = fmt.Sprintf(l("%s cache bisa ditinjau untuk dibersihkan", "%s of cache to review for cleanup"), bytesText(inv.KnownBytes))
 	}
 	if len(inv.Unknown) > 0 {
 		s.Statuses = append(s.Statuses, resultStatus{Label: l("Belum terukur", "Unmeasured"), Value: fmt.Sprintf(l("%d bagian cakupan", "%d scope entries"), len(inv.Unknown)), Availability: domain.Unknown})
@@ -471,22 +526,12 @@ func cleanupPage(ctx context.Context, m *workflow.Maintenance, lang string) Page
 			s.Statuses = append(s.Statuses, resultStatus{Label: l("Inventaris", "Inventory"), Value: inv.Detail, Availability: page.Availability})
 		}
 	}
-	if (m.Demo || m.Available() == nil) && len(inv.Scope) > 0 && (inv.Availability == domain.Available || inv.Availability == domain.Partial) {
+	if (m.Demo || m.Available() == nil) && len(inv.Scope) > 0 && inv.KnownBytes > 0 && inv.KnownFiles > 0 && hasData(inv.Availability) {
 		kind := inv.Kind
 		if kind == "" {
 			kind = actions.CleanAPT
 		}
-		page.Choices = []Choice{{Label: l("Tinjau cakupan pembersihan", "Review cleanup scope"), Kind: kind}}
-	}
-	if m.Demo {
-		page.Advice = append(page.Advice, l("DEMO · tindakan terkunci.", "DEMO · actions locked."))
+		s.Primary = Choice{Label: l("Tinjau pembersihan", "Review cleanup"), Kind: kind}
 	}
 	return page
-}
-
-func displayTime(t time.Time, format string) string {
-	if t.IsZero() {
-		return "?"
-	}
-	return t.Format(format)
 }

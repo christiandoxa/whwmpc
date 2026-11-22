@@ -90,12 +90,13 @@ func (a Analyzer) trimTimer(audit storage.TrimAudit) Finding {
 	needsSchedule := slices.ContainsFunc(audit.Mounts, func(m storage.Mount) bool {
 		return m.Discard == domain.Available && (m.DiscardMode == "" || m.DiscardMode == "nodiscard")
 	})
-	if needsSchedule && timer.ActiveState == "inactive" {
+	if needsSchedule && timer.ActiveState == "inactive" && f.Severity != Warning {
+		f.Severity = Warning
 		f.Recommendation = a.text("Tinjau jadwal TRIM host. Jadwal berkala biasanya sesuai untuk desktop.", "Review the host TRIM schedule. A periodic schedule usually suits desktops.")
 		if status == domain.Available && timer.UnitFileState == "disabled" && timer.LoadState == "loaded" &&
 			timer.Unit == "fstrim.service" && timer.ServiceLoadState == "loaded" && !timer.NeedDaemonReload &&
 			timer.DropInPaths == "" && timer.ServiceDropInPaths == "" && audit.Manual == domain.Available {
-			f.Actions = []Action{{Kind: "enable-trim-timer", Target: "fstrim.timer", Label: a.text("Tinjau aktivasi jadwal", "Preview schedule activation")}}
+			f.Actions = []Action{{Kind: "enable-trim-timer", Target: "fstrim.timer", Label: a.text("Tinjau jadwal TRIM", "Review TRIM schedule")}}
 		}
 	}
 	return f
