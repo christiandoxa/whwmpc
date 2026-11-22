@@ -92,7 +92,8 @@ func substantiallyCapped(limit, maximum *uint64) bool {
 }
 
 func (a Analyzer) powerSupply(p power.Snapshot) Finding {
-	f := finding("power.supply", "power", "Linux power_supply + platform_profile + energy_perf_bias", p.At,
+	f := finding("power.supply", "power", nativeSource(p.OS, "Linux power_supply + platform_profile + energy_perf_bias",
+		"macOS pmset -g batt", "Win32 GetSystemPowerStatus"), p.At,
 		a.status(p.PowerStatus, p.At, powerAge))
 	fields := []string{a.text("Sumber daya belum diketahui", "Power source unknown")}
 	if usable(f.Availability) {

@@ -55,7 +55,7 @@ func availability(status domain.Availability) domain.Availability {
 
 func fsType(value string) string {
 	return allowed(value, "ext2", "ext3", "ext4", "xfs", "btrfs", "vfat", "exfat", "f2fs", "ntfs", "ntfs3",
-		"zfs", "bcachefs", "overlay", "tmpfs", "ramfs", "squashfs", "erofs", "fuseblk", "apfs", "nfs", "nfs4", "cifs", "9p", "virtiofs")
+		"apfs", "hfs", "refs", "zfs", "bcachefs", "overlay", "tmpfs", "ramfs", "squashfs", "erofs", "fuseblk", "apfs", "nfs", "nfs4", "cifs", "9p", "virtiofs")
 }
 
 func numeric(value *float64, low, high float64) *float64 {
@@ -81,6 +81,7 @@ func percent(value domain.Percent) domain.Percent {
 func projectOverview(o domain.Overview, private map[string]bool) *domain.Overview {
 	addPrivate(private, o.CPUModel)
 	distros := map[string]string{
+		"darwin": "macOS", "windows": "Windows",
 		"ubuntu": "Ubuntu", "debian": "Debian GNU/Linux", "zorin": "Zorin OS", "linuxmint": "Linux Mint",
 		"fedora": "Fedora Linux", "rhel": "Red Hat Enterprise Linux", "rocky": "Rocky Linux", "almalinux": "AlmaLinux",
 		"arch": "Arch Linux", "manjaro": "Manjaro", "endeavouros": "EndeavourOS", "opensuse-tumbleweed": "openSUSE Tumbleweed",
@@ -130,19 +131,20 @@ func projectOverview(o domain.Overview, private map[string]bool) *domain.Overvie
 
 func projectSMART(audit storage.SMARTAudit, private map[string]bool) *storage.SMARTAudit {
 	addPrivate(private, audit.Detail)
-	out := &storage.SMARTAudit{Availability: availability(audit.Availability), CapturedAt: audit.CapturedAt.UTC()}
+	out := &storage.SMARTAudit{Source: allowed(audit.Source, storage.DiskUtilitySource, storage.WindowsStorageSource), Availability: availability(audit.Availability), CapturedAt: audit.CapturedAt.UTC()}
 	for _, drive := range audit.Drives {
 		addPrivate(private, drive.Name, drive.Model, drive.Detail)
 		item := storage.Drive{
 			Availability: availability(drive.Availability), CapturedAt: drive.CapturedAt.UTC(), DeviceID: checked(drive.DeviceID, blockNumber),
 			Transport: allowed(drive.Transport, "NVMe", "USB", "SATA", "SAS", "ATA", "SCSI", "Virtual", "MMC", "PCIe"),
-			Protocol:  allowed(drive.Protocol, "NVMe", "ATA", "SCSI"), Rotational: drive.Rotational, MountIDs: slices.Clone(drive.MountIDs),
+			Protocol:  allowed(drive.Protocol, "NVMe", "ATA", "SCSI"), HealthStatus: allowed(drive.HealthStatus, "healthy", "warning", "unhealthy"), Rotational: drive.Rotational, MountIDs: slices.Clone(drive.MountIDs),
 		}
 		if h := drive.Health; h != nil {
 			item.Health = &storage.SMART{
 				Passed: h.Passed, CriticalWarning: h.CriticalWarning, TemperatureC: h.TemperatureC, Spare: h.Spare,
 				SpareThreshold: h.SpareThreshold, PercentageUsed: h.PercentageUsed, MediaErrors: checked(h.MediaErrors, counter),
 				UnsafeShutdowns: checked(h.UnsafeShutdowns, counter), PowerOnHours: checked(h.PowerOnHours, counter),
+				ReadErrorsUncorrected: checked(h.ReadErrorsUncorrected, counter), WriteErrorsUncorrected: checked(h.WriteErrorsUncorrected, counter),
 				DataUnitsRead: checked(h.DataUnitsRead, counter), DataUnitsWritten: checked(h.DataUnitsWritten, counter), ExitCode: h.ExitCode,
 				ExitFlags: choices(h.ExitFlags, "invalid_arguments", "device_open_or_identification_failed", "smart_command_or_checksum_failed",
 					"disk_failing", "current_prefailure_threshold", "historical_attribute_threshold", "error_log_records", "self_test_log_errors"),
@@ -169,6 +171,7 @@ func projectTrim(audit storage.TrimAudit, private map[string]bool) *storage.Trim
 			"failed", "maintenance", "waiting", "elapsed", "dead", "running", "exited", "start", "stop")
 	}
 	out := &storage.TrimAudit{
+		Source:       allowed(audit.Source, storage.DarwinTRIMSource, storage.WindowsTRIMSource),
 		Availability: availability(audit.Availability), CapturedAt: audit.CapturedAt.UTC(), Manual: availability(audit.Manual),
 		Timer: storage.Timer{
 			Availability: availability(t.Availability), Journal: availability(t.Journal), Scheduler: allowed(t.Scheduler, "systemd", "cron", "unknown"),
@@ -179,6 +182,11 @@ func projectTrim(audit storage.TrimAudit, private map[string]bool) *storage.Trim
 				"watchdog", "start-limit-hit", "oom-kill"), LastServiceStart: checked(t.LastServiceStart, scheduleStamp),
 			LastServiceExit: checked(t.LastServiceExit, scheduleStamp), NeedDaemonReload: t.NeedDaemonReload,
 		},
+	}
+	for _, policy := range audit.Policy {
+		if scope := allowed(policy.Scope, "nvme", "sata", "ntfs", "refs"); scope != "" {
+			out.Policy = append(out.Policy, storage.TrimPolicy{Scope: scope, Enabled: policy.Enabled})
+		}
 	}
 	for _, m := range audit.Mounts {
 		addPrivate(private, m.Root, m.Point, m.Source, m.Evidence)

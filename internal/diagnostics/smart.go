@@ -11,24 +11,34 @@ import (
 const smartSource = "smartctl JSON (SMART status, exit bitmask, NVMe Health log)"
 
 func (a Analyzer) SMART(audit storage.SMARTAudit) []Finding {
+	source := audit.Source
+	if source == "" {
+		source = smartSource
+	}
 	if len(audit.Drives) == 0 {
 		status := a.status(audit.Availability, audit.CapturedAt, smartAge)
 		if usable(status) {
 			status = domain.Unknown
 		}
-		f := a.unavailable(finding("smart.coverage", "ssd", "/sys/class/block + "+smartSource, audit.CapturedAt, status),
+		if source == smartSource {
+			source = "/sys/class/block + " + source
+		}
+		f := a.unavailable(finding("smart.coverage", "ssd", source, audit.CapturedAt, status),
 			a.text("Audit kesehatan penyimpanan", "Storage health audit"))
 		return []Finding{f}
 	}
 	var findings []Finding
 	for i, drive := range audit.Drives {
-		findings = append(findings, a.smartDrive(drive, i+1)...)
+		findings = append(findings, a.smartDrive(drive, i+1, source)...)
 	}
 	return ranked(findings)
 }
 
-func (a Analyzer) smartDrive(drive storage.Drive, ordinal int) []Finding {
-	f := finding(fmt.Sprintf("smart.status.%d", ordinal), "ssd", smartSource, drive.CapturedAt,
+func (a Analyzer) smartDrive(drive storage.Drive, ordinal int, source string) []Finding {
+	if source == storage.WindowsStorageSource {
+		return a.windowsDiskHealth(drive, ordinal)
+	}
+	f := finding(fmt.Sprintf("smart.status.%d", ordinal), "ssd", source, drive.CapturedAt,
 		a.status(drive.Availability, drive.CapturedAt, smartAge))
 	label := a.textf("Drive #%d", "Drive #%d", ordinal)
 	if !usable(f.Availability) || drive.Health == nil {
@@ -38,7 +48,9 @@ func (a Analyzer) smartDrive(drive storage.Drive, ordinal int) []Finding {
 		f = a.unavailable(f, label)
 		switch f.Availability {
 		case domain.DependencyMissing:
-			f.Recommendation = a.text("Pasang smartmontools dari repositori distro agar smartctl tersedia.", "Install smartmontools from your distribution to make smartctl available.")
+			if source == smartSource {
+				f.Recommendation = a.text("Pasang smartmontools dari repositori distro agar smartctl tersedia.", "Install smartmontools from your distribution to make smartctl available.")
+			}
 		case domain.PermissionRequired:
 			f.Recommendation = a.text("Minta administrator memeriksa akses baca SMART perangkat ini.", "Ask an administrator to check read access to this device's SMART data.")
 		case domain.Unsupported:
@@ -70,7 +82,9 @@ func (a Analyzer) smartDrive(drive storage.Drive, ordinal int) []Finding {
 	if h.SpareThreshold != nil {
 		fields = append(fields, a.textf("ambang spare %d%%", "%d%% spare threshold", *h.SpareThreshold))
 	}
-	fields = append(fields, fmt.Sprintf("smartctl exit 0x%02X", h.ExitCode))
+	if source == smartSource {
+		fields = append(fields, fmt.Sprintf("smartctl exit 0x%02X", h.ExitCode))
+	}
 	f.Observation = strings.Join(fields, " · ")
 	f.Meaning = a.text("SMART merangkum indikator yang dilaporkan perangkat saat diperiksa.", "SMART summarizes indicators the device reported during the scan.")
 	f.Limits = a.text("SMART mencakup indikator yang diekspos perangkat. Kerusakan mendadak tetap mungkin terjadi.", "SMART covers the indicators exposed by the device. Sudden failure remains possible.")
@@ -157,4 +171,54 @@ func decimalCounter(value string) bool {
 
 func positiveCounter(value string) bool {
 	return decimalCounter(value) && strings.Trim(value, "0") != ""
+}
+
+func (a Analyzer) windowsDiskHealth(drive storage.Drive, ordinal int) []Finding {
+	f := finding(fmt.Sprintf("smart.status.%d", ordinal), "ssd", storage.WindowsStorageSource, drive.CapturedAt,
+		a.status(drive.Availability, drive.CapturedAt, smartAge))
+	label := a.textf("Drive #%d", "Drive #%d", ordinal)
+	if !usable(f.Availability) {
+		return []Finding{a.unavailable(f, label)}
+	}
+	f.Observation = label
+	f.Meaning = a.text("Ini pembacaan provider penyimpanan Windows.", "This is a reading from the Windows storage provider.")
+	f.Limits = a.text("Provider dapat menyembunyikan counter. Status ini tidak membuktikan seluruh atribut SMART terbaca.", "The provider may hide counters. This status does not establish coverage of all SMART attributes.")
+	f.Recommendation = a.text("Pertahankan backup berkala.", "Keep regular backups.")
+	f.Actions = []Action{a.rescan()}
+	switch drive.HealthStatus {
+	case "healthy":
+		f.Observation += a.text(" · provider melaporkan healthy.", " · provider reports healthy.")
+	case "warning":
+		f.Observation += a.text(" · provider melaporkan peringatan.", " · provider reports a warning.")
+		f.Severity = Warning
+	case "unhealthy":
+		f.Observation += a.text(" · provider melaporkan perangkat tidak sehat.", " · provider reports an unhealthy device.")
+		f.Severity = Critical
+		f.Recommendation = a.text("Prioritaskan cadangan data penting ke perangkat lain.", "Prioritize backing up important data to another device.")
+	default:
+		f.Availability = domain.Partial
+		f.Observation += a.text(" · status kesehatan belum terbaca.", " · health status unavailable.")
+	}
+	if h := drive.Health; h != nil {
+		for _, entry := range []struct{ label, count string }{
+			{a.text("jam menyala", "power-on hours"), h.PowerOnHours},
+			{a.text("galat baca tak terkoreksi", "uncorrected reads"), h.ReadErrorsUncorrected},
+			{a.text("galat tulis tak terkoreksi", "uncorrected writes"), h.WriteErrorsUncorrected},
+		} {
+			if entry.count != "" {
+				f.Observation += fmt.Sprintf(" · %s %s", entry.label, entry.count)
+			}
+		}
+		if h.TemperatureC != nil {
+			f.Observation += fmt.Sprintf(" · %d °C", *h.TemperatureC)
+		}
+		if h.PercentageUsed != nil {
+			f.Observation += a.textf(" · estimasi umur terpakai %d%%", " · estimated wear %d%%", *h.PercentageUsed)
+		}
+		if f.Severity == Info && (positiveCounter(h.ReadErrorsUncorrected) || positiveCounter(h.WriteErrorsUncorrected) ||
+			h.PercentageUsed != nil && *h.PercentageUsed >= 100) {
+			f.Severity = Warning
+		}
+	}
+	return []Finding{f}
 }

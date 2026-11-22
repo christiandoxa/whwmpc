@@ -94,3 +94,7 @@ CLI menyediakan lifecycle user timer, proses observasi read-only, retensi riwaya
 ## Backlog B dan D · GPU dan OverDrive
 
 Discovery GPU, metrik vendor, batas daya NVIDIA, dan kontrol OverDrive AMD terhubung ke CLI/TUI. Pengguna memasukkan nilai eksplisit sebelum review. Action service yang sama mengikat plan, verifikasi, dan bukti pemulihan bersyarat. Probe dan preview baca-saja berhasil pada NVIDIA RTX 3060 dan AMD Renoir. Host tidak mengekspos offset voltase. Mutasi pada perangkat nyata belum dijalankan.
+
+## Backlog I · Provider macOS dan Windows
+
+Provider native membaca CPU, memori, disk, proses, uptime, dan daya sesuai API host. Disk Utility dan Windows Storage Provider memperluas audit storage. Kebijakan atau dukungan TRIM dibedakan dari bukti pelaksanaan. Fixture dan kompilasi lulus. Workflow native mencakup macOS 15 dan Windows Server 2025; uji perangkat fisik tetap terpisah.

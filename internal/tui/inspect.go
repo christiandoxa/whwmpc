@@ -166,7 +166,11 @@ func storagePage(audit storage.SMARTAudit, lang string) Page {
 	if audit.Detail != "" {
 		page.Found = append(page.Found, audit.Detail)
 	}
-	page.Evidence = append(page.Evidence, "smartctl · "+audit.CapturedAt.Format("15:04:05 MST"))
+	source := audit.Source
+	if source == "" {
+		source = "smartctl"
+	}
+	page.Evidence = append(page.Evidence, source+" · "+audit.CapturedAt.Format("15:04:05 MST"))
 	for _, drive := range audit.Drives {
 		line := strings.TrimSpace(drive.Name + " " + drive.Model)
 		page.Found = append(page.Found, fmt.Sprintf("%s · %s", line, statusNames[drive.Availability].Text(lang)))
@@ -175,6 +179,9 @@ func storagePage(audit storage.SMARTAudit, lang string) Page {
 		}
 		if len(drive.MountIDs) > 0 {
 			page.Evidence = append(page.Evidence, fmt.Sprintf("%s · %s %v", drive.Name, l("ID mount", "mount IDs"), drive.MountIDs))
+		}
+		if drive.HealthStatus != "" {
+			page.Evidence = append(page.Evidence, drive.HealthStatus)
 		}
 		h := drive.Health
 		if h == nil {
@@ -205,6 +212,8 @@ func storagePage(audit storage.SMARTAudit, lang string) Page {
 			}
 			facts = append(facts, spare)
 		}
+		facts = appendKnown(facts, h.ReadErrorsUncorrected, l("Galat baca tak terkoreksi", "Uncorrected read errors"))
+		facts = appendKnown(facts, h.WriteErrorsUncorrected, l("Galat tulis tak terkoreksi", "Uncorrected write errors"))
 		facts = appendKnown(facts, h.MediaErrors, l("Galat media", "Media errors"))
 		facts = appendKnown(facts, h.UnsafeShutdowns, l("Mati tidak aman", "Unsafe shutdowns"))
 		facts = appendKnown(facts, h.PowerOnHours, l("Jam aktif", "Power-on hours"))
@@ -268,6 +277,12 @@ func trimPage(audit storage.TrimAudit, lang string) Page {
 		} else {
 			page.Evidence = append(page.Evidence, l("Belum ada bukti TRIM untuk mount ini.", "No TRIM evidence for this mount."))
 		}
+	}
+	if audit.Source != "" {
+		page.Evidence = append(page.Evidence, audit.Source)
+	}
+	for _, policy := range audit.Policy {
+		page.Evidence = append(page.Evidence, fmt.Sprintf("%s · %t", policy.Scope, policy.Enabled))
 	}
 	page.Meaning = []string{l("Timer aktif menunjukkan jadwal. Bukti discard dinilai per filesystem.",
 		"An active timer shows scheduling. Discard evidence is evaluated per filesystem.")}

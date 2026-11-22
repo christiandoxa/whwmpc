@@ -10,6 +10,7 @@ import (
 )
 
 type Snapshot struct {
+	OS              string              `json:"-"`
 	At              time.Time           `json:"at"`
 	CPUFreqStatus   domain.Availability `json:"cpufreq_status"`
 	Policies        []Policy            `json:"policies,omitempty"`

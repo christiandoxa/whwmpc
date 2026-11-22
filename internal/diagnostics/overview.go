@@ -36,10 +36,21 @@ func (a Analyzer) Slow(o domain.Overview, p power.Snapshot) []Finding {
 	return ranked(findings)
 }
 
+func nativeSource(os, linux, darwin, windows string) string {
+	switch os {
+	case "darwin":
+		return darwin
+	case "windows":
+		return windows
+	default:
+		return linux
+	}
+}
+
 func (a Analyzer) cpu(o domain.Overview) Finding {
 	p := o.CPU
 	status := a.status(p.Availability, p.CapturedAt, overviewAge)
-	f := finding("overview.cpu", "cpu", "/proc/stat", p.CapturedAt, status)
+	f := finding("overview.cpu", "cpu", nativeSource(o.OS, "/proc/stat", "macOS top interval", "Win32 GetSystemTimes"), p.CapturedAt, status)
 	component := a.text("Penggunaan CPU", "CPU use")
 	if !usable(status) {
 		return a.unavailable(f, component)
@@ -64,7 +75,7 @@ func (a Analyzer) cpu(o domain.Overview) Finding {
 
 func (a Analyzer) memory(o domain.Overview) Finding {
 	m := o.Memory
-	f := finding("overview.memory", "memory", "/proc/meminfo (MemAvailable, SwapTotal, SwapFree)", o.CapturedAt,
+	f := finding("overview.memory", "memory", nativeSource(o.OS, "/proc/meminfo (MemAvailable, SwapTotal, SwapFree)", "macOS hw.memsize and vm_stat", "Win32 GlobalMemoryStatusEx"), o.CapturedAt,
 		a.status(m.Availability, o.CapturedAt, overviewAge))
 	component := a.text("Memori", "Memory")
 	if !usable(f.Availability) {
@@ -90,6 +101,15 @@ func (a Analyzer) memory(o domain.Overview) Finding {
 	}
 	f.Recommendation = a.text("Bandingkan ruang RAM dan swap saat menjalankan pekerjaan yang terasa lambat.", "Compare RAM headroom and swap occupancy during the workload that feels slow.")
 	f.Actions = []Action{a.rescan()}
+	if o.OS == "darwin" {
+		f.Observation = a.textf("RAM bebas %.1f / %.1f GiB.", "RAM free %.1f / %.1f GiB.", gib(m.FreeBytes), gib(m.TotalBytes))
+		f.Meaning = a.text("Halaman bebas adalah batas bawah ruang tersedia.", "Free pages are a lower bound on available memory.")
+		f.Limits = a.text("Halaman yang dapat direklamasi dan indikator tekanan memori tidak diukur.", "Reclaimable pages and memory pressure are not measured.")
+		return f
+	}
+	if o.OS == "windows" {
+		f.Meaning = a.text("Halaman fisik tersedia untuk proses tanpa menulis isinya ke disk terlebih dahulu.", "Available physical pages can be reused without first writing them to disk.")
+	}
 	if usable(a.status(m.Use.Availability, m.Use.CapturedAt, overviewAge)) && underLoad(m.Use.Samples, memoryWarning) {
 		f.Severity = Warning
 		f.Observation += a.textf(" · RAM terpakai ≥%d%% pada %d sampel", " · RAM use ≥%d%% over %d samples", memoryWarning, len(m.Use.Samples))
@@ -101,7 +121,7 @@ func (a Analyzer) memory(o domain.Overview) Finding {
 
 func (a Analyzer) disks(o domain.Overview) []Finding {
 	status := a.status(o.DiskStatus, o.CapturedAt, overviewAge)
-	const source = "statfs (Bavail) + /proc/self/mountinfo"
+	source := nativeSource(o.OS, "statfs (Bavail) + /proc/self/mountinfo", "macOS statfs (startup volume)", "Win32 GetDiskFreeSpaceEx")
 	if !usable(status) || len(o.Disks) == 0 {
 		if usable(status) {
 			status = domain.Unknown
@@ -171,7 +191,7 @@ func (a Analyzer) cpuTemperature(o domain.Overview) Finding {
 }
 
 func (a Analyzer) process(o domain.Overview) Finding {
-	f := finding("overview.process", "process", "/proc/[pid]/stat delta + /proc/stat", o.CapturedAt,
+	f := finding("overview.process", "process", nativeSource(o.OS, "/proc/[pid]/stat delta + /proc/stat", "macOS ps (%CPU and RSS)", "Win32 process timing and working set"), o.CapturedAt,
 		a.status(o.ProcessStatus, o.CapturedAt, overviewAge))
 	component := a.text("Sampel proses", "Process sample")
 	if !usable(f.Availability) {
@@ -194,6 +214,10 @@ func (a Analyzer) process(o domain.Overview) Finding {
 	f.Meaning = a.text("Ini proses dengan bagian CPU terbesar di antara proses yang teramati.", "This is the largest CPU share among sampled processes.")
 	f.Limits = a.text("Sampel mencakup proses yang dapat dibaca dan teramati selama interval.", "The sample covers processes readable and observable during the interval.")
 	f.Recommendation = a.text("Tinjau detail proses saat gejala terjadi.", "Check process details while the slowdown occurs.")
+	if o.OS == "darwin" {
+		f.Limits = a.text("Persentase ps adalah rata-rata yang meluruh dan berbeda dari interval top.", "The ps percentage is a decaying average and differs from the top interval.")
+		return f
+	}
 	if percent >= dominantProcessCPU && usable(a.status(o.CPU.Availability, o.CPU.CapturedAt, overviewAge)) &&
 		underLoad(o.CPU.Samples, cpuWarning) {
 		f.Severity = Warning
@@ -203,7 +227,7 @@ func (a Analyzer) process(o domain.Overview) Finding {
 }
 
 func (a Analyzer) overviewPower(o domain.Overview) Finding {
-	f := finding("overview.power", "power", "Linux power_supply class", o.CapturedAt,
+	f := finding("overview.power", "power", nativeSource(o.OS, "Linux power_supply class", "macOS pmset -g batt", "Win32 GetSystemPowerStatus"), o.CapturedAt,
 		a.status(o.PowerStatus, o.CapturedAt, overviewAge))
 	component := a.text("Sumber daya", "Power source")
 	if !usable(f.Availability) {

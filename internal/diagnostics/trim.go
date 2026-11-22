@@ -14,6 +14,9 @@ import (
 const mountSource = "/proc/self/mountinfo + Linux block queue discard_max_bytes + fstrim.service journal"
 
 func (a Analyzer) TRIM(audit storage.TrimAudit) []Finding {
+	if audit.Source != "" {
+		return a.nativeTRIM(audit)
+	}
 	status := a.status(audit.Availability, audit.CapturedAt, trimAge)
 	if status == domain.Stale {
 		return []Finding{a.unavailable(finding("trim.coverage", "trim", mountSource, audit.CapturedAt, status),
@@ -161,4 +164,33 @@ func (a Analyzer) unitState(value string) string {
 		return value
 	}
 	return a.text("belum diketahui", "unknown")
+}
+
+func (a Analyzer) nativeTRIM(audit storage.TrimAudit) []Finding {
+	f := finding("trim.coverage", "trim", audit.Source, audit.CapturedAt, a.status(audit.Availability, audit.CapturedAt, trimAge))
+	label := a.text("Dukungan TRIM yang dilaporkan", "Reported TRIM support")
+	if audit.Source == storage.WindowsTRIMSource {
+		label = a.text("Kebijakan notifikasi penghapusan", "Delete-notification policy")
+	}
+	if !usable(f.Availability) {
+		return []Finding{a.unavailable(f, label)}
+	}
+	f.Observation = label
+	for _, policy := range audit.Policy {
+		status := a.text("tidak aktif", "disabled")
+		if policy.Enabled {
+			status = a.text("aktif", "enabled")
+		}
+		if audit.Source == storage.DarwinTRIMSource {
+			status = a.text("tidak didukung", "not supported")
+			if policy.Enabled {
+				status = a.text("didukung", "supported")
+			}
+		}
+		f.Observation += " · " + safeToken(policy.Scope) + " " + status
+	}
+	f.Meaning = a.text("Ini kemampuan perangkat atau kebijakan OS yang dapat dibaca.", "This is reported device capability or observable OS policy.")
+	f.Limits = a.text("Belum ada bukti eksekusi discard per volume.", "Per-volume discard execution was not verified.")
+	f.Recommendation = a.text("Periksa bukti per volume dengan alat penyimpanan sistem.", "Use the system storage tools to investigate an individual volume.")
+	return []Finding{f}
 }
