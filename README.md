@@ -8,7 +8,7 @@
 
 ## Mulai
 
-Pasang rilis standalone terbaru di Linux amd64 atau arm64. Installer memeriksa SHA-256 arsip dan memasang binari ke `~/.local/bin` tanpa sudo atau Go.
+Pasang rilis standalone terbaru di Linux amd64 atau arm64 dengan `curl`, `awk`, `tar`, dan `sha256sum`. Installer memeriksa SHA-256 arsip dan memasang binari ke `~/.local/bin` tanpa sudo atau Go.
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/christiandoxa/whwmpc/main/install.sh | sh
@@ -23,6 +23,8 @@ Untuk memasang versi tertentu, sertakan tag rilis.
 ```sh
 curl -fsSL https://raw.githubusercontent.com/christiandoxa/whwmpc/main/install.sh | sh -s -- v0.1.0
 ```
+
+Jika sudah punya checkout repo, jalankan `./install.sh` atau `./install.sh v0.1.0` dari direktori repo. [Skrip installer](install.sh)
 
 Checksum diambil dari rilis GitHub yang sama. Untuk macOS atau Windows, pilih arsip yang cocok dengan arsitektur perangkat lalu ikuti petunjuk ekstraksi. [Unduhan manual](https://github.com/christiandoxa/whwmpc/releases/latest) · [Cara memasang dari arsip](docs/RELEASE.md)
 

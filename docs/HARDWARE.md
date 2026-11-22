@@ -26,6 +26,14 @@ Uji TUI pada 80×24 dan 120×36 melewati pilihan awal Kembali, konfirmasi ekspli
 go test -race ./internal/hardware ./internal/actions
 ```
 
-Tes tidak menulis driver perangkat nyata. Validasi apply dan restore memerlukan persetujuan atas nilai, perangkat, dan rencana tertentu. Pengujian undervolt memerlukan GPU dengan rentang offset yang dilaporkan driver.
+## Persiapan validasi perangkat
 
-Pembacaan dan preview pada perangkat pengembangan menerima uji batas daya RTX 3060 `0000:01:00.0` dari 170 ke 169 W dan uji batas clock Renoir `0000:08:00.0` dari 1900 MHz auto ke 1899 MHz manual. Verifikasi fisik perlu memeriksa hasil apply, lalu restore ke 170 W atau 1900 MHz auto jika identitas pasca-apply masih cocok. Renoir menggerakkan layar HDMI aktif. Ambil ulang preview sebelum memilih uji perangkat.
+Perintah baca-saja berikut sudah dicoba pada perangkat pengembangan. Pembacaan pertama menampilkan identitas, nilai saat ini, dan batas yang tersedia. Jalankan dua preview hanya pada perangkat dan rentang yang cocok.
+
+```sh
+whwmpc gpu --json
+whwmpc gpu --device 0000:01:00.0 --plan gpu-power-limit --value 169000 --json
+whwmpc gpu --device 0000:08:00.0 --plan gpu-core-max --value 1899 --json
+```
+
+Apply dan restore fisik memerlukan persetujuan atas nilai, perangkat, dan rencana tertentu. Cocokkan hasil terverifikasi dengan pembacaan driver, lalu tinjau pemulihan ke 170 W pada RTX 3060 atau 1900 MHz dan mode auto pada Renoir. Jalur restore memeriksa identitas state pasca-apply sebelum menulis. Renoir menggerakkan layar HDMI aktif. Untuk uji undervolt, mulai dari GPU yang melaporkan `gpu-voltage-offset` beserta batasnya. [Rencana, history, dan restore](ACTIONS.md)
