@@ -1,0 +1,211 @@
+{
+  "scope": "Unmodified public LVFS package. Synthetic ESRT/DMI/AC, dummy EFI variables, private bus and temporary ESP. No firmware boot or physical device.",
+  "baseline": {
+    "executable": {
+      "sha256": "b075d5a1f1806fe1df99f6b6a324ccff549f37376039665a154e17ea3f0db321",
+      "bytes": 15228348,
+      "vcs.revision": "69834c1db0edd8ef6dcbb56a54c18304c30032ef",
+      "vcs.modified": "false"
+    },
+    "preview_exit": "0",
+    "apply": {
+      "status": "not_started",
+      "started": false,
+      "message": "Get \"https://r2.fwupd.org/lvfs-prod/6b979d7231194e833a0d9e7add9a1c905238e5240c39612f20ec66a2e2a3fc52-N39BL02W_L00050441.cab\": pengalihan unduhan firmware di luar LVFS resmi"
+    },
+    "apply_exit": "1",
+    "esp_capsules": []
+  },
+  "tested": {
+    "executable": {
+      "sha256": "a79b01a9fc9dede155e1d676cb775043708555637fa83cb63acdde9761add4bc",
+      "bytes": 15233106,
+      "vcs.revision": "04876fc7e50037d87fb38a5b9c918733929263d7",
+      "vcs.modified": "false"
+    },
+    "fwupd": "2.0.20",
+    "only_trusted": true,
+    "official_lvfs_pkcs7_roots": [
+      {
+        "name": "LVFS-CA.pem",
+        "sha256": "6b46718d04424994c07a2b158680b47c354c019d62cfaeec6745c8753c3b1321"
+      },
+      {
+        "name": "LVFS-CA-2025PQ.pem",
+        "sha256": "a140d047f7763e5a3a2646898752c79a4db7f071451e0fcc98c2cfce37b0c814"
+      }
+    ],
+    "tls_connections": {
+      "cdn.fwupd.org": {
+        "established": 2,
+        "errors": []
+      },
+      "fwupd.org": {
+        "established": 2,
+        "errors": []
+      },
+      "r2.fwupd.org": {
+        "established": 2,
+        "errors": []
+      }
+    },
+    "catalog_refresh": {
+      "status": "verified",
+      "started": true,
+      "changed": true,
+      "message": "Metadata LVFS resmi tersedia dan baru diperiksa."
+    },
+    "available_update": [
+      {
+        "Name": "Battery",
+        "Guid": [
+          "778643f5-e815-4bb1-baaa-d5172e619d15"
+        ],
+        "Version": "1.0.7",
+        "Plugin": "uefi_capsule",
+        "Flags": [
+          "internal",
+          "updatable",
+          "require-ac",
+          "supported",
+          "needs-reboot",
+          "usable-during-update"
+        ],
+        "UpdateState": 2,
+        "releases": [
+          {
+            "AppstreamId": "com.lenovo.ThinkPadN39BL_00050441.firmware",
+            "RemoteId": "lvfs",
+            "Version": "1.0.8",
+            "Flags": [
+              "trusted-metadata",
+              "is-upgrade",
+              "trusted-report"
+            ],
+            "Checksum": [
+              "8ea633c83a99e167e75994600c07ad7ed378993d",
+              "6b979d7231194e833a0d9e7add9a1c905238e5240c39612f20ec66a2e2a3fc52"
+            ],
+            "Locations": [
+              "https://fwupd.org/downloads/6b979d7231194e833a0d9e7add9a1c905238e5240c39612f20ec66a2e2a3fc52-N39BL02W_L00050441.cab"
+            ],
+            "Size": 80560
+          }
+        ]
+      }
+    ],
+    "public_cab_actual_url": "https://r2.fwupd.org/lvfs-prod/6b979d7231194e833a0d9e7add9a1c905238e5240c39612f20ec66a2e2a3fc52-N39BL02W_L00050441.cab",
+    "cab_expected_sha256": "6b979d7231194e833a0d9e7add9a1c905238e5240c39612f20ec66a2e2a3fc52",
+    "cab": {
+      "sha256": "6b979d7231194e833a0d9e7add9a1c905238e5240c39612f20ec66a2e2a3fc52",
+      "bytes": 87003
+    },
+    "cab_details": [
+      {
+        "Name": "Battery",
+        "Guid": [
+          "778643f5-e815-4bb1-baaa-d5172e619d15"
+        ],
+        "Version": "1.0.7",
+        "Plugin": "uefi_capsule",
+        "Flags": [
+          "internal",
+          "updatable",
+          "require-ac",
+          "supported",
+          "needs-reboot",
+          "usable-during-update"
+        ],
+        "UpdateState": 2,
+        "releases": [
+          {
+            "AppstreamId": "com.lenovo.ThinkPadN39BL_00050441.firmware",
+            "Version": "1.0.8",
+            "Flags": [
+              "trusted-payload",
+              "trusted-metadata"
+            ],
+            "Checksum": [
+              "8ea633c83a99e167e75994600c07ad7ed378993d",
+              "6b979d7231194e833a0d9e7add9a1c905238e5240c39612f20ec66a2e2a3fc52"
+            ],
+            "Size": 80560
+          },
+          {
+            "RemoteId": "lvfs",
+            "Checksum": [
+              "6b979d7231194e833a0d9e7add9a1c905238e5240c39612f20ec66a2e2a3fc52",
+              "8ea633c83a99e167e75994600c07ad7ed378993d"
+            ]
+          }
+        ]
+      }
+    ],
+    "preview_expects_native_polkit": true,
+    "wrong_confirmation": {
+      "status": "not_started",
+      "started": false,
+      "message": "ID konfirmasi atau isi rencana tidak sah"
+    },
+    "result_plan_id_matches_signed_preview": true,
+    "device_count_before": 1,
+    "device_count_after": 1,
+    "device_id_unchanged": true,
+    "apply": {
+      "status": "partial",
+      "started": true
+    },
+    "apply_exit": "1",
+    "esp_capsules": [
+      {
+        "sha256": "e5b7474db368ddc814acedd31b1f8cc0ab5c977ca35cfb10625837e36cc39b64",
+        "bytes": 80560
+      }
+    ],
+    "history": [
+      {
+        "Name": "Battery",
+        "Guid": [
+          "778643f5-e815-4bb1-baaa-d5172e619d15"
+        ],
+        "Version": "1.0.7",
+        "Plugin": "uefi_capsule",
+        "Flags": [
+          "internal",
+          "require-ac",
+          "supported",
+          "needs-reboot",
+          "historical",
+          "usable-during-update",
+          "updatable-hidden"
+        ],
+        "UpdateState": 4,
+        "releases": [
+          {
+            "AppstreamId": "com.lenovo.ThinkPadN39BL_00050441.firmware",
+            "RemoteId": "lvfs",
+            "Version": "1.0.8",
+            "Flags": [
+              "trusted-payload",
+              "trusted-metadata"
+            ],
+            "Checksum": [
+              "8ea633c83a99e167e75994600c07ad7ed378993d",
+              "6b979d7231194e833a0d9e7add9a1c905238e5240c39612f20ec66a2e2a3fc52"
+            ],
+            "Locations": [
+              "https://fwupd.org/downloads/6b979d7231194e833a0d9e7add9a1c905238e5240c39612f20ec66a2e2a3fc52-N39BL02W_L00050441.cab"
+            ],
+            "Size": 80560
+          }
+        ]
+      }
+    ],
+    "resume": {
+      "state": "reboot_required",
+      "installed": "1.0.7",
+      "availability": "partial"
+    },
+    "harness_exit": 0
+  }
+}

@@ -14,6 +14,8 @@ Setelah konfirmasi pembaruan, aplikasi mengunduh satu CAB melalui HTTPS, membata
 
 Layar firmware menampilkan jumlah perangkat ketika inventaris berhasil dibaca. Jika platform belum mendukung fwupd atau `fwupdmgr` hilang, layar menjelaskan kebutuhan backend dan menyembunyikan pilihan katalog.
 
+Build bersih `04876fc` membaca kandidat Lenovo Battery 1.0.8 dari katalog publik dengan perangkat ESRT sintetis. fwupd memeriksa tanda tangan, GUID, dan versi CAB setelah SHA-256 cocok. Apply yang dikonfirmasi menulis satu capsule 80.560 byte ke ESP sementara. `--resume` mengembalikan `reboot_required` dengan versi aktif 1.0.7. Uji dihentikan sebelum boot. [Bukti uji CAB publik](assets/fwupd-lvfs-cabinet.json)
+
 Jika fwupd mencatat pending atau needs-reboot, restart sendiri sambil mempertahankan daya AC. Lanjutkan dari **Riwayat → Periksa firmware setelah restart**, dengan `whwmpc firmware --resume PLAN_ID`, atau dengan `whwmpc firmware --verify DEVICEID@VERSI` dari hasil aksi. Aplikasi menyimpan target handoff secara privat. Verifikasi mencocokkan versi rilis di `fwupdmgr get-history --json` dengan versi aktif perangkat yang dibaca ulang. Bila versi aktif hanya berasal dari perangkat emulasi, hasilnya unknown. Backend ini tidak menyediakan pemulihan firmware. [Emulasi fwupd](https://github.com/fwupd/fwupd/blob/2.0.20/src/fwupdmgr.md#emulation)
 
 Hasil verifikasi di TUI menampilkan kebutuhan restart, kegagalan, atau konfirmasi versi yang sudah terverifikasi. Versi aktif tampil bila fwupd berhasil membacanya. Piko merayakan hasil ketika riwayat dan versi aktif sudah cocok.
