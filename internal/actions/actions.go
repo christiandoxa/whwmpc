@@ -17,6 +17,7 @@ import (
 	"unicode"
 
 	"github.com/christiandoxa/whwmpc/internal/domain"
+	"github.com/christiandoxa/whwmpc/internal/hardware"
 )
 
 const (
@@ -154,7 +155,7 @@ func (s *Service) TrimTargets(ctx context.Context) ([]TrimTarget, error) {
 
 func (s *Service) Preview(ctx context.Context, kind, target string) (Plan, error) {
 	switch kind {
-	case PowerProfile, TrimMount, EnableTrimTimer, CleanAPT:
+	case PowerProfile, TrimMount, EnableTrimTimer, CleanAPT, hardware.PowerLimit, hardware.CoreMax, hardware.VoltageOffset:
 		return s.preview(ctx, kind, target, "", "")
 	default:
 		return Plan{}, errors.New("tindakan tidak dikenal")
@@ -176,6 +177,12 @@ func (s *Service) PreviewRestore(ctx context.Context, result Result) (Plan, erro
 		return s.preview(ctx, RestorePower, result.Plan.Initial, result.Plan.ID, result.AfterIdentity)
 	case EnableTrimTimer:
 		return s.preview(ctx, RestoreTrimTimer, result.Plan.Target, result.Plan.ID, result.AfterIdentity)
+	case hardware.PowerLimit:
+		return s.preview(ctx, hardware.RestorePowerLimit, result.Plan.Initial, result.Plan.ID, result.AfterIdentity)
+	case hardware.CoreMax:
+		return s.preview(ctx, hardware.RestoreCoreMax, result.Plan.Initial, result.Plan.ID, result.AfterIdentity)
+	case hardware.VoltageOffset:
+		return s.preview(ctx, hardware.RestoreVoltageOffset, result.Plan.Initial, result.Plan.ID, result.AfterIdentity)
 	default:
 		return Plan{}, errors.New("pemulihan tidak tersedia untuk tindakan ini")
 	}
@@ -289,11 +296,11 @@ func (s *Service) ExecuteWithProgress(ctx context.Context, plan Plan, confirmedI
 
 func (s *Service) validate(plan Plan, confirmedID string) error {
 	switch plan.Kind {
-	case PowerProfile, TrimMount, EnableTrimTimer, CleanAPT:
+	case PowerProfile, TrimMount, EnableTrimTimer, CleanAPT, hardware.PowerLimit, hardware.CoreMax, hardware.VoltageOffset:
 		if plan.Restores != "" {
 			return errors.New("jenis rencana tidak valid untuk pemulihan")
 		}
-	case RestorePower, RestoreTrimTimer:
+	case RestorePower, RestoreTrimTimer, hardware.RestorePowerLimit, hardware.RestoreCoreMax, hardware.RestoreVoltageOffset:
 		if plan.Restores == "" {
 			return errors.New("rencana pemulihan memerlukan bukti perubahan")
 		}

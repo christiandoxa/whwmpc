@@ -90,3 +90,7 @@ Jalur CLI/TUI memisahkan CPU, stress dengan sensor, pembacaan file reguler, dan 
 ## Backlog F · Observasi terjadwal
 
 CLI menyediakan lifecycle user timer, proses observasi read-only, retensi riwayat, batas log/resource, dan lock lintas proses. Gate unit memeriksa instalasi tidak mengaktifkan timer serta unit asing dipertahankan. Tidak ada unit yang dipasang atau diaktifkan di host development.
+
+## Backlog B dan D · GPU dan OverDrive
+
+Discovery GPU, metrik vendor, batas daya NVIDIA, dan kontrol OverDrive AMD terhubung ke CLI/TUI. Pengguna memasukkan nilai eksplisit sebelum review. Action service yang sama mengikat plan, verifikasi, dan bukti pemulihan bersyarat. Probe dan preview baca-saja berhasil pada NVIDIA RTX 3060 dan AMD Renoir. Host tidak mengekspos offset voltase. Mutasi pada perangkat nyata belum dijalankan.

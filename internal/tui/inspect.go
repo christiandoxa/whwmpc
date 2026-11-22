@@ -45,6 +45,8 @@ func Inspector(scanner *inspection.Scanner, store state.Store, maintenance *work
 		allowActions := maintenance.Available() == nil
 		a := diagnostics.Analyzer{Language: req.Language, Now: scanner.Now()}
 		switch req.Intent {
+		case assistant.GPU:
+			return gpuPage(ctx, maintenance, req.Language)
 		case assistant.Storage:
 			snapshot := scanner.SMART(ctx, req.Choice.Kind == "rescan")
 			page := withFindings(storagePage(snapshot, req.Language), a.SMART(snapshot), req.Language)

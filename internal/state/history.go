@@ -16,6 +16,7 @@ import (
 	"github.com/christiandoxa/whwmpc/internal/assistant"
 	"github.com/christiandoxa/whwmpc/internal/diagnostics"
 	"github.com/christiandoxa/whwmpc/internal/domain"
+	"github.com/christiandoxa/whwmpc/internal/hardware"
 )
 
 const MaxHistory = 100
@@ -282,7 +283,8 @@ func scanCategory(category string) bool {
 
 func actionCategory(category string) bool {
 	switch category {
-	case actions.PowerProfile, actions.TrimMount, actions.EnableTrimTimer, actions.CleanAPT, actions.RestorePower, actions.RestoreTrimTimer:
+	case actions.PowerProfile, actions.TrimMount, actions.EnableTrimTimer, actions.CleanAPT, actions.RestorePower, actions.RestoreTrimTimer,
+		hardware.PowerLimit, hardware.CoreMax, hardware.VoltageOffset, hardware.RestorePowerLimit, hardware.RestoreCoreMax, hardware.RestoreVoltageOffset:
 		return true
 	}
 	return false

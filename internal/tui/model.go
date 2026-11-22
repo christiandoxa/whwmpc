@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -94,6 +95,7 @@ type screenState struct {
 	reviewThrough  int
 	exportType     string
 	pendingOutput  string
+	parameter      Choice
 }
 
 type Model struct {
@@ -216,11 +218,27 @@ func (m *Model) start(intent assistant.Intent, choice Choice) tea.Cmd {
 	case "more":
 		m.remember()
 		m.screenState = screenState{screen: more}
-		for _, id := range []assistant.Intent{assistant.Storage, assistant.Trim, assistant.Power, assistant.History, assistant.Report, assistant.Settings, assistant.Benchmark} {
+		for _, id := range []assistant.Intent{assistant.Storage, assistant.Trim, assistant.Power, assistant.History, assistant.Report, assistant.Settings} {
 			m.page.Choices = append(m.page.Choices, Choice{m.tr(menuNames[id]), "navigate", string(id)})
 		}
-		m.page.Choices = append(m.page.Choices, Choice{m.tr(Words{"Tanya sesuatu", "Ask a question"}), "ask", ""})
+		m.page.Choices = append(m.page.Choices, Choice{m.tr(Words{"Tanya sesuatu", "Ask a question"}), "ask", ""},
+			Choice{m.tr(Words{"Perangkat lanjutan", "Advanced devices"}), "advanced", ""})
 		return nil
+	case "advanced":
+		m.remember()
+		m.screenState = screenState{screen: taskQuestion, page: Page{Found: []string{m.tr(Words{"Apa yang ingin ditinjau?", "What would you like to review?"})}}}
+		for _, id := range []assistant.Intent{assistant.GPU, assistant.Benchmark} {
+			m.page.Choices = append(m.page.Choices, Choice{m.tr(menuNames[id]), "navigate", string(id)})
+		}
+		return nil
+	case "gpu-value":
+		m.remember()
+		m.screen = fileInput
+		m.exportType = "gpu"
+		m.parameter = choice
+		m.input.Reset()
+		m.input.Placeholder = m.tr(Words{"Nilai integer", "Integer value"})
+		return m.input.Focus()
 	case "ask":
 		return m.ask()
 	case "result-options":
@@ -528,6 +546,16 @@ func (m *Model) submit() tea.Cmd {
 	m.input.Reset()
 	if m.screen == fileInput {
 		format := m.exportType
+		if format == "gpu" {
+			n, err := strconv.ParseInt(value, 10, 32)
+			kind, id, ok := strings.Cut(m.parameter.Value, " ")
+			m.screen = results
+			if err != nil || !ok {
+				m.page = Page{Availability: domain.Error, Found: []string{m.tr(Words{"Nilai integer tidak valid.", "Invalid integer value."})}}
+				return nil
+			}
+			return m.start(assistant.GPU, Choice{Kind: kind, Value: id + "=" + strconv.FormatInt(n, 10)})
+		}
 		if format == "read" || format == "write" {
 			m.screen = taskQuestion
 			m.page = Page{Found: []string{m.tr(Words{"Uji lokasi ini?", "Test this location?"}), domain.SafeText(value),

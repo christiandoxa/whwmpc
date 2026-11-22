@@ -128,6 +128,8 @@ func (m Model) body(w int) []string {
 		switch m.exportType {
 		case "read":
 			title(l("File mana yang ingin dibaca?", "Which file should be read?"))
+		case "gpu":
+			title(m.parameter.Label)
 		case "write":
 			title(l("Direktori mana untuk file sementara?", "Which directory should hold the temporary file?"))
 		default:
@@ -293,7 +295,7 @@ func (m Model) View() tea.View {
 	if m.typing() && h > 4 {
 		if c := m.input.Cursor(); c != nil {
 			c.X = min(c.X, w-1) + len(pad)
-			c.Y = 4
+			c.Y = 2 + len(body) - 1 - start
 			v.Cursor = c
 		}
 	}

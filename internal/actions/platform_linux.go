@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/christiandoxa/whwmpc/internal/hardware"
 	"io"
 	"os"
 	"os/exec"
@@ -40,6 +41,8 @@ func (p linuxPlatform) prepare(ctx context.Context, kind, target string) (prepar
 		return p.trimTimer(ctx, kind, target)
 	case CleanAPT:
 		return p.apt(ctx, target)
+	case hardware.PowerLimit, hardware.CoreMax, hardware.VoltageOffset, hardware.RestorePowerLimit, hardware.RestoreCoreMax, hardware.RestoreVoltageOffset:
+		return p.gpu(ctx, kind, target)
 	default:
 		return prepared{}, errors.New("tindakan tidak dikenal")
 	}
@@ -67,11 +70,18 @@ func (linuxPlatform) authenticate(ctx context.Context, stdin io.Reader, stdout, 
 var executablePaths = map[string][]string{
 	"apt-config": {"/usr/bin/apt-config"},
 	"apt-get":    {"/usr/bin/apt-get"},
+	"blkid":      {"/usr/sbin/blkid", "/sbin/blkid"},
 	"busctl":     {"/usr/bin/busctl", "/bin/busctl"},
 	"busybox":    {"/usr/bin/busybox", "/bin/busybox"},
+	"e2fsck":     {"/usr/sbin/e2fsck", "/sbin/e2fsck"},
+	"env":        {"/usr/bin/env", "/bin/env"},
 	"find":       {"/usr/bin/find", "/bin/find"},
+	"dd":         {"/usr/bin/dd", "/bin/dd"},
+	"nvidia-smi": {"/usr/bin/nvidia-smi"},
 	"fstrim":     {"/usr/sbin/fstrim", "/sbin/fstrim"},
+	"fwupdmgr":   {"/usr/bin/fwupdmgr"},
 	"journalctl": {"/usr/bin/journalctl", "/bin/journalctl"},
+	"lsblk":      {"/usr/bin/lsblk", "/bin/lsblk"},
 	"sudo":       {"/usr/bin/sudo", "/bin/sudo"},
 	"systemctl":  {"/usr/bin/systemctl", "/bin/systemctl"},
 }
@@ -207,6 +217,10 @@ func newInvocation(name string, args []string, needsRoot bool) (invocation, erro
 func (inv invocation) identity() string { return digest(inv.exe.id, inv.sudo.id) }
 
 func (inv invocation) run(ctx context.Context, timeout time.Duration) attempt {
+	return inv.runInput(ctx, timeout, nil)
+}
+
+func (inv invocation) runInput(ctx context.Context, timeout time.Duration, stdin io.Reader) attempt {
 	paths := []executable{inv.exe}
 	if inv.privilege == Sudo {
 		paths = append(paths, inv.sudo)
@@ -217,7 +231,7 @@ func (inv invocation) run(ctx context.Context, timeout time.Duration) attempt {
 			return attempt{err: errors.New("executable berubah setelah pemeriksaan, buat preview baru")}
 		}
 	}
-	step, stderr, exit := run(ctx, timeout, inv.spec[0], inv.spec[1:])
+	step, stderr, exit := runInput(ctx, timeout, inv.spec[0], inv.spec[1:], stdin)
 	if inv.privilege == Sudo && exit == 1 {
 		message := strings.ToLower(string(stderr))
 		if strings.HasPrefix(message, "sudo: ") && (strings.Contains(message, "password is required") ||
@@ -275,6 +289,10 @@ func (b *limitedOutput) Write(data []byte) (int, error) {
 }
 
 func run(ctx context.Context, timeout time.Duration, path string, args []string) (attempt, []byte, int) {
+	return runInput(ctx, timeout, path, args, nil)
+}
+
+func runInput(ctx context.Context, timeout time.Duration, path string, args []string, stdin io.Reader) (attempt, []byte, int) {
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 	cmd := command(ctx, path, args)
@@ -287,7 +305,7 @@ func run(ctx context.Context, timeout time.Duration, path string, args []string)
 		return err
 	}
 	var stdout, stderr limitedOutput
-	cmd.Stdout, cmd.Stderr = &stdout, &stderr
+	cmd.Stdin, cmd.Stdout, cmd.Stderr = stdin, &stdout, &stderr
 	if err := cmd.Start(); err != nil {
 		return attempt{err: err}, nil, -1
 	}

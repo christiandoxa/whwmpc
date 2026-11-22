@@ -11,6 +11,7 @@ import (
 	"github.com/christiandoxa/whwmpc/internal/actions"
 	"github.com/christiandoxa/whwmpc/internal/assistant"
 	"github.com/christiandoxa/whwmpc/internal/domain"
+	"github.com/christiandoxa/whwmpc/internal/hardware"
 	"github.com/christiandoxa/whwmpc/internal/tui/mascot"
 	"github.com/christiandoxa/whwmpc/internal/workflow"
 )
@@ -171,7 +172,7 @@ func previewAction(ctx context.Context, m *workflow.Maintenance, req Request) (P
 	}
 
 	switch req.Choice.Kind {
-	case actions.PowerProfile, actions.TrimMount, actions.CleanAPT, actions.EnableTrimTimer:
+	case actions.PowerProfile, actions.TrimMount, actions.CleanAPT, actions.EnableTrimTimer, hardware.PowerLimit, hardware.CoreMax, hardware.VoltageOffset:
 		p, err := m.Preview(ctx, req.Choice.Kind, req.Choice.Value, false)
 		if err != nil {
 			return unavailableAction(err, req.Language), true
@@ -218,6 +219,14 @@ func actionLabel(kind, lang string) string {
 	switch kind {
 	case actions.CleanAPT:
 		return l("Bersihkan cache paket", "Clean package cache")
+	case hardware.PowerLimit:
+		return l("Ubah batas daya GPU", "Change GPU power limit")
+	case hardware.CoreMax:
+		return l("Ubah clock maksimum GPU", "Change maximum GPU clock")
+	case hardware.VoltageOffset:
+		return l("Ubah offset voltase GPU", "Change GPU voltage offset")
+	case hardware.RestorePowerLimit, hardware.RestoreCoreMax, hardware.RestoreVoltageOffset:
+		return l("Pulihkan kontrol GPU", "Restore GPU control")
 	case actions.EnableTrimTimer:
 		return l("Aktifkan jadwal TRIM", "Enable TRIM schedule")
 	case actions.RestoreTrimTimer:

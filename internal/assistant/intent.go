@@ -19,11 +19,13 @@ const (
 	Settings  Intent = "settings"
 	Report    Intent = "report"
 	Benchmark Intent = "benchmark"
+	GPU       Intent = "gpu"
 )
 
-var Menu = []Intent{Overview, Slow, Storage, Trim, Power, Cleanup, Recommend, History, Report, Settings, Benchmark}
+var Menu = []Intent{Overview, Slow, Storage, Trim, Power, Cleanup, Recommend, History, Report, Settings, Benchmark, GPU}
 
 var phrases = map[Intent][]string{
+	GPU:       {"gpu", "graphics", "kartu grafis"},
 	Benchmark: {"benchmark", "stress test", "uji kinerja"},
 	Overview:  {"overview", "check everything", "system status", "health check", "keseluruhan", "ringkasan", "kondisi komputer"},
 	Slow:      {"slow", "lag", "sluggish", "bottleneck", "lambat", "lemot", "macet"},

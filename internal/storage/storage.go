@@ -14,7 +14,15 @@ type Collector struct {
 	Root   string // Alternate filesystem root for fixtures.
 }
 
+const (
+	DiskUtilitySource    = "diskutil info (macOS SMART status)"
+	WindowsStorageSource = "Windows Storage provider (physical disk health and reliability counters)"
+	DarwinTRIMSource     = "system_profiler (macOS reported device TRIM support)"
+	WindowsTRIMSource    = "fsutil behavior query DisableDeleteNotify"
+)
+
 type SMARTAudit struct {
+	Source       string              `json:"source,omitempty"`
 	Availability domain.Availability `json:"availability"`
 	CapturedAt   time.Time           `json:"captured_at"`
 	Drives       []Drive             `json:"drives,omitempty"`
@@ -22,6 +30,7 @@ type SMARTAudit struct {
 }
 
 type Drive struct {
+	HealthStatus string              `json:"reported_health,omitempty"`
 	Availability domain.Availability `json:"availability"`
 	CapturedAt   time.Time           `json:"captured_at"`
 	Name         string              `json:"name"`
@@ -36,20 +45,22 @@ type Drive struct {
 }
 
 type SMART struct {
-	Passed           *bool          `json:"passed,omitempty"`
-	CriticalWarning  *uint64        `json:"critical_warning,omitempty"`
-	TemperatureC     *int64         `json:"temperature_c,omitempty"`
-	Spare            *uint64        `json:"available_spare,omitempty"`
-	SpareThreshold   *uint64        `json:"spare_threshold,omitempty"`
-	PercentageUsed   *uint64        `json:"percentage_used,omitempty"`
-	MediaErrors      string         `json:"media_errors,omitempty"`
-	UnsafeShutdowns  string         `json:"unsafe_shutdowns,omitempty"`
-	PowerOnHours     string         `json:"power_on_hours,omitempty"`
-	DataUnitsRead    string         `json:"data_units_read,omitempty"`
-	DataUnitsWritten string         `json:"data_units_written,omitempty"`
-	ATAAttributes    []ATAAttribute `json:"ata_attributes,omitempty"`
-	ExitCode         int            `json:"exit_code"`
-	ExitFlags        []string       `json:"exit_flags,omitempty"`
+	ReadErrorsUncorrected  string         `json:"uncorrected_read_errors,omitempty"`
+	WriteErrorsUncorrected string         `json:"uncorrected_write_errors,omitempty"`
+	Passed                 *bool          `json:"passed,omitempty"`
+	CriticalWarning        *uint64        `json:"critical_warning,omitempty"`
+	TemperatureC           *int64         `json:"temperature_c,omitempty"`
+	Spare                  *uint64        `json:"available_spare,omitempty"`
+	SpareThreshold         *uint64        `json:"spare_threshold,omitempty"`
+	PercentageUsed         *uint64        `json:"percentage_used,omitempty"`
+	MediaErrors            string         `json:"media_errors,omitempty"`
+	UnsafeShutdowns        string         `json:"unsafe_shutdowns,omitempty"`
+	PowerOnHours           string         `json:"power_on_hours,omitempty"`
+	DataUnitsRead          string         `json:"data_units_read,omitempty"`
+	DataUnitsWritten       string         `json:"data_units_written,omitempty"`
+	ATAAttributes          []ATAAttribute `json:"ata_attributes,omitempty"`
+	ExitCode               int            `json:"exit_code"`
+	ExitFlags              []string       `json:"exit_flags,omitempty"`
 }
 
 type ATAAttribute struct {
@@ -72,7 +83,15 @@ const (
 	SMARTSelfTestLog
 )
 
+// TrimPolicy reports an operating-system setting or reported device capability.
+type TrimPolicy struct {
+	Scope   string `json:"scope"`
+	Enabled bool   `json:"enabled"`
+}
+
 type TrimAudit struct {
+	Source       string              `json:"source,omitempty"`
+	Policy       []TrimPolicy        `json:"policy,omitempty"`
 	Availability domain.Availability `json:"availability"`
 	CapturedAt   time.Time           `json:"captured_at"`
 	Mounts       []Mount             `json:"mounts,omitempty"`
