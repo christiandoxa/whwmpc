@@ -144,6 +144,15 @@ func summarize(page Page, intent assistant.Intent, lang string) ResultSummary {
 	if page.Summary != nil {
 		summary = *page.Summary
 	}
+	if page.Summary == nil && len(page.Findings) == 0 && len(page.Found) > 0 {
+		summary.Headline = page.Found[0]
+		for _, line := range page.Found[1:min(3, len(page.Found))] {
+			summary.Statuses = append(summary.Statuses, resultStatus{Value: line, Availability: domain.Available})
+		}
+	}
+	if !hasData(page.Availability) && len(summary.Statuses) == 0 && len(summary.Metrics) == 0 && len(page.Findings) == 0 {
+		summary.Statuses = append(summary.Statuses, resultStatus{Label: l("Data", "Data"), Availability: page.Availability})
+	}
 	summary.Coverage = coverageLine(page.Coverage, lang)
 	if len(page.Coverage) == 0 {
 		summary.Coverage = coverageLine([]workflow.Coverage{{ID: workflow.Check(intent), Status: page.Availability}}, lang)
@@ -210,6 +219,14 @@ func summarize(page Page, intent assistant.Intent, lang string) ResultSummary {
 		}
 		if c.Kind == "navigate" && (warning > 0 || intent == assistant.Power) {
 			summary.Primary = c
+		}
+	}
+	if summary.Primary.Kind == "details" && intent != assistant.Overview && intent != assistant.Slow && intent != assistant.Storage {
+		for _, c := range page.Choices {
+			if c.Kind != "save-scan" {
+				summary.Primary = c
+				break
+			}
 		}
 	}
 	if intent == assistant.Slow && summary.Primary.Kind == "details" {

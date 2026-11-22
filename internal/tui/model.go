@@ -411,10 +411,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.lastChecked = m.page.Snapshot.Input.At
 			m.lastCoverage = coverageLine(m.page.Coverage, m.options.Language)
 		}
-		if (len(m.page.Findings) > 0 || m.page.Summary != nil) && m.active != assistant.Recommend {
-			summary := summarize(m.page, m.active, m.options.Language)
-			m.page.Summary = &summary
-		}
 		if m.page.Plan != nil {
 			m.screen = reviewPlan
 			m.reviewThrough = 0
@@ -425,6 +421,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		if wasAction {
 			m.screen = outcome
+		}
+		if m.screen == results || m.screen == outcome {
+			summary := summarize(m.page, m.active, m.options.Language)
+			m.page.Summary = &summary
 		}
 		m.updateCritical()
 		if m.visual.pose == mascot.Nod && replyPose(m.page) == mascot.Idle {

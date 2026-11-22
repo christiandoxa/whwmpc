@@ -56,12 +56,14 @@ func Inspector(scanner *inspection.Scanner, store state.Store, maintenance *work
 		case assistant.Storage:
 			snapshot := scanner.SMART(ctx, req.Choice.Kind == "rescan")
 			page := withFindings(storagePage(snapshot, req.Language), a.SMART(snapshot), req.Language)
+			page.Summary = ssdSummary(snapshot, req.Language)
 			page.Coverage = []workflow.Coverage{{ID: workflow.SSDCheck, Status: snapshot.Availability}}
 			page.Snapshot = &workflow.Snapshot{Input: report.Input{At: scanner.Now(), Demo: maintenance.Demo, SMART: &snapshot, Findings: page.Findings}}
 			return page
 		case assistant.Trim:
 			snapshot := scanner.TRIM(ctx)
 			page := withFindings(trimPage(snapshot, req.Language), a.TRIM(snapshot), req.Language)
+			page.Summary = trimSummary(snapshot, req.Language)
 			page.Coverage = []workflow.Coverage{{ID: workflow.TRIMCheck, Status: snapshot.Availability}}
 			page.Snapshot = &workflow.Snapshot{Input: report.Input{At: scanner.Now(), Demo: maintenance.Demo, Trim: &snapshot, Findings: page.Findings}}
 			if allowActions {
@@ -71,6 +73,7 @@ func Inspector(scanner *inspection.Scanner, store state.Store, maintenance *work
 		case assistant.Power:
 			snapshot := scanner.Power(ctx)
 			page := withFindings(powerPage(snapshot, req.Language), a.Power(snapshot), req.Language)
+			page.Summary = powerSummary(snapshot, req.Language)
 			page.Snapshot = &workflow.Snapshot{Input: report.Input{At: scanner.Now(), Demo: maintenance.Demo, Power: &snapshot, Findings: page.Findings}}
 			if snapshot.LinuxInterfaces() {
 				page.Choices = append(page.Choices, Choice{translator(req.Language)("Pilih profil yang cocok", "Choose a suitable profile"), "navigate", string(assistant.Recommend)})
@@ -85,7 +88,9 @@ func Inspector(scanner *inspection.Scanner, store state.Store, maintenance *work
 			}
 			return historyPage(store, maintenance, req.Language)
 		case assistant.Cleanup:
-			return cleanupPage(ctx, maintenance, req.Language)
+			page := cleanupPage(ctx, maintenance, req.Language)
+			page.Summary.At = scanner.Now()
+			return page
 		case assistant.Overview, assistant.Slow:
 			full := req.Intent == assistant.Overview
 			snapshot, err := workflow.Collect(ctx, scanner, req.Overview, req.Language, maintenance.Demo, full, req.Choice.Kind == "rescan", req.ScanProgress)
@@ -115,6 +120,13 @@ func Inspector(scanner *inspection.Scanner, store state.Store, maintenance *work
 			}
 			page := withFindings(Page{}, a.Recommend(req.Overview, snapshot, workload), req.Language)
 			l := translator(req.Language)
+			if !snapshot.At.IsZero() {
+				s := powerSummary(snapshot, req.Language)
+				s.Headline = page.Findings[0].Observation
+				s.Metrics = s.Metrics[:min(2, len(s.Metrics))]
+				page.Summary = s
+				page.Snapshot = &workflow.Snapshot{Input: report.Input{At: snapshot.At, Demo: maintenance.Demo, Power: &snapshot, Findings: page.Findings}}
+			}
 			if allowActions {
 				page.Choices = actionChoices(page.Choices, page.Findings, nil)
 			}

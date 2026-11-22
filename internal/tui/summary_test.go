@@ -9,15 +9,77 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
+	"github.com/christiandoxa/whwmpc/internal/actions"
 
 	"github.com/christiandoxa/whwmpc/internal/assistant"
 	"github.com/christiandoxa/whwmpc/internal/diagnostics"
 	"github.com/christiandoxa/whwmpc/internal/domain"
 	"github.com/christiandoxa/whwmpc/internal/inspection"
 	"github.com/christiandoxa/whwmpc/internal/platform"
+	"github.com/christiandoxa/whwmpc/internal/power"
 	"github.com/christiandoxa/whwmpc/internal/state"
+	"github.com/christiandoxa/whwmpc/internal/storage"
 	"github.com/christiandoxa/whwmpc/internal/workflow"
 )
+
+func TestComponentSummariesKeepIndependentMeasurements(t *testing.T) {
+	at := platform.DemoTime
+	ssd := storage.SMARTAudit{CapturedAt: at, Availability: domain.Partial, Drives: []storage.Drive{
+		{Model: "Other drive", CapturedAt: at, Availability: domain.Available, Health: &storage.SMART{Passed: new(true)}},
+		{Model: "Affected drive", CapturedAt: at, Availability: domain.Partial, Health: &storage.SMART{
+			Passed: new(false), CriticalWarning: new(uint64(2)), PercentageUsed: new(uint64(127)), MediaErrors: "9007199254740993",
+		}},
+	}}
+	m := New(t.Context(), platform.Demo{}, nil, Options{Language: "en", Motion: "off"})
+	m.screen, m.active = results, assistant.Storage
+	p := Page{Availability: ssd.Availability, Summary: ssdSummary(ssd, "en"), Findings: (diagnostics.Analyzer{Language: "en", Now: at}).SMART(ssd)}
+	s := summarize(p, m.active, "en")
+	m.page.Summary = &s
+	view := ansi.Strip(m.View().Content)
+	for _, want := range []string{"1 critical", "Affected drive", "0x02", "127%", "above 100%", "9007199254740993", "Other drives", "View critical findings"} {
+		if !strings.Contains(view, want) {
+			t.Fatalf("SSD missing %q in\n%s", want, view)
+		}
+	}
+
+	trim := storage.TrimAudit{CapturedAt: at, Availability: domain.Available, Mounts: []storage.Mount{{Point: "/", Discard: domain.Unsupported}},
+		Timer: storage.Timer{Availability: domain.Available, ActiveState: "active", Journal: domain.PermissionRequired}}
+	rows := trimSummary(trim, "en").Statuses
+	if !strings.Contains(rows[0].Value, "0/1") || !strings.Contains(rows[1].Value, "active") || rows[2].Availability != domain.PermissionRequired {
+		t.Fatalf("TRIM independently reported states: %+v", rows)
+	}
+	trim.Mounts[0].LastTrim = &storage.TrimRecord{RecordedAt: at.Add(-2 * time.Hour), PotentialDiscardBytes: 460 << 20}
+	trim.Timer.LastServiceExit, trim.Timer.ServiceResult = "2026-11-22 09:41:00 UTC", "exit-code"
+	rows = trimSummary(trim, "en").Statuses
+	if rows[2].Severity != diagnostics.Warning || !strings.Contains(rows[2].Value, "exit-code") {
+		t.Fatalf("older mount evidence hid latest failed service: %+v", rows)
+	}
+	native := storage.TrimAudit{Source: storage.WindowsTRIMSource, Availability: domain.Available, Policy: []storage.TrimPolicy{{Scope: "NTFS", Enabled: true}}}
+	rows = trimSummary(native, "en").Statuses
+	if rows[1].Value != "NTFS enabled" || rows[0].Availability != domain.Unknown || rows[2].Availability != domain.Unknown {
+		t.Fatalf("native policy inferred support or completion: %+v", rows)
+	}
+
+	powerRows := powerSummary(power.Snapshot{PowerStatus: domain.Available, PowerSource: "ac", CPUFreqStatus: domain.Available,
+		Profiles: power.Profiles{Status: domain.Available, Active: "balanced"}, Policies: []power.Policy{{Name: "policy0", ObservedKHz: new(uint64(833500)),
+			AverageKHz: new(uint64(909000)), DriverKHz: new(uint64(2500000)), ConfigMaxKHz: new(uint64(3500000))}}}, "en")
+	if powerRows.Metrics[0].Value != "balanced" || powerRows.Metrics[2].Label != "Observed clock" || powerRows.Metrics[2].Value != "833.5" ||
+		powerRows.Metrics[3].Label != "Average clock" || powerRows.Metrics[4].Label != "Driver clock" || !strings.Contains(powerRows.Statuses[0].Value, "3500 MHz") {
+		t.Fatalf("power summary confused types of clocks: %+v", powerRows)
+	}
+}
+
+func TestCleanupOutcomeKeepsEstimateObservedBytesAndDelta(t *testing.T) {
+	p := resultPage(workflow.Outcome{Result: actions.Result{
+		Plan:   actions.Plan{Kind: actions.CleanAPT, EstimatedBytes: new(uint64(19 << 20))},
+		Status: actions.Partial, RemovedBytes: new(uint64(2 << 20)), FreeSpaceDelta: new(int64(-100)), CancellationRequested: true,
+	}}, "en", assistant.Cleanup)
+	s := p.Summary
+	if len(s.Metrics) != 3 || s.Metrics[0].Value != "19 MiB" || s.Metrics[1].Value != "2 MiB" || s.Metrics[2].Value != "-100" ||
+		s.Metrics[2].Unit != "B" || s.Statuses[0].Value != "Requested" || !strings.Contains(s.Headline, "Partially verified") {
+		t.Fatalf("cleanup result lost a measurement or claimed success: %+v", s)
+	}
+}
 
 func TestOverviewMetricsPreserveMeasurements(t *testing.T) {
 	const gib = 1 << 30

@@ -59,7 +59,7 @@ func (m Model) choices() []Choice {
 	case home, more, gallery, taskQuestion, reviewPlan:
 		return m.page.Choices
 	}
-	if m.screen == results && m.page.Summary != nil {
+	if (m.screen == results || m.screen == outcome) && m.page.Summary != nil {
 		primary := m.page.Summary.Primary
 		choices := []Choice{primary}
 		if primary.Kind == "details" && m.page.Snapshot != nil {
@@ -161,6 +161,12 @@ func (m Model) body(w int) []string {
 		}
 	case detail:
 		title(l("Semua hasil", "All results"))
+		if s := m.page.Summary; s != nil && !s.At.IsZero() {
+			normal(l("Sampel", "Sample") + " · " + s.At.Format("2006-01-02 15:04:05 MST"))
+		}
+		if m.stalePage() {
+			text(l("Data kedaluwarsa", "Stale data"), m.palette.alert)
+		}
 		for _, check := range m.page.Coverage {
 			status := statusNames[check.Status].Text(m.options.Language)
 			if status == "" {
@@ -171,7 +177,15 @@ func (m Model) body(w int) []string {
 		if len(m.page.Coverage) > 0 {
 			lines = append(lines, "")
 		}
+		if len(m.page.Findings) == 0 {
+			for _, s := range m.page.Found {
+				normal(s)
+			}
+		}
 		for _, s := range m.page.Evidence {
+			normal(s)
+		}
+		for _, s := range append(slices.Clone(m.page.Meaning), m.page.Advice...) {
 			normal(s)
 		}
 	default:

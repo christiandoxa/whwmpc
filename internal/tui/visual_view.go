@@ -125,14 +125,13 @@ func (m Model) summaryBody(s ResultSummary, w, room int) []string {
 			text += l("PERINGATAN", "WARNING") + " · "
 			style, priority = m.palette.alert, 2
 		}
-		if status.Value != "" {
-			text += status.Value
-			if status.Availability != domain.Available {
-				text += " · " + resultStatusLabel(status.Availability, lang)
-			}
-		} else {
+		if status.Availability != domain.Available || status.Value == "" {
 			text += resultStatusLabel(status.Availability, lang)
+			if status.Value != "" {
+				text += " · "
+			}
 		}
+		text += status.Value
 		if emphasis(status) {
 			style, priority = m.palette.alert, min(priority, 2)
 		}

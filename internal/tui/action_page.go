@@ -332,35 +332,50 @@ func resultPage(outcome workflow.Outcome, lang string, intent assistant.Intent) 
 		page.Availability, page.Pose = domain.Unknown, mascot.Warning
 	}
 	page.Found = []string{state + " · " + actionLabel(result.Plan.Kind, lang), result.Message}
+	s := &ResultSummary{Headline: page.Found[0], At: result.FinishedAt}
+	page.Summary = s
+	if result.Message != "" {
+		s.Statuses = append(s.Statuses, resultStatus{Label: l("Verifikasi", "Verification"), Value: result.Message, Availability: page.Availability})
+	}
 	if result.Status == actions.Verified &&
 		(result.Plan.Kind == actions.PowerProfile || result.Plan.Kind == actions.RestorePower) {
 		page.Found = append(page.Found, l("Profil aktif", "Active profile")+" · "+result.Plan.Target)
+		s.Metrics = append(s.Metrics, resultMetric{Label: l("Profil aktif", "Active profile"), Value: result.Plan.Target, Availability: domain.Available})
 		page.Meaning = []string{l("Profil daemon terverifikasi. Kecepatan pekerjaan perlu diukur terpisah.", "Daemon profile verified. Workload speed requires separate measurement.")}
 	}
 	if result.CancellationRequested {
 		page.Found = append(page.Found, l("Penghentian diminta.", "Cancellation requested."))
+		s.Statuses = append(s.Statuses, resultStatus{Label: l("Penghentian", "Cancellation"), Value: l("Diminta", "Requested"), Availability: domain.Available})
 		if result.Status != actions.NotStarted {
 			page.Pose = mascot.Cancelled
 		}
 	}
 	if result.Changed != nil {
+		changed := l("Keadaan awal masih teramati.", "Initial state is still observed.")
 		if *result.Changed {
-			page.Found = append(page.Found, l("Perubahan teramati.", "Change observed."))
-		} else {
-			page.Found = append(page.Found, l("Keadaan awal masih teramati.", "Initial state is still observed."))
+			changed = l("Perubahan teramati.", "Change observed.")
 		}
+		page.Found = append(page.Found, changed)
+		s.Statuses = append(s.Statuses, resultStatus{Label: l("Keadaan", "State"), Value: changed, Availability: domain.Available})
+	}
+	if v := result.Plan.EstimatedBytes; v != nil {
+		s.Metrics = append(s.Metrics, resultMetric{Label: l("Estimasi awal", "Initial estimate"), Value: bytesText(*v), Availability: domain.Available})
 	}
 	if result.PotentialDiscardBytes != nil {
 		page.Found = append(page.Found, bytesText(*result.PotentialDiscardBytes)+" "+l("berpotensi diajukan untuk discard", "potentially submitted for discard"))
+		s.Metrics = append(s.Metrics, resultMetric{Label: l("Potensi discard", "Potential discard"), Value: bytesText(*result.PotentialDiscardBytes), Availability: domain.Available})
 	}
 	if result.RemovedBytes != nil {
 		page.Found = append(page.Found, bytesText(*result.RemovedBytes)+" "+l("teramati terhapus", "observed removed"))
+		s.Metrics = append(s.Metrics, resultMetric{Label: l("Teramati terhapus", "Observed removed"), Value: bytesText(*result.RemovedBytes), Availability: domain.Available})
 	}
 	if result.FreeSpaceDelta != nil {
 		page.Found = append(page.Found, fmt.Sprintf("%+d B · %s", *result.FreeSpaceDelta, l("perubahan ruang bebas filesystem arsip", "archive filesystem free-space change")))
+		s.Metrics = append(s.Metrics, resultMetric{Label: l("Selisih ruang bebas", "Free space change"), Value: fmt.Sprintf("%+d", *result.FreeSpaceDelta), Unit: "B", Availability: domain.Available})
 	}
 	if outcome.HistoryErr != nil {
 		page.Advice = append(page.Advice, l("Riwayat gagal disimpan", "Could not save history")+" · "+domain.SafeText(outcome.HistoryErr.Error()))
+		s.Statuses = append(s.Statuses, resultStatus{Label: l("Riwayat", "History"), Value: outcome.HistoryErr.Error(), Availability: domain.Error})
 	}
 	if result.Status == actions.Unknown || result.Status == actions.Partial {
 		page.Advice = append(page.Advice, l("Periksa bukti aktual sebelum mempertimbangkan tindakan baru.", "Check current evidence before considering another action."))
@@ -387,23 +402,37 @@ func cleanupPage(ctx context.Context, m *workflow.Maintenance, lang string) Page
 	if page.Availability == "" {
 		page.Availability = domain.Error
 	}
+	s := &ResultSummary{Headline: l("Inventaris pembersihan", "Cleanup inventory")}
+	page.Summary = s
 	page.Found = []string{fmt.Sprintf("%s · %s", inv.Category, statusNames[page.Availability].Text(lang))}
 	if err != nil {
 		page.Found = append(page.Found, domain.SafeText(err.Error()))
+		s.Statuses = append(s.Statuses, resultStatus{Label: l("Inventaris", "Inventory"), Value: err.Error(), Availability: page.Availability})
+	}
+	if inv.Category != "" {
+		s.Statuses = append(s.Statuses, resultStatus{Label: l("Kategori", "Category"), Value: inv.Category, Availability: page.Availability})
 	}
 	if len(inv.Scope) > 0 {
 		page.Pose = mascot.Broom
 		page.Found = append(page.Found, fmt.Sprintf("%s · %d %s", bytesText(inv.KnownBytes), inv.KnownFiles, l("file teramati", "observed files")))
+		s.Metrics = []resultMetric{
+			{Label: l("Potensi cleanup", "Cleanup estimate"), Value: bytesText(inv.KnownBytes), Availability: page.Availability},
+			{Label: l("Cakupan terukur", "Measured scope"), Value: fmt.Sprintf(l("%d file teramati · %d target", "%d observed files · %d targets"), inv.KnownFiles, len(inv.Scope)), Availability: page.Availability},
+		}
 		page.Meaning = []string{inv.Impact, l("Paket yang sudah terpasang tetap tersedia. Isi cache yang dihapus perlu diunduh ulang.", "Installed packages stay available. Removed cache contents may need to be downloaded again.")}
 		page.Advice = []string{l("Seluruh kategori cache yang ditawarkan. Penghapusan permanen.", "Entire displayed cache category. Permanent deletion.")}
 		page.Evidence = append(page.Evidence, inv.Scope...)
 	}
 	if len(inv.Unknown) > 0 {
+		s.Statuses = append(s.Statuses, resultStatus{Label: l("Belum terukur", "Unmeasured"), Value: fmt.Sprintf(l("%d bagian cakupan", "%d scope entries"), len(inv.Unknown)), Availability: domain.Unknown})
 		page.Evidence = append(page.Evidence, l("Cakupan belum terukur", "Unmeasured scope"))
 		page.Evidence = append(page.Evidence, inv.Unknown...)
 	}
 	if inv.Detail != "" {
 		page.Evidence = append(page.Evidence, inv.Detail)
+		if len(inv.Scope) == 0 && err == nil {
+			s.Statuses = append(s.Statuses, resultStatus{Label: l("Inventaris", "Inventory"), Value: inv.Detail, Availability: page.Availability})
+		}
 	}
 	if (m.Demo || m.Available() == nil) && len(inv.Scope) > 0 && (inv.Availability == domain.Available || inv.Availability == domain.Partial) {
 		kind := inv.Kind
