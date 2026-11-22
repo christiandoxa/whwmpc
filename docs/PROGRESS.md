@@ -124,3 +124,5 @@ CLI dan TUI menampilkan inventaris APFS atau NTFS serta cek read-only sesuai pri
 ## Review distribusi 0.2.0
 
 Tugas lanjutan membuka status observasi terjadwal secara baca-saja. Ringkasan pemeriksaan campuran menghitung hasil parsial hanya saat ada data. Benchmark tanpa sampel menampilkan status dan penyebabnya. Panduan memasang arsip, cakupan platform, peta Piko, dan changelog mengikuti fitur yang dapat dijalankan. Verifikasi modul dan govulncheck lulus.
+
+Workflow native menyiapkan image APFS dan NTFS sementara dengan identitas terpisah dari volume sistem. Pemeriksaan menguji executable terhadap target itu dan membandingkan checksum image yang dipasang baca-saja.

@@ -29,3 +29,12 @@ jobs:
         run: ./whwmpc --version
       - if: runner.os == 'Windows'
         run: ./whwmpc.exe --version
+      - name: Check a temporary APFS image
+        if: runner.os == 'macOS' && runner.environment == 'github-hosted'
+        timeout-minutes: 5
+        run: python3 scripts/check-apfs-ci.py ./whwmpc
+      - name: Check a temporary NTFS image
+        if: runner.os == 'Windows' && runner.environment == 'github-hosted'
+        shell: pwsh
+        timeout-minutes: 5
+        run: ./scripts/check-ntfs-ci.ps1 -Checker ./whwmpc.exe
