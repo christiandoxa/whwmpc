@@ -160,6 +160,13 @@ func aimFor(intent assistant.Intent, choice Choice, plan *actions.Plan) mascot.P
 }
 
 func previewAction(ctx context.Context, m *workflow.Maintenance, req Request) (Page, bool) {
+	if m.Demo && req.Choice.Kind == actions.CleanAPT {
+		estimate := uint64(376) << 20
+		return planPage(actions.Plan{ID: "demo-cleanup", Kind: actions.CleanAPT, Target: "Cache APT (fixture)",
+			Initial: "/var/cache/apt/archives dan indeks cache (fixture)", Privilege: actions.Sudo,
+			Impact: "Berkas cache akan diunduh lagi saat diperlukan.", Risk: "Penghapusan permanen pada aksi nyata. Demo terkunci.", EstimatedBytes: &estimate}, req.Language), true
+	}
+
 	switch req.Choice.Kind {
 	case actions.PowerProfile, actions.TrimMount, actions.CleanAPT, actions.EnableTrimTimer:
 		p, err := m.Preview(ctx, req.Choice.Kind, req.Choice.Value, false)
@@ -203,56 +210,65 @@ func cancellationPage(lang string, intent assistant.Intent) Page {
 	}
 }
 
+func actionLabel(kind, lang string) string {
+	l := translator(lang)
+	switch kind {
+	case actions.CleanAPT:
+		return l("Bersihkan cache paket", "Clean package cache")
+	case actions.EnableTrimTimer:
+		return l("Aktifkan jadwal TRIM", "Enable TRIM schedule")
+	case actions.RestoreTrimTimer:
+		return l("Pulihkan jadwal TRIM", "Restore TRIM schedule")
+	case actions.TrimMount:
+		return l("Jalankan TRIM", "Run TRIM")
+	case actions.PowerProfile:
+		return l("Ganti profil daya", "Change power profile")
+	case actions.RestorePower:
+		return l("Pulihkan profil daya", "Restore power profile")
+	default:
+		return l("Jalankan tindakan", "Run action")
+	}
+}
+
 func planPage(plan actions.Plan, lang string) Page {
 	l := translator(lang)
-	rollback := l("Tidak tersedia", "Unavailable")
-	if plan.Rollback {
-		rollback = l("Bisa ditinjau setelah perubahan terverifikasi", "Can be previewed after a verified change")
+	action := actionLabel(plan.Kind, lang)
+	after := plan.Target
+	permission := l("Administrator melalui kebijakan sistem", "Administrator through system policy")
+	if plan.Privilege == actions.Sudo {
+		permission = l("Administrator melalui sudo", "Administrator through sudo")
 	}
-	label := l("Rencana", "Plan")
-	found := []string{
-		fmt.Sprintf("%s · %s", label, plan.Kind),
+	restore := l("Tidak bisa dipulihkan", "Cannot be undone")
+	if plan.Rollback {
+		restore = l("Dapat ditinjau untuk pemulihan setelah verifikasi", "Restore can be reviewed after verification")
+	}
+	switch plan.Kind {
+	case actions.CleanAPT:
+		after = l("cache paket dalam cakupan dihapus permanen", "package cache in scope is permanently deleted")
+	case actions.EnableTrimTimer:
+		after = l("jadwal aktif", "schedule active")
+	case actions.TrimMount:
+		after = l("blok yang tidak terpakai diajukan untuk discard", "unused blocks submitted for discard")
+	case actions.RestoreTrimTimer:
+		after = l("jadwal kembali ke kondisi sebelumnya", "schedule restored to its previous state")
+	}
+	found := []string{action,
 		l("Target", "Target") + " · " + plan.Target,
+		l("Sebelum", "Before") + " · " + plan.Initial,
+		l("Sesudah", "After") + " · " + after,
+		l("Dampak", "Impact") + " · " + plan.Impact,
 		l("Risiko", "Risk") + " · " + plan.Risk,
-		l("Izin", "Privilege") + " · " + plan.Privilege,
-		l("Kedaluwarsa", "Expires") + " · " + plan.ExpiresAt.Format("15:04:05 MST"),
+		l("Izin", "Permission") + " · " + permission,
+		l("Pemulihan", "Recovery") + " · " + restore,
+	}
+	if !plan.ExpiresAt.IsZero() {
+		found = append(found, l("Berlaku hingga", "Valid until")+" · "+plan.ExpiresAt.Format("15:04:05 MST"))
 	}
 	if plan.EstimatedBytes != nil {
 		found = append(found, l("Estimasi teramati", "Observed estimate")+" · "+bytesText(*plan.EstimatedBytes))
 	}
-	evidence := []string{
-		"ID · " + plan.ID,
-		fmt.Sprintf("%s · %d", l("Versi", "Version"), plan.Version),
-		l("Operasi persis", "Exact operation") + " · " + fmt.Sprintf("%q", plan.Operation),
-		l("Kondisi awal", "Preconditions") + " · " + plan.Initial,
-		l("Pemulihan", "Restore") + " · " + rollback,
-	}
-	advice := append([]string(nil), evidence...)
-	page := Page{
-		Availability: domain.Available, Pose: mascot.Preview, Plan: &plan,
-		Found: found, Meaning: []string{plan.Impact},
-		Advice: advice, Evidence: append(append([]string(nil), found...), evidence...),
-		Choices: []Choice{
-			{Label: l("Batalkan", "Cancel"), Kind: "cancel-plan"},
-			{Label: l("Lanjut ke konfirmasi", "Continue to confirmation"), Kind: "confirm-plan", Value: plan.ID},
-		},
-	}
-	if plan.Kind == actions.CleanAPT {
-		page.Pose = mascot.Broom
-	}
-	return page
-}
-
-func (m *Model) confirmPage() {
-	l := translator(m.options.Language)
-	page := &m.page
-	page.Pose, page.Confirm = mascot.Confirm, true
-	page.Choices = []Choice{
-		{Label: l("Batalkan", "Cancel"), Kind: "cancel-plan"},
-		{Label: l("Terapkan rencana ini", "Apply this plan"), Kind: "apply", Value: page.Plan.ID},
-	}
-	m.choice, m.scroll = 0, 0
-	m.showReply()
+	return Page{Availability: domain.Available, Pose: mascot.Confirm, Plan: &plan, Found: found,
+		Choices: []Choice{{l("Kembali", "Back"), "cancel-plan", ""}, {action, "apply", plan.ID}}}
 }
 
 func resultPage(outcome workflow.Outcome, lang string, intent assistant.Intent) Page {
@@ -285,7 +301,7 @@ func resultPage(outcome workflow.Outcome, lang string, intent assistant.Intent) 
 	default:
 		page.Availability, page.Pose = domain.Unknown, mascot.Warning
 	}
-	page.Found = []string{state + " · " + result.Plan.Kind, result.Message}
+	page.Found = []string{state + " · " + actionLabel(result.Plan.Kind, lang), result.Message}
 	if result.Status == actions.Verified &&
 		(result.Plan.Kind == actions.PowerProfile || result.Plan.Kind == actions.RestorePower) {
 		page.Found = append(page.Found, l("Profil aktif", "Active profile")+" · "+result.Plan.Target)
@@ -352,7 +368,7 @@ func cleanupPage(ctx context.Context, m *workflow.Maintenance, lang string) Page
 	if inv.Detail != "" {
 		page.Evidence = append(page.Evidence, inv.Detail)
 	}
-	if m.Available() == nil && len(inv.Scope) > 0 && (inv.Availability == domain.Available || inv.Availability == domain.Partial) {
+	if (m.Demo || m.Available() == nil) && len(inv.Scope) > 0 && (inv.Availability == domain.Available || inv.Availability == domain.Partial) {
 		page.Choices = []Choice{{Label: l("Tinjau seluruh cache APT", "Preview entire APT cache"), Kind: actions.CleanAPT}}
 	}
 	if m.Demo {

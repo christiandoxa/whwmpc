@@ -39,21 +39,20 @@ type Choice struct {
 }
 
 type Page struct {
-	Snapshot                  *workflow.Snapshot
-	Coverage                  []workflow.Coverage
-	Summary                   *ResultSummary
-	Availability              domain.Availability
-	Pose                      mascot.Pose
-	Findings                  []diagnostics.Finding
-	Priority                  string
-	Plan                      *actions.Plan
-	Confirm                   bool
-	Found, Meaning            []string
-	Advice, Evidence, Sidebar []string
-	Choices                   []Choice
+	Snapshot         *workflow.Snapshot
+	Coverage         []workflow.Coverage
+	Summary          *ResultSummary
+	Availability     domain.Availability
+	Pose             mascot.Pose
+	Findings         []diagnostics.Finding
+	Plan             *actions.Plan
+	Found, Meaning   []string
+	Advice, Evidence []string
+	Choices          []Choice
 }
 
 type Request struct {
+	Snapshot     *workflow.Snapshot
 	ScanProgress func(workflow.ScanProgress)
 	Output       string
 	Printing     func()
@@ -92,6 +91,7 @@ type screenState struct {
 	page           Page
 	active         assistant.Intent
 	choice, scroll int
+	reviewThrough  int
 	exportType     string
 }
 
@@ -111,7 +111,6 @@ type Model struct {
 	visual                                       presentation
 	activity, actionPose                         mascot.Pose
 	overview                                     domain.Overview
-	lastScreen                                   string
 	toast                                        string
 	stage                                        int
 	scenario                                     string
@@ -226,6 +225,9 @@ func (m *Model) start(intent assistant.Intent, choice Choice) tea.Cmd {
 		m.screen, m.choice, m.scroll = taskQuestion, 0, 0
 		m.page.Found = []string{m.tr(Words{"Apa langkah berikutnya?", "What would you like to do next?"})}
 		m.page.Meaning, m.page.Advice = nil, nil
+		if m.page.Snapshot != nil {
+			m.page.Choices = append([]Choice{{m.tr(Words{"Simpan hasil ini", "Save these results"}), "save-snapshot", ""}}, m.page.Choices...)
+		}
 		m.page.Choices = append(slices.Clone(m.page.Choices), Choice{m.tr(Words{"Kembali", "Back"}), "back", ""})
 		return nil
 	case "details":
@@ -234,15 +236,20 @@ func (m *Model) start(intent assistant.Intent, choice Choice) tea.Cmd {
 		return nil
 	case "motion":
 		return m.setMotion(motion.Mode(choice.Value))
-	case "confirm-plan":
-		if m.screen == reviewPlan && !m.options.Demo && plan != nil && choice.Value == plan.ID && m.reviewFits() {
-			m.confirmPage()
-		}
-		return nil
 	case "apply":
-		if m.screen != reviewPlan || m.options.Demo || plan == nil || !m.page.Confirm || choice.Value != plan.ID || !m.reviewFits() {
+		if m.screen != reviewPlan || m.options.Demo || plan == nil || choice.Value != plan.ID ||
+			m.choice != 1 || !m.reviewReady() {
 			return nil
 		}
+	case "save-snapshot":
+		m.remember()
+		m.screen, m.choice, m.scroll = taskQuestion, 0, 0
+		page := reportPage(m.options.Language)
+		page.Snapshot = m.page.Snapshot
+		page.Found = []string{m.tr(Words{"Simpan hasil ini", "Save these results"})}
+		page.Meaning = []string{m.tr(Words{"Gunakan hasil yang sedang dibuka.", "Export the results already open."})}
+		m.page = page
+		return nil
 	case "export-select":
 		m.remember()
 		m.screen = fileInput
@@ -293,7 +300,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
+		if m.screen == reviewPlan && (m.width != msg.Width || m.height != msg.Height) {
+			m.reviewThrough, m.scroll = 0, 0
+		}
 		m.width, m.height = msg.Width, msg.Height
+		m.recordReview()
 		m.scheduleMotion(m.now())
 		w, _ := m.bounds()
 		m.input.SetWidth(max(1, w-4))
@@ -352,6 +363,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		if m.page.Plan != nil {
 			m.screen = reviewPlan
+			m.reviewThrough = 0
+			m.recordReview()
+		}
+		if m.active == assistant.Recommend && slices.ContainsFunc(m.page.Choices, func(c Choice) bool { return c.Kind == "workload" }) {
+			m.screen = taskQuestion
 		}
 		if wasAction {
 			m.screen = outcome
@@ -448,6 +464,13 @@ func (m *Model) key(msg tea.KeyPressMsg) tea.Cmd {
 		if key == "pgup" || key == "pgdown" {
 			step *= 5
 		}
+		if m.screen == reviewPlan && (!m.reviewReady() || key == "pgup" || key == "pgdown") {
+			w, h := m.bounds()
+			room := m.bodyRoom(h, len(m.choices()))
+			m.scroll = max(0, min(m.scroll+max(-room, min(room, step)), max(0, len(m.body(w))-room)))
+			m.recordReview()
+			return nil
+		}
 		if m.screen == detail || m.screen == help || key == "pgup" || key == "pgdown" || len(m.choices()) == 0 {
 			m.scroll = max(0, min(m.scroll+step, m.maxScroll()))
 		} else {
@@ -479,7 +502,7 @@ func (m *Model) submit() tea.Cmd {
 		format := m.exportType
 		m.screen = results
 		return m.launch(Request{Intent: assistant.Report, Choice: Choice{Kind: "export", Value: format}, Output: value,
-			Overview: m.overview, Language: m.options.Language}, mascot.Scanning)
+			Overview: m.overview, Snapshot: m.page.Snapshot, Language: m.options.Language}, mascot.Scanning)
 	}
 	intents := assistant.Route(value)
 	if len(intents) == 1 {

@@ -62,6 +62,9 @@ func (m Model) choices() []Choice {
 	if m.screen == results && m.page.Summary != nil {
 		primary := m.page.Summary.Primary
 		choices := []Choice{primary}
+		if primary.Kind == "details" && m.page.Snapshot != nil {
+			choices = append(choices, Choice{m.tr(Words{"Simpan hasil ini", "Save these results"}), "save-snapshot", ""})
+		}
 		if primary.Kind != "details" {
 			choices = append(choices, Choice{m.tr(Words{"Lihat semua hasil", "View all results"}), "details", ""})
 		}
@@ -74,9 +77,23 @@ func (m Model) choices() []Choice {
 	return append(choices, Choice{m.tr(Words{"Kembali", "Back"}), "back", ""})
 }
 
-func (m Model) reviewFits() bool {
+func (m Model) bodyRoom(h, options int) int {
+	return max(1, h-7-min(min(options, 8), max(1, h-8)))
+}
+
+func (m Model) reviewReady() bool {
 	w, h := m.bounds()
-	return w >= 40 && len(m.body(w))+len(m.page.Choices) <= h-6
+	return w >= 32 && h >= 12 && (len(m.body(w)) <= m.bodyRoom(h, 2) || m.reviewThrough >= len(m.body(w)))
+}
+
+func (m *Model) recordReview() {
+	if m.screen != reviewPlan {
+		return
+	}
+	w, h := m.bounds()
+	if w >= 32 && h >= 12 && m.scroll <= m.reviewThrough {
+		m.reviewThrough = max(m.reviewThrough, min(len(m.body(w)), m.scroll+m.bodyRoom(h, 2)))
+	}
 }
 
 func (m Model) body(w int) []string {
@@ -188,18 +205,13 @@ func (m Model) View() tea.View {
 	rows := []string{m.palette.secondary.Render(label) + "   " + m.palette.muted.Render(face+" Piko"), ""}
 	body := m.body(w)
 	choices := m.choices()
-	if m.screen == reviewPlan && !m.reviewFits() {
-		choices = nil
-	}
+
 	optionRows := min(min(len(choices), 8), max(1, h-8))
-	room := max(1, h-7-optionRows)
+	room := m.bodyRoom(h, len(choices))
 	start := min(m.scroll, max(0, len(body)-room))
 	rows = append(rows, body[start:min(len(body), start+room)]...)
 	if len(body) > room {
 		rows = append(rows, m.palette.muted.Render(fmt.Sprintf("%d–%d / %d", start+1, min(len(body), start+room), len(body))))
-	}
-	if m.screen == reviewPlan && !m.reviewFits() {
-		rows = append(rows, m.palette.alert.Render(m.tr(Words{"Perbesar terminal untuk menyetujui.", "Enlarge the terminal to approve."})))
 	}
 	if len(choices) > 0 {
 		rows = append(rows, "")
@@ -213,13 +225,31 @@ func (m Model) View() tea.View {
 					mark = "> "
 				}
 			}
-			rows = append(rows, style.Render(ansi.Truncate(mark+c.Label, w, "…")))
+			label := c.Label
+			if m.screen == reviewPlan && c.Kind == "apply" {
+				switch {
+				case m.options.Demo:
+					label += " · DEMO"
+				case !m.reviewReady():
+					label += " · " + m.tr(Words{"baca dulu", "review first"})
+				}
+			}
+			rows = append(rows, style.Render(ansi.Truncate(mark+label, w, "…")))
 		}
 	}
 	footer := m.tr(Words{"↑↓ Pilih  ·  Enter Buka  ·  Esc Kembali  ·  ? Bantuan", "↑↓ Select  ·  Enter Open  ·  Esc Back  ·  ? Help"})
 	switch m.screen {
 	case home:
 		footer = m.tr(Words{"↑↓ Pilih  ·  Enter Buka  ·  / Tanya  ·  ? Bantuan", "↑↓ Select  ·  Enter Open  ·  / Ask  ·  ? Help"})
+	case reviewPlan:
+		switch {
+		case m.options.Demo:
+			footer = m.tr(Words{"DEMO · Aksi terkunci · Esc Kembali", "DEMO · Actions locked · Esc Back"})
+		case !m.reviewReady():
+			footer = m.tr(Words{"↓ Baca seluruh rencana · Esc Kembali", "↓ Read the full plan · Esc Back"})
+		default:
+			footer = m.tr(Words{"↑↓ Pilih · Enter Lanjut · Esc Kembali", "↑↓ Select · Enter Continue · Esc Back"})
+		}
 	case scanning, executing:
 		footer = m.tr(Words{"Esc Minta penghentian", "Esc Request cancellation"})
 	case questionInput, fileInput:

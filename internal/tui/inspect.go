@@ -13,6 +13,7 @@ import (
 	"github.com/christiandoxa/whwmpc/internal/domain"
 	"github.com/christiandoxa/whwmpc/internal/inspection"
 	"github.com/christiandoxa/whwmpc/internal/power"
+	"github.com/christiandoxa/whwmpc/internal/report"
 	"github.com/christiandoxa/whwmpc/internal/state"
 	"github.com/christiandoxa/whwmpc/internal/storage"
 	"github.com/christiandoxa/whwmpc/internal/tui/mascot"
@@ -22,6 +23,9 @@ import (
 func Inspector(scanner *inspection.Scanner, store state.Store, maintenance *workflow.Maintenance) Inspect {
 	return func(ctx context.Context, req Request) (page Page) {
 		defer func() {
+			if page.Snapshot == nil && len(page.Findings) > 0 {
+				page.Snapshot = &workflow.Snapshot{Input: report.Input{At: scanner.Now(), Demo: maintenance.Demo, Findings: page.Findings}}
+			}
 			if !maintenance.Demo && len(page.Findings) > 0 {
 				page.Choices = appendChoice(page.Choices, saveScanChoice(req.Language))
 			}
@@ -40,10 +44,15 @@ func Inspector(scanner *inspection.Scanner, store state.Store, maintenance *work
 		switch req.Intent {
 		case assistant.Storage:
 			snapshot := scanner.SMART(ctx, req.Choice.Kind == "rescan")
-			return withFindings(storagePage(snapshot, req.Language), a.SMART(snapshot), req.Language)
+			page := withFindings(storagePage(snapshot, req.Language), a.SMART(snapshot), req.Language)
+			page.Coverage = []workflow.Coverage{{ID: workflow.SSDCheck, Status: snapshot.Availability}}
+			page.Snapshot = &workflow.Snapshot{Input: report.Input{At: scanner.Now(), Demo: maintenance.Demo, SMART: &snapshot, Findings: page.Findings}}
+			return page
 		case assistant.Trim:
 			snapshot := scanner.TRIM(ctx)
 			page := withFindings(trimPage(snapshot, req.Language), a.TRIM(snapshot), req.Language)
+			page.Coverage = []workflow.Coverage{{ID: workflow.TRIMCheck, Status: snapshot.Availability}}
+			page.Snapshot = &workflow.Snapshot{Input: report.Input{At: scanner.Now(), Demo: maintenance.Demo, Trim: &snapshot, Findings: page.Findings}}
 			if allowActions {
 				page.Choices = actionChoices(page.Choices, page.Findings, snapshot.Mounts)
 			}
@@ -51,6 +60,7 @@ func Inspector(scanner *inspection.Scanner, store state.Store, maintenance *work
 		case assistant.Power:
 			snapshot := scanner.Power(ctx)
 			page := withFindings(powerPage(snapshot, req.Language), a.Power(snapshot), req.Language)
+			page.Snapshot = &workflow.Snapshot{Input: report.Input{At: scanner.Now(), Demo: maintenance.Demo, Power: &snapshot, Findings: page.Findings}}
 			page.Choices = append(page.Choices, Choice{translator(req.Language)("Pilih profil yang cocok", "Choose a suitable profile"), "navigate", string(assistant.Recommend)})
 			if allowActions {
 				page.Choices = actionChoices(page.Choices, page.Findings, nil)

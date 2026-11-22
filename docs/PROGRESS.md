@@ -74,3 +74,7 @@ Beranda dengan tiga tujuan dan Lainnya menggantikan dashboard. Satu kolom, dafta
 ## Revamp UX 2 · Ringkasan dan cakupan
 
 Pemeriksaan kondisi memakai pengumpulan snapshot yang sama dengan laporan lengkap. Empat tahap pemeriksaan mencakup lima ID cakupan. Ringkasan memprioritaskan tiga temuan dan menghitung semua temuan kritis. Detail tersendiri menyimpan temuan lengkap, teknis, dan konteks saat kembali. Pemeriksaan lambat langsung mengukur bukti yang tersedia tanpa menanyakan konteks yang belum memengaruhi aturan.
+
+## Revamp UX 3 · Review tindakan dan ekspor
+
+Satu layar review memperlihatkan Kembali sebagai pilihan awal dan aksi spesifik sebagai pilihan kedua. Rencana panjang memerlukan pembacaan dengan gulir sebelum Apply tersedia. ID, expiry, revalidasi, klaim, dan verifikasi tetap memakai backend existing. Demo cleanup dapat ditinjau dan selalu terkunci. Ekspor snapshot memakai data yang sudah dikumpulkan, sedangkan laporan lengkap menyatakan pemeriksaan tambahan. Tes mencakup resize review, Enter berulang, pembatalan, dan ekspor dengan scanner nil.

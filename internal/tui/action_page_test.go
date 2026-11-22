@@ -34,24 +34,16 @@ func TestApplyRequiresDisplayedPlanAndConfirmation(t *testing.T) {
 	m := New(ctx, platform.Demo{}, run, Options{Language: "en", Motion: "off"})
 	m = step(m, overviewMsg{platform.Demo{}.Overview(ctx)})
 	m.active, m.screen, m.page = assistant.Cleanup, reviewPlan, planPage(plan, "en")
-	if cmd := m.start(assistant.Cleanup, Choice{Kind: "apply", Value: plan.ID}); cmd != nil {
-		t.Fatal("preview allowed apply before confirmation")
+	if m.choices()[m.choice].Kind != "cancel-plan" {
+		t.Fatal("review defaults to apply")
 	}
-	m = step(m, tea.KeyPressMsg{Code: tea.KeyDown})
-	m = step(m, tea.KeyPressMsg{Code: tea.KeyEnter})
-	if !m.page.Confirm || m.page.Pose != mascot.Confirm || m.page.Choices[m.choice].Kind != "cancel-plan" {
-		t.Fatalf("confirmation is not bound or defaults to apply: %+v", m.page)
+	if cmd := m.start(assistant.Cleanup, Choice{Kind: "apply", Value: plan.ID}); cmd != nil {
+		t.Fatal("apply was not selected")
 	}
 	if cmd := m.start(assistant.Cleanup, Choice{Kind: "apply", Value: "different"}); cmd != nil {
 		t.Fatal("different ID was accepted")
 	}
 	m = step(m, tea.KeyPressMsg{Code: tea.KeyDown})
-	m = step(m, keyPress("?"))
-	m = step(m, tea.KeyPressMsg{Code: tea.KeyEnter})
-	if m.busy {
-		t.Fatal("invoked hidden apply from detail panel")
-	}
-	m = step(m, keyPress("?"))
 	m = step(m, tea.WindowSizeMsg{Width: 22, Height: 7})
 	m = step(m, tea.KeyPressMsg{Code: tea.KeyEnter})
 	if m.busy {
@@ -99,5 +91,28 @@ func TestPikoCelebratesOnlyVerifiedProfileAndPreservesCriticalNotice(t *testing.
 	m.showReply()
 	if !strings.Contains(m.View().Content, "CRITICAL") {
 		t.Fatal("verification hid an unrelated critical finding")
+	}
+}
+
+func TestLongReviewBlocksApplyUntilRead(t *testing.T) {
+	ctx := context.Background()
+	m := New(ctx, platform.Demo{}, nil, Options{Language: "en"})
+	m.remember()
+	plan := actions.Plan{ID: "review", Kind: actions.CleanAPT, Initial: strings.Repeat("/var/cache/apt/archives ", 28), Risk: "Permanent deletion", Privilege: actions.Sudo}
+	m.screen, m.page = reviewPlan, planPage(plan, "en")
+	m = step(m, tea.WindowSizeMsg{Width: 48, Height: 16})
+	if m.reviewReady() || !strings.Contains(m.View().Content, "review first") {
+		t.Fatal("did not gate long review")
+	}
+	for i := 0; i < 200 && !m.reviewReady(); i++ {
+		m = step(m, tea.KeyPressMsg{Code: tea.KeyDown})
+	}
+	if !m.reviewReady() || m.choice != 0 || !strings.Contains(m.View().Content, "Permanent deletion") {
+		t.Fatalf("review did not show risk %s", m.View().Content)
+	}
+	m = step(m, tea.KeyPressMsg{Code: tea.KeyEnter})
+	m = step(m, tea.KeyPressMsg{Code: tea.KeyEnter})
+	if m.busy && m.screen == executing {
+		t.Fatal("repeated Enter caused apply")
 	}
 }

@@ -18,8 +18,8 @@ func reportPage(lang string) Page {
 	l := translator(lang)
 	return Page{
 		Availability: domain.Available,
-		Found:        []string{l("Laporan lokal", "Local report")},
-		Meaning:      []string{l("Snapshot pemeriksaan, temuan, dan ringkasan aksi yang tersedia.", "Snapshot of checks, findings, and available action summaries.")},
+		Found:        []string{l("Buat laporan lengkap", "Create a full report")},
+		Meaning:      []string{l("Pemeriksaan tambahan akan dijalankan sebelum laporan dibuat.", "Additional checks will run before the report is created.")},
 		Advice:       []string{l("Nama pengguna, hostname, serial, nama proses, dan path pribadi disaring dari laporan.", "Usernames, hostnames, serial numbers, process names, and personal paths are filtered from the report.")},
 		Choices: []Choice{
 			{Label: l("Ekspor Markdown", "Export Markdown"), Kind: "export-select", Value: "markdown"},
@@ -30,12 +30,17 @@ func reportPage(lang string) Page {
 
 func exportReport(ctx context.Context, scanner *inspection.Scanner, store state.Store, req Request, demo bool) Page {
 	l := translator(req.Language)
-	var entries []state.Entry
-	var historyErr error
-	if !demo {
-		entries, historyErr = store.History()
+	var doc report.Report
+	var historyErr, err error
+	if req.Snapshot != nil {
+		doc = report.Build(req.Snapshot.Input)
+	} else {
+		var entries []state.Entry
+		if !demo {
+			entries, historyErr = store.History()
+		}
+		doc, err = workflow.ScanReport(ctx, scanner, req.Overview, req.Language, demo, entries)
 	}
-	doc, err := workflow.ScanReport(ctx, scanner, req.Overview, req.Language, demo, entries)
 	if err == nil {
 		var data []byte
 		data, err = report.Encode(doc, req.Choice.Value)

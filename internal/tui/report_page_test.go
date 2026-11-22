@@ -48,3 +48,18 @@ func TestExportPickerUsesExplicitPathAndPiko(t *testing.T) {
 		t.Fatalf("export state = %+v, read err = %v", m.page, err)
 	}
 }
+
+func TestSaveDisplayedSnapshotWithoutScanner(t *testing.T) {
+	ctx := context.Background()
+	scanner := inspection.New(true)
+	snapshot, err := workflow.Collect(ctx, scanner, scanner.Overview(ctx), "en", true, false, false, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(t.TempDir(), "snapshot.json")
+	page := exportReport(ctx, nil, state.Store{}, Request{Snapshot: &snapshot, Output: path, Choice: Choice{Value: "json"}}, true)
+	data, err := os.ReadFile(path)
+	if err != nil || page.Pose != mascot.Printing || strings.Contains(string(data), `"smart":`) {
+		t.Fatalf("snapshot changed coverage or exported incorrectly %v", err)
+	}
+}
