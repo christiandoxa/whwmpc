@@ -20,6 +20,8 @@ Aksi memakai konfirmasi, klaim satu kali, dan autentikasi OS yang sama dengan ti
 
 Uji end-to-end CLI NVIDIA dari `c79c5c9` menjalankan preview, apply, pembacaan balik, dan restore pada backend fixture dan sudo sintetis dalam user namespace privat. Rencana usang, penolakan autentikasi, replay, dan perubahan daya eksternal ditolak sebelum penulisan. Batas yang diminta kembali ke 170 W setelah apply ke 169 W, dengan batas yang ditegakkan fixture terbaca terpisah. [Hasil uji CLI](assets/nvidia-cli-fixture.txt)
 
+Uji TUI pada 80×24 dan 120×36 melewati pilihan awal Kembali, konfirmasi eksplisit, autentikasi fixture, apply 169 W, dan restore 170 W. Riwayat mempertahankan kedua hasil. Rencana pemulihan tersisa ditolak setelah restore terverifikasi, termasuk ketika fixture kembali ke nilai yang diharapkan rencana lama. [Hasil uji TUI dan replay restore](assets/nvidia-tui-fixture.txt)
+
 ```sh
 go test -race ./internal/hardware ./internal/actions
 ```

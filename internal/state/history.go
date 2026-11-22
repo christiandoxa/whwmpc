@@ -27,6 +27,8 @@ const historyPrefix = "event-"
 const stagePrefix = ".stage-event-"
 const historyStamp = "20060102T150405.000000000Z"
 
+var errAlreadyRestored = errors.New("tindakan sudah dipulihkan")
+
 type Entry struct {
 	Version  int            `json:"version"`
 	At       time.Time      `json:"at"`
@@ -34,6 +36,7 @@ type Entry struct {
 	Category string         `json:"category"`
 	Findings *FindingCounts `json:"findings,omitempty"`
 	PlanID   string         `json:"plan_id,omitempty"`
+	Restores string         `json:"restores,omitempty"`
 	Action   *ActionSummary `json:"action,omitempty"`
 
 	dir string
@@ -94,7 +97,12 @@ func (s Store) RecordAction(result actions.Result) error {
 	if validPlanID(result.Plan.ID) {
 		entry.PlanID = result.Plan.ID
 		summary.VerifyAfterRestart = result.Started && result.Plan.Kind == actions.FirmwareUpdate && (result.Status == actions.Partial || result.Status == actions.Unknown)
-		summary.CanRestore = result.Status == actions.Verified && result.Receipt != ""
+		isRestore := strings.HasPrefix(result.Plan.Kind, "restore-")
+		if isRestore && result.Status == actions.Verified && result.Started &&
+			validPlanID(result.Plan.Restores) && result.Plan.Restores != result.Plan.ID {
+			entry.Restores = result.Plan.Restores
+		}
+		summary.CanRestore = !isRestore && result.Status == actions.Verified && result.Receipt != ""
 		if summary.CanRestore || summary.VerifyAfterRestart {
 			var err error
 			receipt, err = json.Marshal(result)
@@ -223,6 +231,9 @@ func (s Store) RollbackReceipt(planID string) (actions.Result, error) {
 	}
 	defer root.Close()
 	entries, historyErr := readHistory(root)
+	if slices.ContainsFunc(entries, func(entry Entry) bool { return entry.Restores == planID }) {
+		return actions.Result{}, errAlreadyRestored
+	}
 	for _, entry := range entries {
 		if entry.PlanID != planID || entry.Action == nil || !entry.Action.CanRestore {
 			continue
@@ -259,6 +270,7 @@ func readHistory(root *os.Root) ([]Entry, error) {
 	}
 	dirs = dirs[:min(len(dirs), MaxHistory)]
 	out := make([]Entry, 0, len(dirs))
+	restored := make(map[string]bool)
 	var errs []error
 	for _, name := range dirs {
 		entry, err := readEntry(root, name)
@@ -270,6 +282,14 @@ func readHistory(root *os.Root) ([]Entry, error) {
 			continue
 		}
 		out = append(out, entry)
+		if entry.Restores != "" {
+			restored[entry.Restores] = true
+		}
+	}
+	for _, entry := range out {
+		if entry.Action != nil && restored[entry.PlanID] {
+			entry.Action.CanRestore = false
+		}
 	}
 	return out, errors.Join(errs...)
 }
@@ -310,11 +330,14 @@ func validEntry(entry Entry) bool {
 	}
 	switch entry.Kind {
 	case "scan":
-		return scanCategory(entry.Category) && entry.Findings != nil && entry.Action == nil && entry.PlanID == ""
+		return scanCategory(entry.Category) && entry.Findings != nil && entry.Action == nil && entry.PlanID == "" && entry.Restores == ""
 	case "action":
 		return actionCategory(entry.Category) && entry.Action != nil && actionStatus(entry.Action.Status) && entry.Findings == nil &&
 			(!entry.Action.VerifyAfterRestart || (entry.Category == actions.FirmwareUpdate && validPlanID(entry.PlanID))) &&
-			((entry.PlanID == "" && !entry.Action.CanRestore) || validPlanID(entry.PlanID))
+			((entry.PlanID == "" && !entry.Action.CanRestore) || validPlanID(entry.PlanID)) &&
+			(entry.Restores == "" || (strings.HasPrefix(entry.Category, "restore-") && entry.Action.Status == actions.Verified &&
+				entry.Action.Started && !entry.Action.CanRestore && validPlanID(entry.PlanID) &&
+				validPlanID(entry.Restores) && entry.Restores != entry.PlanID))
 	default:
 		return false
 	}

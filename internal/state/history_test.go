@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -15,6 +16,7 @@ import (
 	"github.com/christiandoxa/whwmpc/internal/actions"
 	"github.com/christiandoxa/whwmpc/internal/diagnostics"
 	"github.com/christiandoxa/whwmpc/internal/domain"
+	"github.com/christiandoxa/whwmpc/internal/hardware"
 )
 
 func testStore(t *testing.T) Store {
@@ -62,6 +64,87 @@ func TestHistorySummarizesAndKeepsRollbackProofPrivate(t *testing.T) {
 	}
 	if _, err := s.RollbackReceipt("../outside"); err == nil {
 		t.Fatal("accepted traversal in receipt lookup")
+	}
+}
+
+func TestVerifiedRestoreRetiresOriginalReceipt(t *testing.T) {
+	store := testStore(t)
+	at := time.Now().UTC()
+	original, unrelated := strings.Repeat("a", 40), strings.Repeat("b", 40)
+	for i, id := range []string{original, unrelated} {
+		if err := store.RecordAction(actions.Result{
+			Plan: actions.Plan{ID: id, Kind: hardware.PowerLimit, Rollback: true}, Status: actions.Verified,
+			Started: true, FinishedAt: at.Add(time.Duration(i) * time.Second), Receipt: "fixture apply receipt",
+		}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for i, tc := range []struct {
+		name    string
+		link    string
+		status  actions.Status
+		started bool
+	}{
+		{"legacy restore without link", "", actions.Verified, true},
+		{"unstarted restore", original, actions.Verified, false},
+		{"failed restore", original, actions.Failed, true},
+		{"partial restore", original, actions.Partial, true},
+		{"unknown restore", original, actions.Unknown, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			id := fmt.Sprintf("%040x", i+1)
+			if err := store.RecordAction(actions.Result{
+				Plan:   actions.Plan{ID: id, Kind: hardware.RestorePowerLimit, Restores: tc.link},
+				Status: tc.status, Started: tc.started, FinishedAt: at.Add(time.Duration(i+2) * time.Second),
+			}); err != nil {
+				t.Fatal(err)
+			}
+			entries, err := store.History()
+			if err != nil || len(entries) == 0 || entries[0].PlanID != id || entries[0].Restores != "" {
+				t.Fatalf("unverified restoration link persisted: %+v, %v", entries, err)
+			}
+			if _, err := store.RollbackReceipt(original); err != nil {
+				t.Fatalf("retry no longer allowed: %v", err)
+			}
+		})
+	}
+	restore := strings.Repeat("c", 40)
+	if err := store.RecordAction(actions.Result{
+		Plan:   actions.Plan{ID: restore, Kind: hardware.RestorePowerLimit, Restores: original},
+		Status: actions.Verified, Started: true, FinishedAt: at.Add(10 * time.Second), Receipt: "no restore of a restore",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	entries, err := store.History()
+	if err != nil || len(entries) != 8 || entries[0].PlanID != restore || entries[0].Restores != original ||
+		entries[0].Action == nil || entries[0].Action.CanRestore {
+		t.Fatalf("verified restore link missing: %+v, %v", entries, err)
+	}
+	found := false
+	for _, entry := range entries {
+		switch entry.PlanID {
+		case original:
+			found = true
+			if entry.Action.CanRestore {
+				t.Fatal("already-restored entry still offers a restore")
+			}
+		case unrelated:
+			if !entry.Action.CanRestore {
+				t.Fatal("unrelated original entry lost its receipt")
+			}
+		}
+	}
+	if !found {
+		t.Fatal("original entry disappeared from history")
+	}
+	if _, err := store.RollbackReceipt(original); !errors.Is(err, errAlreadyRestored) {
+		t.Fatalf("already-restored receipt lookup = %v", err)
+	}
+	if _, err := store.RollbackReceipt(restore); !errors.Is(err, fs.ErrNotExist) {
+		t.Fatalf("a restore received its own rollback receipt: %v", err)
+	}
+	if _, err := store.RollbackReceipt(unrelated); err != nil {
+		t.Fatalf("unrelated receipt lookup failed: %v", err)
 	}
 }
 

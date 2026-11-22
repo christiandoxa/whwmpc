@@ -111,6 +111,14 @@ func (m *Maintenance) Authenticate(ctx context.Context, plan actions.Plan, id st
 	if err != nil {
 		return err
 	}
+	if plan.Restores != "" {
+		if err := svc.Validate(plan, id); err != nil {
+			return err
+		}
+		if _, err := m.Store.RollbackReceipt(plan.Restores); err != nil {
+			return err
+		}
+	}
 	return svc.Authenticate(ctx, plan, id, in, out, stderr)
 }
 
@@ -149,6 +157,11 @@ func (m *Maintenance) Execute(ctx context.Context, plan actions.Plan, id string,
 		return rejected(err)
 	}
 	defer release()
+	if plan.Restores != "" {
+		if _, err := m.Store.RollbackReceipt(plan.Restores); err != nil {
+			return rejected(err)
+		}
+	}
 	result, err := svc.ExecuteWithProgress(ctx, plan, id, notify)
 	return Outcome{Result: result, HistoryErr: m.Store.RecordAction(result)}, err
 }

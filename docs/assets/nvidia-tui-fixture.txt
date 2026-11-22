@@ -1,0 +1,19 @@
+NVIDIA TUI and restore checks in an isolated user, mount, PID, and network namespace
+Build: f7feeaaac624f81d7a6477149d43af01a3f5b9fe plus the restore history guard
+TUI executable SHA-256: 38831ff539b6fb7051c0f73f9e68cf2c774f7cbc3f2b7c24d4b59e14ff6c8a98
+Backend: synthetic nvidia-smi and sudo, PID-only procfs, temporary root
+
+PTY 80x24 and 120x36
+- GPU details displayed requested 170000 mW and enforced 160000 mW separately.
+- Home, advanced tasks, GPU details, and numeric entry led to the apply review.
+- The default Back selection returned to GPU without authentication.
+- Explicit apply authenticated through the terminal fixture and verified 169000 mW.
+- History offered a restore preview with Back selected by default.
+- Explicit restore authenticated through the terminal fixture and verified 170000 mW.
+- History kept both verified events and removed the completed restore choice.
+- The fixture recorded exactly two writes. Exit restored the alternate screen and termios.
+
+Separate CLI check
+- Two signed restore plans were issued for the same verified apply.
+- After one verified restore, the fixture returned to the other plan's expected precondition.
+- The old signed plan was rejected before another setter call. A new preview was also refused.
