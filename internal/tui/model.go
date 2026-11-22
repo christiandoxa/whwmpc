@@ -411,7 +411,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.lastChecked = m.page.Snapshot.Input.At
 			m.lastCoverage = coverageLine(m.page.Coverage, m.options.Language)
 		}
-		if len(m.page.Findings) > 0 && m.active != assistant.Recommend {
+		if (len(m.page.Findings) > 0 || m.page.Summary != nil) && m.active != assistant.Recommend {
 			summary := summarize(m.page, m.active, m.options.Language)
 			m.page.Summary = &summary
 		}
@@ -728,20 +728,27 @@ func (m Model) overviewFindingPage(data domain.Overview) Page {
 }
 
 func (m Model) stalePage() bool {
-	if m.options.Demo || m.busy || len(m.page.Findings) == 0 {
+	if m.options.Demo || m.busy {
 		return false
 	}
 	var stamp time.Time
-	for _, finding := range m.page.Findings {
-		if finding.At.After(stamp) {
-			stamp = finding.At
+	if m.page.Summary != nil {
+		stamp = m.page.Summary.At
+	}
+	if stamp.IsZero() {
+		for _, finding := range m.page.Findings {
+			if finding.At.After(stamp) {
+				stamp = finding.At
+			}
 		}
 	}
 	if stamp.IsZero() {
 		return false
 	}
-	age := 30 * time.Second
+	var age time.Duration
 	switch m.active {
+	case assistant.Overview, assistant.Slow:
+		age = 30 * time.Second
 	case assistant.Power, assistant.Recommend:
 		age = time.Minute
 	case assistant.Storage:
@@ -749,5 +756,5 @@ func (m Model) stalePage() bool {
 	case assistant.Trim:
 		age = 15 * time.Minute
 	}
-	return m.now().Sub(stamp) > age
+	return age != 0 && m.now().Sub(stamp) > age
 }

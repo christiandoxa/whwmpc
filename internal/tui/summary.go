@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/christiandoxa/whwmpc/internal/actions"
 	"github.com/christiandoxa/whwmpc/internal/assistant"
@@ -14,8 +15,26 @@ import (
 
 type ResultSummary struct {
 	Headline, Coverage string
+	At                 time.Time
+	Metrics            []resultMetric
+	Statuses           []resultStatus
 	Highlights         []string
 	Primary            Choice
+}
+
+type resultMetric struct {
+	Category                 string
+	Label, Value, Unit, Note string
+	Usage                    *float64
+	Availability             domain.Availability
+	Secondary                bool
+}
+
+type resultStatus struct {
+	Category     string
+	Label, Value string
+	Availability domain.Availability
+	Severity     diagnostics.Severity
 }
 
 var checkNames = map[workflow.Check]Words{
@@ -89,9 +108,15 @@ func highlight(f diagnostics.Finding, lang string) string {
 	if name == "" {
 		name = l("Pemeriksaan", "Check")
 	}
-	reason := statusNames[f.Availability].Text(lang)
+	reason := resultStatusLabel(f.Availability, lang)
 	switch {
 	case f.Severity == diagnostics.Critical:
+		if f.Category == "disk" {
+			return l("KRITIS · Ruang disk hampir habis", "CRITICAL · Disk space is almost exhausted")
+		}
+		if f.Observation != "" {
+			return l("KRITIS", "CRITICAL") + " · " + f.Observation
+		}
 		reason = l("perlu perhatian segera", "needs immediate attention")
 	case f.Availability != domain.Available && f.Availability != domain.Partial:
 		// Keep the availability label when a measurement could not be taken.
@@ -102,23 +127,45 @@ func highlight(f diagnostics.Finding, lang string) string {
 		case strings.HasPrefix(f.ID, "overview.disk."):
 			reason = l("ruang hampir habis", "space is running low")
 		default:
-			reason = l("ada peringatan pada sampel", "sample has a warning")
+			if f.Observation != "" {
+				return l("PERINGATAN", "WARNING") + " · " + f.Observation
+			}
+			reason = l("perlu ditinjau", "needs review")
 		}
-	case f.Availability == domain.Available:
-		reason = l("sampel tercatat", "sample recorded")
+	case f.Availability == domain.Available && f.Observation != "":
+		return f.Observation
 	}
 	return name + " · " + reason
 }
 
 func summarize(page Page, intent assistant.Intent, lang string) ResultSummary {
 	l := translator(lang)
-	summary := ResultSummary{Coverage: coverageLine(page.Coverage, lang)}
+	var summary ResultSummary
+	if page.Summary != nil {
+		summary = *page.Summary
+	}
+	summary.Coverage = coverageLine(page.Coverage, lang)
 	if len(page.Coverage) == 0 {
 		summary.Coverage = coverageLine([]workflow.Coverage{{ID: workflow.Check(intent), Status: page.Availability}}, lang)
 	}
+	if page.Snapshot != nil {
+		in := page.Snapshot.Input
+		if summary.At.IsZero() {
+			summary.At = in.At
+		}
+		if in.Overview != nil {
+			if len(summary.Metrics) == 0 {
+				summary.Metrics = overviewMetrics(*in.Overview, lang)
+			}
+			summary.Statuses = overviewStatuses(in.SMART, in.Trim, in.Power, lang)
+		}
+	}
 	findings := sortedFindings(page.Findings)
 	critical, warning := 0, 0
-	incomplete := false
+	incomplete := len(page.Coverage) == 0 && page.Availability != domain.Available
+	incomplete = incomplete || slices.ContainsFunc(summary.Metrics, func(metric resultMetric) bool {
+		return !metric.Secondary && metric.Availability != domain.Available
+	})
 	for _, check := range page.Coverage {
 		incomplete = incomplete || check.Status != domain.Available
 	}
@@ -130,7 +177,8 @@ func summarize(page Page, intent assistant.Intent, lang string) ResultSummary {
 			warning++
 		}
 		incomplete = incomplete || f.Availability != domain.Available
-		if len(summary.Highlights) < 3 {
+		if len(summary.Highlights) < 3 && (f.Severity == diagnostics.Critical || f.Severity == diagnostics.Warning ||
+			(f.Availability != domain.Available && !represented(summary, f))) {
 			summary.Highlights = append(summary.Highlights, highlight(f, lang))
 		}
 	}
@@ -139,16 +187,19 @@ func summarize(page Page, intent assistant.Intent, lang string) ResultSummary {
 		summary.Headline = fmt.Sprintf(l("%d temuan kritis perlu perhatian", "%d critical findings need attention"), critical)
 	case warning > 0:
 		summary.Headline = fmt.Sprintf(l("Ada %d peringatan untuk ditinjau", "%d warnings to review"), warning)
-	case intent == assistant.Slow:
-		summary.Headline = l("Gejala lambat belum terlihat pada sampel ini", "Slowdown was not observed in this sample")
+	case summary.Headline != "":
 	case incomplete:
 		summary.Headline = l("Sebagian pemeriksaan perlu ditinjau", "Some checks need review")
+	case intent == assistant.Slow:
+		summary.Headline = l("Gejala lambat belum terlihat pada sampel ini", "Slowdown was not observed in this sample")
 	default:
 		summary.Headline = l("Tidak ada peringatan pada sampel ini", "No warnings in this sample")
 	}
-	summary.Primary = Choice{l("Lihat semua hasil", "View all results"), "details", ""}
+	if summary.Primary.Kind == "" {
+		summary.Primary = Choice{l("Lihat semua hasil", "View all results"), "details", ""}
+	}
 	if critical > 0 {
-		summary.Primary.Label = l("Lihat temuan kritis", "View critical findings")
+		summary.Primary = Choice{l("Lihat temuan kritis", "View critical findings"), "details", ""}
 		return summary
 	}
 	for _, c := range page.Choices {
@@ -165,6 +216,14 @@ func summarize(page Page, intent assistant.Intent, lang string) ResultSummary {
 		summary.Primary = Choice{l("Periksa ulang saat gejala muncul", "Check again during the slowdown"), "rescan", ""}
 	}
 	return summary
+}
+
+func represented(s ResultSummary, f diagnostics.Finding) bool {
+	return slices.ContainsFunc(s.Metrics, func(m resultMetric) bool {
+		return m.Category == f.Category && m.Availability == f.Availability
+	}) || slices.ContainsFunc(s.Statuses, func(status resultStatus) bool {
+		return status.Category == f.Category && status.Availability == f.Availability
+	})
 }
 
 func findingEvidence(findings []diagnostics.Finding, lang string) []string {

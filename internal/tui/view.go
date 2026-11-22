@@ -175,18 +175,9 @@ func (m Model) body(w int) []string {
 			normal(s)
 		}
 	default:
-		if m.screen == results && m.page.Summary != nil {
-			s := m.page.Summary
-			title(s.Headline)
-			text(s.Coverage, m.palette.secondary)
-			if m.stalePage() {
-				text(l("Data kedaluwarsa", "Stale data"), m.palette.alert)
-			}
-			for _, line := range s.Highlights {
-				normal("· " + line)
-			}
-			echoQuestion()
-			return lines
+		if (m.screen == results || m.screen == outcome) && m.page.Summary != nil {
+			_, h := m.bounds()
+			return m.summaryBody(*m.page.Summary, w, m.bodyRoom(h, len(m.choices())))
 		}
 		if len(m.page.Found) > 0 {
 			title(m.page.Found[0])
@@ -363,7 +354,7 @@ func (m Model) View() tea.View {
 func overviewPage(o domain.Overview, lang string) Page {
 	l := func(id, en string) string { return (Words{id, en}).Text(lang) }
 	status := func(a domain.Availability) string { return statusNames[a].Text(lang) }
-	page := Page{Availability: o.Availability}
+	page := Page{Availability: o.Availability, Summary: &ResultSummary{At: o.CapturedAt, Metrics: overviewMetrics(o, lang)}}
 	if o.CapturedAt.IsZero() {
 		return page
 	}
