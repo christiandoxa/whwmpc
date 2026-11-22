@@ -12,7 +12,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-24.04, macos-15, windows-2025]
+        os: [ubuntu-24.04, ubuntu-24.04-arm, macos-15, windows-2025]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 10
     env:
@@ -33,6 +33,10 @@ jobs:
         if: runner.os == 'Linux' && runner.environment == 'github-hosted' && github.event_name == 'push'
         timeout-minutes: 5
         run: python3 scripts/check-ext4-ci.py ./whwmpc
+      - name: Exercise a temporary systemd user timer
+        if: runner.os == 'Linux' && runner.environment == 'github-hosted' && github.event_name == 'push'
+        timeout-minutes: 3
+        run: bash scripts/check-daemon-ci.sh ./whwmpc
       - name: Check a temporary APFS image
         if: runner.os == 'macOS' && runner.environment == 'github-hosted'
         timeout-minutes: 5

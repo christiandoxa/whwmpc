@@ -25,10 +25,6 @@ jobs:
         run: python3 scripts/tui_pty.py ./whwmpc --width 120 --height 36
       - run: python3 scripts/tui_pty.py ./whwmpc --width 80 --height 24 --flow slow
       - run: python3 scripts/tui_pty.py ./whwmpc --width 80 --height 24 --flow cleanup
-      - name: Exercise a temporary systemd user timer
-        if: github.event_name == 'push' && runner.environment == 'github-hosted'
-        timeout-minutes: 3
-        run: bash scripts/check-daemon-ci.sh ./whwmpc
 
   compile:
     runs-on: ubuntu-24.04
