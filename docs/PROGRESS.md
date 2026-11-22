@@ -220,3 +220,7 @@ Apache License 2.0 dan hak cipta 2026 Christian Doxa Hamasiah terpasang di repos
 `install.ps1` memilih paket amd64 atau arm64, memverifikasi SHA-256, dan mendukung upgrade atau pemilihan tag tanpa Administrator. Workflow native memasang rilis publik pada Windows x64 dan ARM64 dengan Windows PowerShell dan PowerShell 7, lalu memeriksa bahwa checksum salah mempertahankan executable yang sudah terpasang. [Panduan instalasi](../README.md#windows)
 
 Tes regresi telemetry Windows memakai snapshot proses native, membatalkan context pada awal interval sampling, dan memastikan daftar proses kosong dengan status `unknown`. CPU proses baru dihitung bila snapshot pembanding benar-benar diambil. [Provider native](NATIVE.md)
+
+## Validasi rentang clock AMDGPU
+
+Fixture SMU 13.0.7 mereproduksi preview clock pada rentang teks 500–3000 MHz dengan minimum Fmax driver 2000 MHz. Versi sebelum guard menerima preview 1000 MHz meski driver akan menolak nilai tersebut. Guard baru menolak preview sebelum penulisan dan mempertahankan kontrol voltase dengan batasnya sendiri. Pada Renoir fisik MP1 12.0.0, preview 1900 → 1899 MHz tetap tersedia. Mode auto dan tabel OverDrive tetap sama sesudah preview baca-saja. [Matriks AMDGPU](HARDWARE.md)

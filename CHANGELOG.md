@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Rencana baru untuk batas clock AMDGPU memerlukan rentang yang terverifikasi untuk slot maksimum. Driver yang memakai batas minimum terpisah dapat tetap menyediakan metrik dan kontrol voltase yang valid.
+
 ## 0.3.8
 
 - Proyek menggunakan Apache License 2.0 dengan hak cipta Christian Doxa Hamasiah. Paket standalone menyertakan `LICENSE` dan `NOTICE`.

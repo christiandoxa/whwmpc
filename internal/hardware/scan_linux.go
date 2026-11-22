@@ -65,9 +65,16 @@ func scanAt(ctx context.Context, runner sysrun.Runner, pciRoot string) Snapshot 
 				switch {
 				case err == nil:
 					gpu.Controls = state.controls()
-					if len(gpu.Controls) > 0 {
+					i := slices.IndexFunc(gpu.Controls, func(c Control) bool { return c.Kind == CoreMax })
+					if i >= 0 && !state.coreMaxRangeVerified() {
+						gpu.Controls = slices.Delete(gpu.Controls, i, i+1)
+						gpu.TuningDetail = coreRangeUnavailable
+					}
+					if len(gpu.Controls) > 0 && gpu.TuningDetail != "" {
+						gpu.TuningAvailability = domain.Partial
+					} else if len(gpu.Controls) > 0 {
 						gpu.TuningAvailability = domain.Available
-					} else {
+					} else if gpu.TuningDetail == "" {
 						gpu.TuningDetail = "OverDrive tidak melaporkan nilai/rentang untuk kontrol yang didukung."
 					}
 				case errors.Is(err, os.ErrPermission):

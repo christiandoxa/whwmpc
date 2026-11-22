@@ -81,11 +81,14 @@ func amdSettings(pciRoot, kind, id string) (Settings, error) {
 	if err != nil {
 		return Settings{}, err
 	}
-	kind = strings.TrimPrefix(kind, "restore-")
+	controlKind := strings.TrimPrefix(kind, "restore-")
 	controls := amd.controls()
-	i := slices.IndexFunc(controls, func(c Control) bool { return c.Kind == kind })
+	i := slices.IndexFunc(controls, func(c Control) bool { return c.Kind == controlKind })
 	if i < 0 {
-		return Settings{}, fmt.Errorf("nilai/rentang OverDrive %s tidak tersedia: %w", kind, os.ErrNotExist)
+		return Settings{}, fmt.Errorf("nilai/rentang OverDrive %s tidak tersedia: %w", controlKind, os.ErrNotExist)
+	}
+	if kind == CoreMax && !amd.coreMaxRangeVerified() {
+		return Settings{}, errors.New(coreRangeUnavailable)
 	}
 	return Settings{ID: id, PCI: id, Hardware: amd.Device + "/" + amd.Subsystem, Control: controls[i], Mode: amd.Mode, Table: amd.Table, SysfsDir: amd.Dir}, nil
 }

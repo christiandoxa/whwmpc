@@ -11,8 +11,9 @@ import (
 )
 
 const (
-	OverdriveFile   = "pp_od_clk_voltage"
-	PerformanceFile = "power_dpm_force_performance_level"
+	OverdriveFile        = "pp_od_clk_voltage"
+	PerformanceFile      = "power_dpm_force_performance_level"
+	coreRangeUnavailable = "Rentang untuk nilai maksimum clock OverDrive belum terverifikasi pada backend AMDGPU ini."
 )
 
 type amdState struct {
@@ -77,6 +78,33 @@ func readAMDControl(path string) (string, error) {
 		return "", fmt.Errorf("driver tidak menyediakan kontrol %s yang dapat ditulis administrator", filepath.Base(path))
 	}
 	return readSys(path)
+}
+
+func (a amdState) coreMaxRangeVerified() bool {
+	// Some PMFW backends print the Fmin floor in OD_RANGE. Their setter checks a separate Fmax floor.
+	ip := filepath.Join(a.Dir, "ip_discovery", "die", "0", "MP1", "0")
+	if _, err := os.Stat(ip); errors.Is(err, os.ErrNotExist) {
+		// Older Renoir kernels may lack IP discovery. These IDs all select CHIP_RENOIR.
+		switch a.Device {
+		case "0x15e7", "0x1636", "0x1638", "0x164c":
+			return true
+		}
+		return false
+	}
+	var version [3]string
+	for i, name := range [...]string{"major", "minor", "revision"} {
+		value, err := readSys(filepath.Join(ip, name))
+		if err != nil {
+			return false
+		}
+		version[i] = value
+	}
+	switch strings.Join(version[:], ".") {
+	case "12.0.0", "12.0.1", "13.0.1", "13.0.3", "13.0.8", "14.0.0", "14.0.1", "14.0.4", "14.0.5":
+		return true
+	default:
+		return false
+	}
 }
 
 func (a amdState) controls() []Control {

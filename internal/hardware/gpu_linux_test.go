@@ -222,4 +222,27 @@ func TestLinuxScanPreservesBackendCoverage(t *testing.T) {
 			}
 		})
 	}
+	if _, err := amdSettings(root, CoreMax, pci); err != nil {
+		t.Fatalf("Renoir without IP discovery lost its clock control: %v", err)
+	}
+	// SMU 13.0.7 exports the minimum for Fmin. The fixture has no separate Fmax minimum.
+	ip := filepath.Join(card, "ip_discovery", "die", "0", "MP1", "0")
+	if err := os.MkdirAll(ip, 0700); err != nil {
+		t.Fatal(err)
+	}
+	for name, value := range map[string]string{"major": "13", "minor": "0", "revision": "7"} {
+		if err := os.WriteFile(filepath.Join(ip, name), []byte(value), 0600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	device := scanAt(t.Context(), &gpuRunner{lookErr: os.ErrNotExist}, root).Devices[1]
+	if device.TuningAvailability != domain.Partial || len(device.Controls) != 1 || device.Controls[0].Kind != VoltageOffset || device.TuningDetail != coreRangeUnavailable {
+		t.Fatalf("unverified clock range should not hide a valid voltage control: %+v", device)
+	}
+	if _, err := amdSettings(root, CoreMax, pci); err == nil || err.Error() != coreRangeUnavailable {
+		t.Fatalf("fresh clock plan accepted an unverified range: %v", err)
+	}
+	if restore, err := amdSettings(root, RestoreCoreMax, pci); err != nil || restore.InitialTarget() != pci+"=2150,auto" {
+		t.Fatalf("the observed state used by existing signed restore receipts changed: %+v, %v", restore, err)
+	}
 }
