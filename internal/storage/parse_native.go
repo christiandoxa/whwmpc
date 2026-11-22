@@ -98,7 +98,8 @@ func parseDarwinDisks(data []byte) ([]string, error) {
 func parseDarwinSMART(disk string, data []byte, now time.Time) Drive {
 	drive := Drive{Name: disk, CapturedAt: now, Availability: domain.Error}
 	doc, err := plistFields(data)
-	if err != nil || doc["DeviceIdentifier"].Text != disk || doc["Whole"].XMLName.Local != "true" {
+	if err != nil || doc["DeviceIdentifier"].Text != disk || doc["WholeDisk"].XMLName.Local != "true" {
+		drive.Detail = "Disk Utility tidak mengembalikan metadata yang cocok dengan disk fisik."
 		return drive
 	}
 	drive.Model = cleanLabel(doc["MediaName"].Text)

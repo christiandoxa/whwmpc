@@ -16,13 +16,16 @@ func TestNativeStorageParsers(t *testing.T) {
 	if err != nil || len(disks) != 1 || disks[0] != "disk0" {
 		t.Fatalf("diskutil list %+v %v", disks, err)
 	}
-	const plist = `<plist><dict><key>DeviceIdentifier</key><string>disk0</string><key>Whole</key><true/><key>SMARTStatus</key><string>Failing</string><key>SolidState</key><true/></dict></plist>`
+	const plist = `<plist><dict><key>DeviceIdentifier</key><string>disk0</string><key>WholeDisk</key><true/><key>SMARTStatus</key><string>Failing</string><key>SolidState</key><true/></dict></plist>`
 	d := parseDarwinSMART("disk0", []byte(plist), time.Now())
 	if d.Health == nil || d.Health.Passed == nil || *d.Health.Passed || d.Availability != domain.Available {
 		t.Fatalf("missing failed SMART %+v", d)
 	}
 	if d := parseDarwinSMART("disk1", []byte(plist), time.Now()); d.Health != nil || d.Availability != domain.Error {
 		t.Fatalf("accepted changed ID %+v", d)
+	}
+	if d := parseDarwinSMART("disk0", []byte(strings.Replace(plist, "WholeDisk</key><true/>", "WholeDisk</key><false/>", 1)), time.Now()); d.Health != nil || d.Availability != domain.Error {
+		t.Fatalf("accepted a partition as a whole disk %+v", d)
 	}
 	if d := parseDarwinSMART("disk0", []byte(strings.Replace(plist, "Failing", "Not Supported", 1)), time.Now()); d.Availability != domain.Unsupported {
 		t.Fatalf("unsupported SMART %+v", d)
