@@ -1,0 +1,58 @@
+{
+  "backend": "2.0.20",
+  "executable": {
+    "sha256": "a7074bab40d918ac0602b02f4cdcea7a9f9346edb4086e36ef29c2239f4c3281",
+    "vcs.revision": "9300a8289d567647ed6ad976429cac0076238b12",
+    "vcs.modified": "false"
+  },
+  "scope": "Public LVFS metadata refresh into disposable fwupd config/cache; no device paths, host bus, or flash",
+  "metadata_uri": "https://cdn.fwupd.org/downloads/firmware.xml.zst",
+  "signature_uri": "https://cdn.fwupd.org/downloads/firmware.xml.zst.jcat",
+  "normal_public_tls_root_count": 120,
+  "distro_lvfs_pki": [
+    {
+      "name": "LVFS-CA.pem",
+      "sha256": "6b46718d04424994c07a2b158680b47c354c019d62cfaeec6745c8753c3b1321"
+    },
+    {
+      "name": "LVFS-CA-2025PQ.pem",
+      "sha256": "a140d047f7763e5a3a2646898752c79a4db7f071451e0fcc98c2cfce37b0c814"
+    }
+  ],
+  "tls_relay_connections": {
+    "cdn.fwupd.org": {
+      "established": 2,
+      "errors": []
+    },
+    "fwupd.org": {
+      "established": 0,
+      "errors": []
+    }
+  },
+  "cache_files_created": {
+    "metadata": {
+      "bytes": 2018857,
+      "sha256": "38fe57d69a45e2c34e87eccfc3174e440f2a7a340219e076b7adfa2439d344b4"
+    },
+    "jcat": {
+      "bytes": 15052,
+      "sha256": "03b0dd929b181726d73aca85f6958d39030608289373102fe699468ea56b4d41"
+    }
+  },
+  "backend_cache_mtime_before": -1,
+  "backend_cache_mtime_after": 1795348711,
+  "backend_reports_cached_jcat_sha256": false,
+  "only_trusted": true,
+  "devices_before": 0,
+  "devices_after": 0,
+  "firmware_write_history": 0,
+  "apply": {
+    "kind": "firmware-refresh",
+    "status": "verified",
+    "started": true,
+    "changed": true,
+    "cli_exit": 0,
+    "message": "Metadata LVFS resmi tersedia dan baru diperiksa."
+  },
+  "diagnostics": []
+}
