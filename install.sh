@@ -11,6 +11,7 @@ download() {
 }
 
 main() {
+    [ "$#" -le 1 ] || fail "penggunaan: sh install.sh [vX.Y.Z]"
     repo=https://github.com/christiandoxa/whwmpc
     [ "$(uname -s)" = Linux ] || fail "installer ini khusus Linux"
     case "$(uname -m)" in
@@ -22,10 +23,14 @@ main() {
         command -v "$tool" >/dev/null || fail "perintah diperlukan: $tool"
     done
 
-    latest=$(download -o /dev/null -w '%{url_effective}' "$repo/releases/latest")
-    tag=${latest#"$repo/releases/tag/"}
-    printf '%s\n' "$tag" | awk '/^v[0-9]+\.[0-9]+\.[0-9]+$/ { ok=1 } END { exit !ok }' ||
-        fail "tag rilis stabil tidak ditemukan"
+    if [ "$#" -eq 1 ]; then
+        tag=$1
+    else
+        latest=$(download -o /dev/null -w '%{url_effective}' "$repo/releases/latest")
+        tag=${latest#"$repo/releases/tag/"}
+    fi
+    printf '%s\n' "$tag" | awk '/^v[0-9]+\.[0-9]+\.[0-9]+$/ { ok=1 } END { exit !(NR == 1 && ok) }' ||
+        fail "tag rilis harus berbentuk vX.Y.Z"
     archive="whwmpc_${tag}_linux_${arch}.tar.gz"
     base="$repo/releases/download/$tag"
 
@@ -62,4 +67,4 @@ main() {
     esac
 }
 
-main
+main "$@"

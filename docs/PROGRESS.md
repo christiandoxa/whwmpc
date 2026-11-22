@@ -109,4 +109,6 @@ Jalur CLI/TUI mengaudit inventaris. Metadata LVFS dan staging firmware memerluka
 
 Build arsip untuk Linux amd64/arm64, macOS arm64, dan Windows amd64. Manifest memuat checksum keempat target. Workflow rilis menjalankan smoke terhadap executable yang diekstrak dari arsip pada runner dengan OS dan arsitektur sesuai, lalu menerbitkan aset dari artefak yang sama.
 
+Installer Linux mendukung rilis stabil terbaru dan tag eksplisit. Kedua jalur diuji dengan arsip publik `v0.1.0`, SHA-256 dari rilis, dan eksekusi binari di direktori pengguna sementara.
+
 Verifikasi firmware pascarestart mengikuti format riwayat fwupd 2.0.20. Versi yang dicoba berasal dari entri release dalam riwayat. Hasil sukses juga memerlukan versi aktif yang cocok. Fixture mencakup riwayat pending, sukses, duplikat, dan target yang berbeda.

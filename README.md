@@ -12,11 +12,19 @@ Pasang rilis standalone terbaru di Linux amd64 atau arm64. Installer memeriksa S
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/christiandoxa/whwmpc/main/install.sh | sh
+~/.local/bin/whwmpc --version
 ~/.local/bin/whwmpc
-~/.local/bin/whwmpc --demo
 ```
 
-Jika `~/.local/bin` sudah ada di `PATH`, gunakan `whwmpc` atau `whwmpc demo animations`. Jalankan ulang installer untuk memperbarui binari. Checksum diambil dari rilis GitHub yang sama. [Unduhan manual](https://github.com/christiandoxa/whwmpc/releases/latest) · [Build dari sumber](docs/RELEASE.md)
+Gunakan `~/.local/bin/whwmpc --demo` untuk mencoba data simulasi. Jika `~/.local/bin` sudah ada di `PATH`, cukup ketik `whwmpc`. Jalankan ulang installer untuk memperbarui binari.
+
+Untuk memasang versi tertentu, sertakan tag rilis.
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/christiandoxa/whwmpc/main/install.sh | sh -s -- v0.1.0
+```
+
+Checksum diambil dari rilis GitHub yang sama. [Unduhan manual](https://github.com/christiandoxa/whwmpc/releases/latest) · [Build dari sumber](docs/RELEASE.md)
 
 Beranda menyediakan **Cek kondisi PC**, **PC terasa lambat**, dan **Bersihkan ruang**. Tekan Enter pada pilihan pertama untuk memulai pemeriksaan. Gunakan **Lainnya…** untuk SSD, TRIM, daya, riwayat, laporan, pengaturan, dan pertanyaan bebas.
 
