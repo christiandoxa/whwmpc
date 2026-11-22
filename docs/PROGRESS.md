@@ -140,3 +140,5 @@ Binari publik juga lulus benchmark CLI baca dan tulis 1 MiB pada file sementara,
 Lifecycle systemd user lulus pada akun sementara Ubuntu amd64. Fixture juga memeriksa bahwa service menulis satu observasi ke riwayat sebelum unit dilepas. Matriks native mencakup Ubuntu amd64 dan arm64 untuk uji loop ext4 dan daemon pada kedua arsitektur. [Hasil Ubuntu amd64](https://github.com/christiandoxa/whwmpc/actions/runs/45007833793/job/137163307354)
 
 Manifest image Fedora terpin menyediakan amd64 dan arm64. Workflow cache menjalankan skenario DNF5 di kedua runner native.
+
+Ubuntu arm64 lulus alur repair ext4 bertanda tangan dan lifecycle systemd. Fedora DNF5 lulus pada amd64 dan arm64. Arch pacman lulus pada amd64, satu-satunya arsitektur Linux dalam manifest image Arch yang terpin. [Job Ubuntu arm64](https://github.com/christiandoxa/whwmpc/actions/runs/45008131794/job/137164194201) · [CI cache](https://github.com/christiandoxa/whwmpc/actions/runs/45008131828)

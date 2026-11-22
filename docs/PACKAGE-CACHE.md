@@ -16,4 +16,4 @@ Tindakan memerlukan akses root atau otorisasi sudo. Pemeriksaan ulang menolak pe
 
 Hasil memisahkan ukuran logis kandidat, ukuran file kandidat yang teramati hilang, serta selisih ruang bebas filesystem. Selisih ruang bebas dapat terpengaruh alokasi blok, cache filesystem, dan aktivitas lain pada volume. Aksi hanya menampilkan hasil terverifikasi sesudah cakupan dibaca ulang.
 
-Workflow [Native package cache](../.github/workflows/package-cache.yml) menjalankan backend asli di kontainer Arch dan Fedora dengan digest terpin dan jaringan dimatikan. Fixture mencakup perubahan kandidat, lock yang sedang dipakai, penghapusan paket cache, dan sentinel di luar cakupan. Cache komputer pengembangan dan runner tetap berada di luar kontainer.
+Workflow memakai digest terpin dan jaringan dimatikan. Fedora diuji pada amd64 dan arm64. Image Arch terpin menyediakan amd64. Fixture mencakup perubahan kandidat, lock yang sedang dipakai, penghapusan paket cache, dan sentinel di luar cakupan. [Hasil CI kontainer](https://github.com/christiandoxa/whwmpc/actions/runs/45008131828)

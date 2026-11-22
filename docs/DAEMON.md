@@ -18,6 +18,6 @@ Interval 5 menit hingga 24 jam. Timer mengulang setelah service berhenti. Cakupa
 
 Unit membatasi CPU 20%, memori 192 MiB, 32 task, dan 90 detik. Stdout dibuang. Stderr masuk ke journal dengan burst maksimum 8 pesan per menit; retensi journal mengikuti systemd host. Service tidak menyediakan IPC atau maintenance terjadwal dan tidak menaikkan privilege.
 
-Tes lifecycle memakai direktori sementara dan manager fixture. Di runner Ubuntu 24.04, satu akun sementara memasang dan mengaktifkan timer, menjalankan satu observasi melalui service, memeriksa riwayat, lalu melepas unit. [Hasil CI Ubuntu amd64](https://github.com/christiandoxa/whwmpc/actions/runs/45007833793/job/137163307354)
+Tes lifecycle memakai direktori sementara dan manager fixture. Di runner Ubuntu 24.04, satu akun sementara memasang dan mengaktifkan timer, menjalankan satu observasi melalui service, memeriksa riwayat, lalu melepas unit. [Hasil amd64](https://github.com/christiandoxa/whwmpc/actions/runs/45007833793/job/137163307354) · [Hasil arm64](https://github.com/christiandoxa/whwmpc/actions/runs/45008131794/job/137164194201)
 
 [Timer](https://www.freedesktop.org/software/systemd/man/latest/systemd.timer.html) · [Service](https://www.freedesktop.org/software/systemd/man/latest/systemd.service.html) · [Batas resource](https://www.freedesktop.org/software/systemd/man/latest/systemd.resource-control.html)
