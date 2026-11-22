@@ -8,6 +8,8 @@
 
 ## Mulai
 
+### Linux
+
 Pasang rilis standalone terbaru di Linux amd64 atau arm64 dengan `curl`, `awk`, `tar`, dan `sha256sum`. Installer memeriksa SHA-256 arsip dan memasang binari ke `~/.local/bin` tanpa sudo atau Go.
 
 ```sh
@@ -26,7 +28,24 @@ curl -fsSL https://raw.githubusercontent.com/christiandoxa/whwmpc/main/install.s
 
 Jika sudah punya checkout repo, jalankan `./install.sh` atau `./install.sh v0.1.0` dari direktori repo. [Skrip installer](install.sh)
 
-Checksum diambil dari rilis GitHub yang sama. Untuk macOS atau Windows, pilih arsip yang cocok dengan arsitektur perangkat lalu ikuti petunjuk ekstraksi. [Unduhan manual](https://github.com/christiandoxa/whwmpc/releases/latest) · [Cara memasang dari arsip](docs/RELEASE.md)
+### Windows
+
+Jalankan di Windows PowerShell 5.1 atau PowerShell 7 pada Windows 11 atau Windows Server 2025. Installer memilih paket amd64 atau arm64, memeriksa SHA-256, dan memasang `whwmpc.exe` ke `%LOCALAPPDATA%\Programs\whwmpc` tanpa Administrator atau Go.
+
+```powershell
+$installer = [scriptblock]::Create((Invoke-WebRequest -UseBasicParsing 'https://raw.githubusercontent.com/christiandoxa/whwmpc/main/install.ps1').Content)
+& $installer
+& "$env:LOCALAPPDATA\Programs\whwmpc\whwmpc.exe" --version
+& "$env:LOCALAPPDATA\Programs\whwmpc\whwmpc.exe"
+```
+
+Jalankan ulang `& $installer` untuk memperbarui. Gunakan `& $installer -Version v0.3.7` untuk memilih versi tertentu, atau jalankan `.\install.ps1` dari checkout repo. Tambahkan `--demo` ke perintah executable untuk mencoba data simulasi. [Skrip PowerShell](install.ps1)
+
+### Instalasi manual
+
+Untuk instalasi dari arsip di Linux, macOS, atau Windows, pilih paket yang cocok dengan perangkat dan cocokkan checksum dari rilis yang sama. [Unduhan manual](https://github.com/christiandoxa/whwmpc/releases/latest) · [Cara memasang dari arsip](docs/RELEASE.md)
+
+### Navigasi
 
 Beranda menyediakan **Cek kondisi PC**, **PC terasa lambat**, dan **Bersihkan ruang**. Tekan Enter pada pilihan pertama untuk memulai pemeriksaan. Gunakan **Lainnya…** untuk SSD, TRIM, daya, riwayat, laporan, pengaturan, dan pertanyaan bebas. **Tugas lanjutan** membuka GPU, firmware, filesystem, benchmark, dan status observasi terjadwal.
 

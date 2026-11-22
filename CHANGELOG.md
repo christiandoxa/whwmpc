@@ -3,6 +3,7 @@
 ## 0.3.8
 
 - Proyek menggunakan Apache License 2.0 dengan hak cipta Christian Doxa Hamasiah. Paket standalone menyertakan `LICENSE` dan `NOTICE`.
+- `install.ps1` memasang paket Windows amd64 atau arm64 dari rilis stabil terbaru atau tag yang dipilih setelah memeriksa SHA-256.
 
 ## 0.3.7
 

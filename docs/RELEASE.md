@@ -18,7 +18,7 @@ tar -xzf whwmpc_snapshot_linux_amd64.tar.gz ./whwmpc
 
 ## Pasang dari arsip
 
-Unduh arsip platform dan `SHA256SUMS` dari rilis yang sama. Installer README mengotomatiskan langkah ini untuk Linux. [Halaman rilis](https://github.com/christiandoxa/whwmpc/releases)
+Unduh arsip platform dan `SHA256SUMS` dari rilis yang sama. Installer di README mengotomatiskan langkah ini untuk Linux dan Windows. [Panduan instalasi](../README.md#mulai) · [Halaman rilis](https://github.com/christiandoxa/whwmpc/releases)
 
 Pada Linux atau macOS, ganti nama arsip sesuai unduhan. Gunakan direktori baru untuk ekstraksi.
 

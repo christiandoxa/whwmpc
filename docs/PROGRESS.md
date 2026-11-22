@@ -214,3 +214,7 @@ Katalog LVFS lokal memuat versi NVMe Lenovo `MU05.1`. Fixture yang menggabungkan
 Keenam arsip `v0.3.7` lulus SHA-256 dan uji di runner searsitektur. Manifest rilis, artefak CI, dan build lokal identik. Upgrade `v0.3.6` → `v0.3.7` lewat installer lulus pada Linux amd64 dan ARM64 lewat QEMU. Gate lokal mencakup 266 tes race, vet, build, verifikasi modul, dan govulncheck. [Rilis](https://github.com/christiandoxa/whwmpc/releases/tag/v0.3.7) · [Workflow rilis](https://github.com/christiandoxa/whwmpc/actions/runs/45027937682) · [CI](https://github.com/christiandoxa/whwmpc/actions/runs/45027647916) · [CI native](https://github.com/christiandoxa/whwmpc/actions/runs/45027647643)
 
 Apache License 2.0 dan hak cipta 2026 Christian Doxa Hamasiah terpasang di repositori. Keenam arsip snapshot lulus pemeriksaan isi serta mode `0644` untuk `LICENSE` dan `NOTICE`. Lisensi Go juga terverifikasi ada pada keenamnya. [Lisensi](../LICENSE) · [Atribusi](../NOTICE)
+
+## Installer Windows
+
+`install.ps1` memilih paket amd64 atau arm64, memverifikasi SHA-256, dan mendukung upgrade atau pemilihan tag tanpa Administrator. Workflow native memasang rilis publik pada Windows x64 dan ARM64 dengan Windows PowerShell dan PowerShell 7, lalu memeriksa bahwa checksum salah mempertahankan executable yang sudah terpasang. [Panduan instalasi](../README.md#windows)
