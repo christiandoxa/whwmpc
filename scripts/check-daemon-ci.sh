@@ -28,10 +28,10 @@ sudo install -o "$account" -m 0755 "$source_binary" "$binary"
 uid_dir="/run/user/$account_uid"
 sudo systemctl start "$manager"
 for _ in {1..40}; do
-    [[ -S "$uid_dir/bus" ]] && break
+    sudo -u "$account" test -S "$uid_dir/bus" && break
     sleep 0.25
 done
-if [[ ! -S "$uid_dir/bus" ]]; then
+if ! sudo -u "$account" test -S "$uid_dir/bus"; then
     sudo systemctl status --no-pager "$manager" || true
     printf '%s\n' 'Temporary user manager did not start its session bus.' >&2
     exit 1
@@ -53,5 +53,5 @@ as_user "$binary" daemon stop
 as_user "$binary" daemon status | grep -Fx 'ActiveState=inactive'
 as_user "$binary" daemon disable
 as_user "$binary" daemon uninstall
-test ! -e "$fixture_home/.config/systemd/user/whwmpc-monitor.service"
-test ! -e "$fixture_home/.config/systemd/user/whwmpc-monitor.timer"
+as_user test ! -e "$fixture_home/.config/systemd/user/whwmpc-monitor.service"
+as_user test ! -e "$fixture_home/.config/systemd/user/whwmpc-monitor.timer"

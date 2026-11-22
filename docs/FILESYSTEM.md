@@ -12,6 +12,8 @@ Setelah perbaikan, volume dibaca ulang dalam mode read-only. Status verified mem
 
 Fixture menguji target terpasang, output rusak, jenis dan UUID berubah, jurnal belum dipulihkan, izin, dan klasifikasi hasil. Tes Linux membuat image ext2, ext3, dan ext4 di direktori sementara. Untuk tiap image, tes memastikan digest tetap sama saat pemeriksaan baca-saja, menyisipkan inkonsistensi reference count, memperbaikinya, lalu memeriksa hasilnya. Penggunaan sudo pada partisi asli belum diuji.
 
+Pada runner Ubuntu 24.04, satu partisi loop ext4 dari image sementara melewati pemeriksaan, penolakan ID konfirmasi yang salah, apply dengan rencana bertanda tangan, dan pemeriksaan ulang yang bersih. [Job perbaikan ext4](https://github.com/christiandoxa/whwmpc/actions/runs/45007448130/job/137162074979)
+
 [e2fsck 1.47.0](https://github.com/tytso/e2fsprogs/blob/v1.47.0/e2fsck/e2fsck.8.in) · [Implementasi klaim dan exit code](https://github.com/tytso/e2fsprogs/blob/v1.47.0/e2fsck/unix.c) · [Sumber BLKGETDISKSEQ](https://github.com/torvalds/linux/blob/master/include/uapi/linux/fs.h) · [Util-linux blkid dan lsblk](https://github.com/util-linux/util-linux/tree/v2.39.3/misc-utils)
 
 ## macOS APFS dan Windows NTFS

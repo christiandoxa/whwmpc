@@ -134,3 +134,5 @@ Uji image APFS lulus di macOS 15 dengan checksum tetap sama. Di Windows, satu co
 CI menjalankan lifecycle timer systemd pada akun fixture sementara. Tes menjalankan satu service observasi, mengecek histori, lalu melepas timer dan menghapus akun fixture.
 
 `v0.2.0` terbit dari `386e85e`. Workflow lulus pada Linux amd64/arm64, macOS arm64, dan Windows amd64. Empat arsip publik lolos SHA-256. Binari publik Linux amd64 lulus PTY 80×24 dan 120×36 serta pemasangan eksplisit `v0.1.0` yang dilanjutkan ke versi stabil terbaru. [Aset rilis](https://github.com/christiandoxa/whwmpc/releases/tag/v0.2.0) · [Workflow rilis](https://github.com/christiandoxa/whwmpc/actions/runs/45006921549)
+
+Binari publik juga lulus benchmark CLI baca dan tulis 1 MiB pada file sementara, termasuk riwayat dan pembersihan file hasil tulis. Perbaikan ext4 melalui rencana bertanda tangan lulus pada partisi loop terisolasi di Ubuntu. [Job Linux](https://github.com/christiandoxa/whwmpc/actions/runs/45007448130/job/137162074979)
