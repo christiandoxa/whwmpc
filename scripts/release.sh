@@ -14,16 +14,21 @@ cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.."
 stage=$(mktemp -d "$out/.whwmpc.XXXXXXXX")
 trap 'rm -r -- "$stage"' EXIT
 
-export GOTOOLCHAIN=local CGO_ENABLED=0 GOOS=linux
+umask 022
+export GOTOOLCHAIN=local CGO_ENABLED=0 GOAMD64=v1 GOARM64=v8.0 LC_ALL=C
 shopt -s nullglob
 archives=()
-for arch in amd64 arm64; do
-    export GOARCH=$arch
-    name="whwmpc_${version}_linux_${arch}"
+for target in linux/amd64 linux/arm64 darwin/arm64 windows/amd64; do
+    export GOOS=${target%/*} GOARCH=${target#*/}
+    name="whwmpc_${version}_${GOOS}_${GOARCH}"
+    executable=whwmpc
+    if [[ "$GOOS" == windows ]]; then
+        executable+=.exe
+    fi
     package="$stage/$name"
     mkdir -p "$package/LICENSES"
     go build -mod=readonly -trimpath -buildvcs=false -ldflags="-s -w -X main.version=$version" \
-        -o "$package/whwmpc" ./cmd/whwmpc
+        -o "$package/$executable" ./cmd/whwmpc
     cp README.md "$package/"
     if [[ -f LICENSE ]]; then
         cp LICENSE "$package/"
@@ -42,8 +47,26 @@ for arch in amd64 arm64; do
         cp -- "${notices[@]}" "$package/LICENSES/$module/"
     done < "$stage/modules"
 
-    archive="$name.tar.gz"
-    tar -C "$package" --sort=name --owner=0 --group=0 --numeric-owner --mtime=@0 -czf "$stage/$archive" .
+    if [[ "$GOOS" == windows ]]; then
+        archive="$name.zip"
+        python3 - "$package" "$stage/$archive" <<'PYTHON'
+from pathlib import Path
+import sys
+import zipfile
+
+root = Path(sys.argv[1])
+with zipfile.ZipFile(sys.argv[2], "w", compression=zipfile.ZIP_DEFLATED) as archive:
+    for path in sorted(root.rglob("*")):
+        if path.is_file():
+            entry = zipfile.ZipInfo(path.relative_to(root).as_posix())
+            entry.compress_type = zipfile.ZIP_DEFLATED
+            entry.external_attr = path.stat().st_mode << 16
+            archive.writestr(entry, path.read_bytes())
+PYTHON
+    else
+        archive="$name.tar.gz"
+        tar -C "$package" --sort=name --owner=0 --group=0 --numeric-owner --mtime=@0 -czf "$stage/$archive" .
+    fi
     archives+=("$archive")
 done
 

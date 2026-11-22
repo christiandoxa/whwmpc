@@ -1,6 +1,6 @@
 # Build dan rilis
 
-Jalankan dari checkout lokal menggunakan versi Go yang tercantum di `go.mod`. Workflow dan skrip paket memakai Ubuntu dengan GNU tar dan sha256sum. Arsip berisi `whwmpc`, README, dan pemberitahuan lisensi untuk Go serta dependensi yang masuk ke binari.
+Jalankan dari checkout lokal menggunakan versi Go yang tercantum di `go.mod`. Workflow dan skrip paket memakai Ubuntu dengan GNU tar, sha256sum, dan Python 3. Arsip berisi executable, README, dan pemberitahuan lisensi untuk Go serta dependensi yang masuk ke executable. Build lintas platform memakai `CGO_ENABLED=0` dan paket memakai urutan serta timestamp stabil.
 
 ```sh
 bash scripts/release.sh snapshot
@@ -10,9 +10,15 @@ tar -xzf whwmpc_snapshot_linux_amd64.tar.gz ./whwmpc
 ./whwmpc --version
 ```
 
-Pilih arsip `linux_arm64` untuk Linux arm64. Dependency sistem opsional tetap dipasang melalui package manager distro. macOS dan Windows diuji kompilasi.
+| Target | Arsip | Executable |
+| --- | --- | --- |
+| Linux amd64/arm64 | `whwmpc_<versi>_linux_<arch>.tar.gz` | `whwmpc` |
+| macOS arm64 | `whwmpc_<versi>_darwin_arm64.tar.gz` | `whwmpc` |
+| Windows amd64 | `whwmpc_<versi>_windows_amd64.zip` | `whwmpc.exe` |
 
-Untuk rilis stabil, tinjau hasil CI pada commit tujuan, buat tag beranotasi `vX.Y.Z`, lalu push tag tersebut. Workflow Release menguji aplikasi, membangun ulang paket Linux amd64 dan arm64 dari tag, dan menerbitkan dua arsip beserta `SHA256SUMS`. [Verifikasi tag di GitHub CLI](https://cli.github.com/manual/gh_release_create)
+Arsip Linux mempertahankan nama dan struktur yang dipakai `install.sh`. Pada macOS, pakai `shasum -a 256 -c SHA256SUMS` untuk kumpulan arsip lengkap atau cocokkan hash arsip yang dipilih dengan barisnya di manifest. Pada Windows, gunakan `Get-FileHash -Algorithm SHA256` untuk membandingkan arsip dengan manifest, lalu ekstrak ZIP dan jalankan `.\whwmpc.exe` di PowerShell. Paket macOS berbentuk executable command-line hasil cross-build tanpa notarization. Dependency sistem opsional tetap mengikuti platform dan backend.
+
+Untuk rilis stabil, tinjau hasil CI pada commit tujuan, buat tag beranotasi `vX.Y.Z`, lalu push tag tersebut. Workflow Release membangun paket dari commit yang ditag. Publikasi menunggu checksum dan smoke executable hasil paket pada keempat runner yang sesuai arsitektur. [Verifikasi tag di GitHub CLI](https://cli.github.com/manual/gh_release_create)
 
 ## Uji terminal dan rekaman
 

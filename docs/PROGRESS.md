@@ -104,3 +104,7 @@ CI native pada `584472c` menemukan fixture macOS memakai nama properti yang berb
 ## Backlog C dan E · Firmware dan perawatan filesystem
 
 Jalur CLI/TUI mengaudit inventaris. Metadata LVFS dan staging firmware memerlukan rencana terpisah. Firmware menunggu bukti fwupd setelah restart, dengan handoff privat dari Riwayat. Filesystem ext offline memakai descriptor terpin, cek read-only, koreksi terbatas e2fsck, dan verifikasi ulang. Fixture aksi dan image ext4 sementara melewati diagnosis baca-saja dan perbaikan metadata. Tidak ada flash atau perbaikan block device pada host.
+
+## Backlog J · Matriks paket standalone
+
+Build arsip untuk Linux amd64/arm64, macOS arm64, dan Windows amd64. Manifest memuat checksum keempat target. Workflow rilis menjalankan smoke terhadap executable yang diekstrak dari arsip pada runner dengan OS dan arsitektur sesuai, lalu menerbitkan aset dari artefak yang sama.
