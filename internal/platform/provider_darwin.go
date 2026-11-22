@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/binary"
 	"math"
-	"os"
 	"time"
 
 	"github.com/christiandoxa/whwmpc/internal/domain"
@@ -31,19 +30,10 @@ func (Native) Overview(ctx context.Context) domain.Overview {
 		}
 	}
 
-	o.CPU.StartedAt = time.Now().UTC()
-	sample := runner.Run(ctx, "/usr/bin/top", "-l", "4", "-s", "1", "-n", "0", "-F", "-R")
-	o.CPU.CapturedAt = time.Now().UTC()
-	o.CPU.Availability = runAvailability(sample)
-	if o.CPU.Availability == domain.Available {
-		o.CPU.Samples = darwinCPUSamples(string(sample.Output))
-		switch len(o.CPU.Samples) {
-		case 0:
-			o.CPU.Availability = domain.Unknown
-		case 1, 2:
-			o.CPU.Availability = domain.Partial
-		}
-	}
+	cpuStart := time.Now().UTC()
+	sample := (sysrun.Native{Timeout: 12 * time.Second}).Run(ctx, "/usr/bin/top", "-l", "4", "-s", "1", "-n", "0", "-F", "-R")
+	o.CPU = darwinCPUResult(sample)
+	o.CPU.StartedAt, o.CPU.CapturedAt = cpuStart, time.Now().UTC()
 	o.Memory = darwinMemory(ctx, runner)
 	o.Disks, o.DiskStatus = darwinDisks()
 	power := ReadPower(ctx, runner)
@@ -114,20 +104,4 @@ func ReadPower(ctx context.Context, runner sysrun.Runner) PowerReading {
 		return PowerReading{Availability: status}
 	}
 	return darwinPower(string(result.Output))
-}
-
-func runAvailability(out sysrun.Result) domain.Availability {
-	if out.Err != nil {
-		return nativeAvailability(out.Err)
-	}
-	switch out.ExitCode {
-	case 0:
-		return domain.Available
-	case 126:
-		return domain.PermissionRequired
-	case 127:
-		return nativeAvailability(os.ErrNotExist)
-	default:
-		return domain.Error
-	}
 }

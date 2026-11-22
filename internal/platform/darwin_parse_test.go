@@ -1,11 +1,38 @@
 package platform
 
 import (
+	"context"
 	"math"
+	"slices"
 	"testing"
 
 	"github.com/christiandoxa/whwmpc/internal/domain"
+	"github.com/christiandoxa/whwmpc/internal/sysrun"
 )
+
+func TestDarwinCPUPreservesIntervalsBeforeDeadline(t *testing.T) {
+	const first = "CPU usage: 100% user, 0% sys, 0% idle\n"
+	const intervals = "CPU usage: 10% user, 0% sys, 90% idle\nCPU usage: 20% user, 0% sys, 80% idle\n"
+	const last = "CPU usage: 30% user, 0% sys, 70% idle\n"
+	for _, tc := range []struct {
+		name, output string
+		err          error
+		status       domain.Availability
+		samples      []float64
+	}{
+		{"complete log", first + intervals + last, nil, domain.Available, []float64{10, 20, 30}},
+		{"deadline with samples", first + intervals + "CPU usage: truncated", context.DeadlineExceeded, domain.Partial, []float64{10, 20}},
+		{"deadline before intervals", first, context.DeadlineExceeded, domain.Error, nil},
+		{"cancellation", first + intervals, context.Canceled, domain.Error, nil},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			got := darwinCPUResult(sysrun.Result{Output: []byte(tc.output), Err: tc.err})
+			if got.Availability != tc.status || !slices.Equal(got.Samples, tc.samples) {
+				t.Fatalf("CPU status = %s, samples = %v", got.Availability, got.Samples)
+			}
+		})
+	}
+}
 
 func TestDarwinSensorParsers(t *testing.T) {
 	raw := "CPU usage: 100% user, 0% sys, 0% idle\nCPU usage: 2.4% user, 7.6% sys, 90.00% idle\nCPU usage: invalid, 120% idle\n"

@@ -1,14 +1,33 @@
 package platform
 
 import (
+	"context"
+	"errors"
 	"math"
+	"os"
 	"path"
 	"regexp"
 	"strconv"
 	"strings"
 
 	"github.com/christiandoxa/whwmpc/internal/domain"
+	"github.com/christiandoxa/whwmpc/internal/sysrun"
 )
+
+func darwinCPUResult(out sysrun.Result) domain.Percent {
+	result := domain.Percent{Availability: runAvailability(out)}
+	if result.Availability != domain.Available && !errors.Is(out.Err, context.DeadlineExceeded) {
+		return result
+	}
+	result.Samples = darwinCPUSamples(string(out.Output))
+	switch {
+	case len(result.Samples) == 0 && result.Availability == domain.Available:
+		result.Availability = domain.Unknown
+	case len(result.Samples) > 0 && (len(result.Samples) < 3 || result.Availability != domain.Available):
+		result.Availability = domain.Partial
+	}
+	return result
+}
 
 var topIdle = regexp.MustCompile(`^CPU usage:[^\r\n]*, ([0-9]+(?:\.[0-9]+)?)% idle`)
 
@@ -118,4 +137,20 @@ func darwinPower(out string) PowerReading {
 		reading.Availability = domain.Partial
 	}
 	return reading
+}
+
+func runAvailability(out sysrun.Result) domain.Availability {
+	if out.Err != nil {
+		return nativeAvailability(out.Err)
+	}
+	switch out.ExitCode {
+	case 0:
+		return domain.Available
+	case 126:
+		return domain.PermissionRequired
+	case 127:
+		return nativeAvailability(os.ErrNotExist)
+	default:
+		return domain.Error
+	}
 }

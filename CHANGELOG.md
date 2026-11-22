@@ -1,5 +1,9 @@
 # Changelog
 
+## Belum dirilis
+
+- Pemeriksaan CPU macOS mempertahankan interval yang selesai sebagai data parsial ketika `top` mencapai batas waktu.
+
 ## 0.3.4
 
 - Keluar segera setelah mengganti mode gerak tetap menyimpan pilihan terakhir.
