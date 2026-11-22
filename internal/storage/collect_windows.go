@@ -2,7 +2,9 @@ package storage
 
 import (
 	"context"
+	"errors"
 	"path/filepath"
+	"time"
 
 	"github.com/christiandoxa/whwmpc/internal/domain"
 	"github.com/christiandoxa/whwmpc/internal/sysrun"
@@ -58,10 +60,16 @@ func (c Collector) InspectSMART(ctx context.Context) SMARTAudit {
 	if runner == nil {
 		runner = sysrun.Native{}
 	}
+	if native, ok := runner.(sysrun.Native); ok && native.Timeout <= 0 {
+		runner = sysrun.Native{Timeout: 20 * time.Second}
+	}
 	result := runner.Run(ctx, filepath.Join(system, "WindowsPowerShell", "v1.0", "powershell.exe"),
 		"-NoProfile", "-NoLogo", "-NonInteractive", "-Command", windowsStorageRead)
 	audit.Availability = nativeCommandStatus(result)
 	if audit.Availability != domain.Available {
+		if errors.Is(result.Err, context.DeadlineExceeded) {
+			audit.Detail = "Windows Storage provider belum selesai dalam batas waktu."
+		}
 		return audit
 	}
 	audit.Drives, err = parseWindowsSMART(result.Output, audit.CapturedAt)

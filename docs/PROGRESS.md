@@ -128,3 +128,5 @@ Tugas lanjutan membuka status observasi terjadwal secara baca-saja. Ringkasan pe
 Workflow native menyiapkan image APFS dan NTFS sementara dengan identitas terpisah dari volume sistem. Pemeriksaan menguji executable terhadap target itu dan membandingkan checksum image yang dipasang baca-saja.
 
 Uji image NTFS berhasil di Windows Server 2025. Parser APFS mengenali prefiks keluaran pemeriksa dengan tetap meminta bukti selesai pada volume. Tiga varian ext2/3/4 lulus uji diagnosis dan perbaikan image sementara.
+
+Uji image APFS lulus di macOS 15 dengan checksum tetap sama. Di Windows, satu cold start Storage Provider mencapai batas delapan detik. Probe PowerShell Storage memakai batas 20 detik dan menampilkan penyebab jika mencapai batas tersebut.
