@@ -12,6 +12,7 @@ macOS memakai otorisasi terminal yang didokumentasikan Apple. Windows memakai `S
 
 ## Sesi dan batas akses
 
+- Jika SMART atau pemeriksaan lain terhalang izin, pilih **Lengkapi pemeriksaan** pada hasil. Layar persetujuan menampilkan cakupan komponen tersebut. Pemeriksaan lain di ringkasan tetap memakai data dan waktu sampel sebelumnya. Jika autentikasi batal atau gagal, hasil dan pilihan sebelumnya tetap tersedia. Mengganti akses melalui Pengaturan mengembalikan layar asal tanpa memulai pemeriksaan baru.
 - UI tetap berjalan sebagai pengguna biasa. Bubble Tea melepas terminal selama autentikasi dan memulihkannya saat kembali. Prompt kredensial berasal dari OS.
 - Helper adalah proses terpisah dengan protokol baca bertipe. Pesan hanya memuat ID berurutan dan operasi yang terdaftar. Target perangkat berasal dari inventaris lokal yang divalidasi. Helper memakai executable sistem dari jalur yang diperiksa dan argumen baca yang dibatasi. Respons yang melebihi 4 MiB, tidak cocok dengan permintaan, atau gagal validasi menutup sesi.
 - Linux dan macOS memakai dua pipe yang diwariskan dari proses pemanggil. Autentikasi interaktif memakai `sudo -k` untuk perintah helper, sehingga sesi baca tidak memperbarui timestamp autentikasi sudo. Windows memakai named pipe lokal dengan ACL, penolakan koneksi remote, dan pemeriksaan PID serta identitas executable. [Keamanan named pipe Windows](https://learn.microsoft.com/en-us/windows/win32/ipc/named-pipe-security-and-access-rights)

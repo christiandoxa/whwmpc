@@ -2,12 +2,14 @@ package workflow
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/christiandoxa/whwmpc/internal/actions"
 	"github.com/christiandoxa/whwmpc/internal/diagnostics"
 	"github.com/christiandoxa/whwmpc/internal/domain"
 	"github.com/christiandoxa/whwmpc/internal/inspection"
+	"github.com/christiandoxa/whwmpc/internal/privread"
 	"github.com/christiandoxa/whwmpc/internal/report"
 	"github.com/christiandoxa/whwmpc/internal/state"
 )
@@ -58,45 +60,94 @@ func Collect(ctx context.Context, scanner *inspection.Scanner, overview domain.O
 	}
 	step(PowerCheck, 2)
 	p := scanner.Power(ctx)
-	powerCoverage := p.PowerStatus
-	if p.LinuxInterfaces() {
-		powerCoverage = combine(p.PowerStatus, p.Profiles.Status, p.CPUFreqStatus)
-	}
-	snap := Snapshot{
-		Input: report.Input{Demo: demo, Overview: &overview, Power: &p},
-		Coverage: []Coverage{
-			{SystemCheck, combine(overview.CPU.Availability, overview.Memory.Availability)},
-			{DiskCheck, overview.DiskStatus},
-			{PowerCheck, powerCoverage},
-		},
-	}
+	snap := Snapshot{Input: report.Input{Demo: demo, Overview: &overview, Power: &p}}
 	if full && ctx.Err() == nil {
 		step(SSDCheck, 3)
 		s := scanner.SMART(ctx, fresh)
 		step(TRIMCheck, 4)
 		t := scanner.TRIM(ctx)
 		snap.Input.SMART, snap.Input.Trim = &s, &t
-		snap.Coverage = append(snap.Coverage, Coverage{SSDCheck, s.Availability}, Coverage{TRIMCheck, t.Availability})
 	}
 	if ctx.Err() != nil {
 		return Snapshot{}, ctx.Err()
 	}
-	snap.Input.At = scanner.Now()
-	a := diagnostics.Analyzer{Language: lang, Now: snap.Input.At}
-	findings := a.Slow(overview, p)
-	if full {
-		findings = append(findings, a.SMART(*snap.Input.SMART)...)
-		findings = append(findings, a.TRIM(*snap.Input.Trim)...)
+	snap.finish(scanner.Now(), lang)
+	return snap, nil
+}
+
+// Complete keeps the other readings in the original snapshot at their original times.
+func Complete(ctx context.Context, scanner *inspection.Scanner, snap Snapshot, op privread.Operation, lang string, progress func(ScanProgress)) (Snapshot, error) {
+	if snap.Input.Overview == nil || snap.Input.Power == nil {
+		return Snapshot{}, errors.New("original overview is missing")
 	}
-	findings = append(findings, a.Power(p)...)
+	ctx, cancel := context.WithTimeout(ctx, 65*time.Second)
+	defer cancel()
+	step := func(check Check) {
+		if progress != nil && ctx.Err() == nil {
+			progress(ScanProgress{check, 1, 1})
+		}
+	}
+	switch op {
+	case privread.SMART:
+		step(SSDCheck)
+		r := scanner.SMART(ctx, true)
+		snap.Input.SMART = &r
+	case privread.TRIM:
+		step(TRIMCheck)
+		r := scanner.TRIM(ctx)
+		snap.Input.Trim = &r
+	case privread.Power:
+		step(PowerCheck)
+		r := scanner.Power(ctx)
+		snap.Input.Power = &r
+	case privread.Temperature:
+		step(SystemCheck)
+		if reading, ok := scanner.PrivilegedTemperature(ctx); ok {
+			copy := *snap.Input.Overview
+			copy.Temperature = reading
+			snap.Input.Overview = &copy
+		}
+	default:
+		return Snapshot{}, errors.New("check is outside the overview")
+	}
+	if ctx.Err() != nil {
+		return Snapshot{}, ctx.Err()
+	}
+	snap.finish(scanner.Now(), lang)
+	return snap, nil
+}
+
+func (snap *Snapshot) finish(at time.Time, lang string) {
+	in := &snap.Input
+	in.At = at
+	powerCoverage := in.Power.PowerStatus
+	if in.Power.LinuxInterfaces() {
+		powerCoverage = combine(powerCoverage, in.Power.Profiles.Status, in.Power.CPUFreqStatus)
+	}
+	snap.Coverage = []Coverage{
+		{SystemCheck, combine(in.Overview.CPU.Availability, in.Overview.Memory.Availability)},
+		{DiskCheck, in.Overview.DiskStatus},
+		{PowerCheck, powerCoverage},
+	}
+	a := diagnostics.Analyzer{Language: lang, Now: at}
+	findings := a.Slow(*in.Overview, *in.Power)
+	if in.SMART != nil {
+		findings = append(findings, a.SMART(*in.SMART)...)
+		snap.Coverage = append(snap.Coverage, Coverage{SSDCheck, in.SMART.Availability})
+	}
+	if in.Trim != nil {
+		findings = append(findings, a.TRIM(*in.Trim)...)
+		snap.Coverage = append(snap.Coverage, Coverage{TRIMCheck, in.Trim.Availability})
+	}
+	findings = append(findings, a.Power(*in.Power)...)
 	seen := make(map[string]bool)
+	in.Findings = nil
 	for _, f := range findings {
 		if !seen[f.ID] {
 			seen[f.ID] = true
-			snap.Input.Findings = append(snap.Input.Findings, f)
+			in.Findings = append(in.Findings, f)
 		}
 	}
-	return snap, nil
 }
 
 func combine(status ...domain.Availability) domain.Availability {

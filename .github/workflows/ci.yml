@@ -26,6 +26,7 @@ jobs:
       - run: python3 scripts/tui_pty.py ./whwmpc --width 80 --height 24 --flow slow
       - run: python3 scripts/tui_pty.py ./whwmpc --width 80 --height 24 --flow cleanup
       - run: python3 scripts/tui_pty.py ./whwmpc --width 80 --height 24 --flow condition --deep
+      - run: python3 scripts/tui_pty.py ./whwmpc --width 80 --height 24 --flow ssd
 
   compile:
     runs-on: ubuntu-24.04

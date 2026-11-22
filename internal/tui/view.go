@@ -66,8 +66,8 @@ func (m Model) choices() []Choice {
 	if (m.screen == results || m.screen == outcome) && m.page.Summary != nil {
 		primary := m.page.Summary.Primary
 		choices := []Choice{primary}
-		if primary.Kind == "details" && m.page.Summary.RetryRead {
-			choices = append(choices, m.retryReadChoice())
+		if primary.Kind == "details" && m.page.Summary.RetryRead != "" {
+			choices = append(choices, m.retryReadChoice(m.page.Summary.RetryRead))
 		} else if primary.Kind == "details" && m.page.Snapshot != nil {
 			choices = append(choices, Choice{m.tr(Words{"Simpan hasil ini", "Save these results"}), "save-snapshot", ""})
 		}

@@ -140,10 +140,30 @@ def choose_level(terminal, deep):
 
 def task_flow(terminal, flow, resize=False, deep=False):
     terminal.expect("Mau dibantu apa?")
-    index = ("condition", "slow", "cleanup").index(flow)
+    index = ("condition", "slow", "cleanup", "ssd").index(flow)
     for _ in range(index):
         press(terminal, b"\x1b[B")
     press(terminal, b"\r")
+    if flow == "ssd":
+        terminal.expect("Kesehatan SSD")
+        press(terminal, b"\r")
+        offset = choose_level(terminal, False)
+        terminal.expect("Lengkapi pemeriksaan SSD", offset)
+        press(terminal, b"\x1b[B")
+        press(terminal, b"\r")
+        terminal.expect("Kembali ke hasil")
+        terminal.expect("SSD / SMART")
+        offset = len(terminal.output)
+        press(terminal, b"\r")
+        terminal.expect("Lengkapi pemeriksaan SSD", offset)
+        press(terminal, b"\r")
+        press(terminal, b"\x1b[A")
+        offset = len(terminal.output)
+        press(terminal, b"\r")
+        terminal.expect("Lolos", offset)
+        if terminal.output.count(ENTER_ALT) < 2 or LEAVE_ALT not in terminal.output:
+            raise RuntimeError("SSD authorization did not restore the alternate screen")
+        return
     offset = choose_level(terminal, deep and flow != "cleanup")
     if flow == "cleanup":
         terminal.expect("file teramati", offset)
@@ -206,7 +226,7 @@ def main():
     parser.add_argument("--duration", type=float, default=5, help="seconds to capture after startup")
     parser.add_argument("--gallery", action="store_true", help="record the normal fixture flow in the Piko gallery")
     parser.add_argument("--app-arg", action="append", default=[], help="extra demo flag in a recording")
-    parser.add_argument("--flow", choices=("condition", "slow", "cleanup"))
+    parser.add_argument("--flow", choices=("condition", "slow", "cleanup", "ssd"))
     parser.add_argument("--deep", action="store_true", help="choose deep inspection using fixtures")
     args = parser.parse_args()
     if not 80 <= args.width <= 240 or not 24 <= args.height <= 80 or not 0.5 <= args.duration <= 30:
@@ -219,6 +239,8 @@ def main():
         if args.record is None:
             parser.error("--gallery requires --record")
         args.app_arg.extend(["demo", "animations"])
+    if args.flow == "ssd":
+        args.app_arg.append("--demo-scenario=ssd-permission")
 
     with tempfile.TemporaryDirectory(prefix="whwmpc-pty-") as tempdir:
         terminal = Terminal(

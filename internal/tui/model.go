@@ -68,6 +68,7 @@ type Request struct {
 	Overview     domain.Overview
 	Workload     assistant.Workload
 	Language     string
+	Complete     privread.Operation
 }
 
 type Inspect func(context.Context, Request) Page
@@ -102,6 +103,7 @@ type screenState struct {
 	question       string
 	access         *readAccess
 	readErr        error
+	request        *Request
 }
 
 type Model struct {
@@ -133,6 +135,7 @@ type Model struct {
 	job                                          uint64
 	cancelJob                                    context.CancelFunc
 	workName                                     string
+	beforeRead                                   *screenState
 	busy, runningAction, cancelling, quitPending bool
 }
 
@@ -236,10 +239,8 @@ func (m *Model) start(intent assistant.Intent, choice Choice) tea.Cmd {
 		}
 		m.options.Privilege.Disable()
 		return m.finishReadAuthorization(nil)
-	case "deep-scope":
-		m.remember()
-		m.privilegeChoices(readAccess{purpose: changeReads, scope: readScope(m.active)})
-		return nil
+	case "complete-read":
+		return m.completeRead(privread.Operation(choice.Value))
 	case "deep-authorize":
 		return m.authorizeReads()
 	case "back", "cancel-plan":
@@ -338,6 +339,11 @@ func (m *Model) start(intent assistant.Intent, choice Choice) tea.Cmd {
 		intent = assistant.Intent(choice.Value)
 		choice = Choice{}
 	}
+	if choice.Kind == "rescan" && m.page.Summary != nil && m.request != nil && m.request.Intent == intent && m.request.Plan == nil && startsInspection(*m.request) {
+		req := *m.request
+		req.Choice, req.Complete, req.Snapshot = choice, "", nil
+		return m.repeatCheck(req)
+	}
 	question := m.question
 	if choice.Kind != "rescan" && choice.Kind != "apply" && choice.Kind != "workload" {
 		m.remember()
@@ -434,6 +440,20 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.cancelJob()
 		m.cancelJob = nil
+		previousRead := m.beforeRead
+		m.beforeRead = nil
+		if previousRead != nil {
+			if note := m.repeatFailure(msg.page); note != "" {
+				m.screenState = *previousRead
+				m.busy, m.cancelling, m.workName = false, false, ""
+				if m.quitPending {
+					return m, m.quit()
+				}
+				m.toast = note
+				m.showReply()
+				return m, nil
+			}
+		}
 		if m.cancelling && !m.runningAction {
 			m.busy, m.cancelling = false, false
 			if m.quitPending {
@@ -463,6 +483,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			summary := summarize(m.page, m.active, m.options.Language)
 			m.summarizeReads(&summary)
 			m.page.Summary = &summary
+		}
+		if previousRead != nil {
+			m.toast = m.tr(Words{"Pemeriksaan ulang selesai", "Repeat check finished"})
 		}
 		m.updateCritical()
 		if m.visual.pose == mascot.Nod && replyPose(m.page) == mascot.Idle {

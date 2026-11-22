@@ -46,6 +46,7 @@ var (
 
 type State struct {
 	Requested, Active bool
+	Scope             Scope
 	Availability      domain.Availability
 	Err               error
 	Reads             uint64
@@ -97,7 +98,10 @@ func (s *Session) Enable(ctx context.Context, scope Scope, terminal *os.File, st
 	ctx, cancel := context.WithTimeout(ctx, 90*time.Second)
 	defer cancel()
 	s.mu.Lock()
-	s.reset()
+	s.epoch++
+	if s.cancel != nil {
+		s.cancel()
+	}
 	epoch := s.epoch
 	s.cancel = cancel
 	s.mu.Unlock()
@@ -127,11 +131,14 @@ func (s *Session) Enable(ctx context.Context, scope Scope, terminal *os.File, st
 			return ErrCancelled
 		}
 		s.cancel = nil
-		s.state = disabled(err)
+		if !s.state.Active {
+			s.state = disabled(err)
+		}
 		return err
 	}
+	s.closeClient()
 	s.cancel, s.client = nil, connected
-	s.state = State{Requested: true, Active: true, Availability: domain.Available}
+	s.state = State{Requested: true, Active: true, Scope: scope, Availability: domain.Available}
 	if connected != nil {
 		s.expiry = time.AfterFunc(time.Until(connected.until), func() { s.fail(connected, ErrExpired) })
 	}
@@ -159,20 +166,30 @@ func (s *Session) reset() {
 	if s.cancel != nil {
 		s.cancel()
 	}
+	s.closeClient()
+	s.cancel, s.state = nil, State{}
+}
+
+func (s *Session) closeClient() {
 	if s.client != nil {
 		s.client.close()
+		s.client = nil
 	}
 	if s.expiry != nil {
 		s.expiry.Stop()
 		s.expiry = nil
 	}
-	s.cancel, s.client, s.state = nil, nil, State{}
 }
 
 func (s *Session) State() State {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return s.state
+}
+
+func (s *Session) CanRead(op Operation) bool {
+	state := s.State()
+	return state.Active && state.Scope.Allows(op) && slices.Contains(s.Operations(), op)
 }
 
 func (s *Session) Read(ctx context.Context, op Operation, out any) bool {

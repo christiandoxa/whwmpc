@@ -93,7 +93,13 @@ func Inspector(scanner *inspection.Scanner, store state.Store, maintenance *work
 			return page
 		case assistant.Overview, assistant.Slow:
 			full := req.Intent == assistant.Overview
-			snapshot, err := workflow.Collect(ctx, scanner, req.Overview, req.Language, maintenance.Demo, full, req.Choice.Kind == "rescan", req.ScanProgress)
+			var snapshot workflow.Snapshot
+			var err error
+			if req.Complete != "" && req.Snapshot != nil {
+				snapshot, err = workflow.Complete(ctx, scanner, *req.Snapshot, req.Complete, req.Language, req.ScanProgress)
+			} else {
+				snapshot, err = workflow.Collect(ctx, scanner, req.Overview, req.Language, maintenance.Demo, full, req.Choice.Kind == "rescan", req.ScanProgress)
+			}
 			if err != nil {
 				return Page{Availability: domain.Error, Found: []string{translator(req.Language)("Pemeriksaan belum selesai", "Scan did not finish"), domain.SafeText(err.Error())}}
 			}

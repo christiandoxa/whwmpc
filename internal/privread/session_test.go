@@ -73,6 +73,33 @@ func TestSingleOperationScope(t *testing.T) {
 	}
 }
 
+func TestDeniedScopeChangeKeepsExistingReadSession(t *testing.T) {
+	backend := fakeBackend(func(_ context.Context, op Operation) any {
+		if op != SMART {
+			t.Errorf("unexpected operation %q", op)
+		}
+		return storage.SMARTAudit{CapturedAt: time.Now(), Availability: domain.Available}
+	})
+	start := backend.Start
+	backend.Start = func(ctx context.Context, scope Scope, terminal *os.File, stderr io.Writer) (io.ReadWriteCloser, error) {
+		if scope != Scope(SMART) {
+			return nil, ErrDenied
+		}
+		return start(ctx, scope, terminal, stderr)
+	}
+	s := New(backend, false)
+	defer s.Disable()
+	if err := s.Enable(t.Context(), Scope(SMART), nil, nil); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Enable(t.Context(), Check, nil, nil); !errors.Is(err, ErrDenied) {
+		t.Fatalf("expected denied scope change, got %v", err)
+	}
+	if !s.CanRead(SMART) || s.CanRead(TRIM) || !s.Read(t.Context(), SMART, new(storage.SMARTAudit)) {
+		t.Fatal("a failed scope change revoked or widened the previous authorization")
+	}
+}
+
 func TestScopedReadsPartialDataAndExpiry(t *testing.T) {
 	entered, stopped := make(chan struct{}), make(chan struct{})
 	s := New(fakeBackend(func(ctx context.Context, op Operation) any {

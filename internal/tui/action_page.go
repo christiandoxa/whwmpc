@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"strings"
 	"time"
 
 	tea "charm.land/bubbletea/v2"
@@ -58,6 +59,8 @@ func (m *Model) launch(req Request, pose mascot.Pose) tea.Cmd {
 		m.privilegeChoices(readAccess{purpose: firstReads, scope: readScope(req.Intent), request: req})
 		return nil
 	}
+	request := req
+	m.request = &request
 	m.busy, m.cancelling, m.workName = true, false, ""
 	m.activity = pose
 	switch req.Choice.Kind {
@@ -106,6 +109,33 @@ func (m *Model) launch(req Request, pose mascot.Pose) tea.Cmd {
 		}
 	}
 	return m.doRequest(ctx, job, req)
+}
+
+func (m *Model) repeatCheck(req Request) tea.Cmd {
+	origin := m.screenState
+	m.beforeRead = &origin
+	m.readErr = nil
+	cmd := m.launch(req, aimFor(req.Intent, req.Choice, req.Plan))
+	if m.busy && m.workName == "" {
+		m.workName = m.tr(Words{"Memeriksa data terbaru", "Reading new measurements"})
+	}
+	return cmd
+}
+
+func (m Model) repeatFailure(p Page) string {
+	if m.cancelling {
+		return m.tr(Words{"Pemeriksaan dihentikan", "Check stopped"})
+	}
+	if m.request != nil && m.request.Complete != "" && m.options.Privilege != nil {
+		st := m.options.Privilege.State()
+		if !st.Active && st.Err != nil && needsRead(p, permissionChecks(p, m.active), m.request.Complete) {
+			return privilegeReason(st, m.options.Language)
+		}
+	}
+	if p.Snapshot == nil && p.Availability == domain.Error {
+		return strings.Join(p.Found, " · ")
+	}
+	return ""
 }
 
 func (m Model) doRequest(ctx context.Context, job uint64, req Request) tea.Cmd {

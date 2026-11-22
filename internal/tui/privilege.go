@@ -11,7 +11,6 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/christiandoxa/whwmpc/internal/assistant"
-
 	"github.com/christiandoxa/whwmpc/internal/domain"
 	"github.com/christiandoxa/whwmpc/internal/privread"
 	"github.com/christiandoxa/whwmpc/internal/tui/mascot"
@@ -33,6 +32,7 @@ type accessPurpose uint8
 const (
 	firstReads accessPurpose = iota
 	changeReads
+	completeReads
 )
 
 type readAccess struct {
@@ -97,6 +97,17 @@ func (m *Model) privilegeChoices(flow readAccess) {
 			description = append(description, l("Lihat cache dan perkiraan ruang yang bisa dibersihkan.", "See cache contents and estimated space to reclaim."))
 		}
 	}
+	if flow.purpose == completeReads {
+		op := privread.Operation(flow.scope)
+		title = retryLabels[op].Text(m.options.Language)
+		admin = l("Izinkan dan lengkapi", "Authorize and complete")
+		if m.readErr != nil {
+			description = append(description, privilegeReason(privread.State{Err: m.readErr}, m.options.Language))
+		} else if st := m.options.Privilege.State(); st.Requested && !st.Active {
+			description = append(description, privilegeReason(st, m.options.Language))
+		}
+		description = append(description, l("Data pemeriksaan lain tetap memakai snapshot ini.", "Other checks keep their existing readings."))
+	}
 	var labels []string
 	for _, op := range m.options.Privilege.Operations() {
 		if flow.scope.Allows(op) {
@@ -104,6 +115,9 @@ func (m *Model) privilegeChoices(flow readAccess) {
 		}
 	}
 	choices := []Choice{{ordinary, "ordinary", ""}}
+	if flow.purpose == completeReads {
+		choices[0] = Choice{l("Kembali ke hasil", "Return to results"), "back", ""}
+	}
 	switch {
 	case len(labels) == 0:
 		description = append(description, l("Tugas ini memakai akses biasa.", "This task uses ordinary access."))
@@ -173,9 +187,44 @@ func (m *Model) finishReadAuthorization(err error) tea.Cmd {
 	}
 	cmd := m.returnTo()
 	if err != nil {
+		m.readErr = err
 		m.toast = privilegeReason(privread.State{Err: err}, m.options.Language)
+		return cmd
+	}
+	if flow.purpose == completeReads {
+		return m.repeatCheck(flow.request)
+	}
+	if m.active == assistant.Settings && len(m.back) > 0 {
+		return m.returnTo()
 	}
 	return cmd
+}
+
+func (m *Model) completeRead(op privread.Operation) tea.Cmd {
+	if m.options.Privilege == nil || m.request == nil || !slices.ContainsFunc(m.page.Choices, func(c Choice) bool {
+		return c.Kind == "complete-read" && c.Value == string(op)
+	}) {
+		return nil
+	}
+	req := *m.request
+	if !startsInspection(req) || !readScope(req.Intent).Allows(op) || req.Plan != nil {
+		return nil
+	}
+	req.Complete = op
+	if req.Intent == assistant.Overview || req.Intent == assistant.Slow {
+		if m.page.Snapshot == nil {
+			return nil
+		}
+		req.Snapshot = m.page.Snapshot
+	} else if req.Intent == assistant.Storage {
+		req.Choice.Kind = "rescan"
+	}
+	if m.options.Privilege.CanRead(op) {
+		return m.repeatCheck(req)
+	}
+	m.remember()
+	m.privilegeChoices(readAccess{purpose: completeReads, scope: privread.Scope(op), request: req})
+	return nil
 }
 
 func privilegeReason(s privread.State, lang string) string {
@@ -211,21 +260,60 @@ func (m *Model) summarizeReads(s *ResultSummary) {
 	if m.readErr != nil && !st.Requested {
 		st = privread.State{Requested: true, Availability: domain.PermissionRequired, Err: m.readErr}
 	}
-	if n := permissionChecks(m.page, m.active); n != 0 {
+	needed := permissionChecks(m.page, m.active)
+	if n := len(needed); n != 0 {
 		s.Coverage += fmt.Sprintf(l(" · %d perlu izin", " · %d need permission"), n)
 	}
 	if st.Requested && !st.Active {
 		s.Statuses = append(s.Statuses, resultStatus{Label: l("Akses baca", "Read access"), Value: privilegeReason(st, m.options.Language), Availability: st.Availability})
-		s.RetryRead = true
-		m.page.Choices = appendChoice(m.page.Choices, m.retryReadChoice())
+	}
+	if m.request == nil || !startsInspection(*m.request) || m.options.Privilege.Capability() != nil {
+		return
+	}
+	for _, op := range m.options.Privilege.Operations() {
+		if readScope(m.request.Intent).Allows(op) && needsRead(m.page, needed, op) {
+			if s.RetryRead == "" {
+				s.RetryRead = op
+			}
+			m.page.Choices = appendChoice(m.page.Choices, m.retryReadChoice(op))
+		}
 	}
 }
 
-func (m Model) retryReadChoice() Choice {
-	return Choice{Label: m.tr(Words{"Coba izin baca lagi", "Retry read authorization"}), Kind: "deep-scope"}
+var retryLabels = map[privread.Operation]Words{
+	privread.SMART:       {"Lengkapi pemeriksaan SSD", "Complete the SSD check"},
+	privread.TRIM:        {"Lengkapi pemeriksaan TRIM", "Complete the TRIM check"},
+	privread.Power:       {"Lengkapi pemeriksaan daya", "Complete the power check"},
+	privread.Temperature: {"Lengkapi pembacaan suhu", "Complete the temperature reading"},
+	privread.GPU:         {"Lengkapi pemeriksaan GPU", "Complete the GPU check"},
+	privread.Firmware:    {"Lengkapi inventaris firmware", "Complete the firmware inventory"},
+	privread.Filesystem:  {"Lengkapi inventaris filesystem", "Complete the filesystem inventory"},
 }
 
-func permissionChecks(page Page, intent assistant.Intent) int {
+func (m Model) retryReadChoice(op privread.Operation) Choice {
+	label := m.tr(retryLabels[op])
+	if st := m.options.Privilege.State(); errors.Is(st.Err, privread.ErrExpired) {
+		label += m.tr(Words{" · izin habis", " · access expired"})
+	}
+	return Choice{Label: label, Kind: "complete-read", Value: string(op)}
+}
+
+func needsRead(page Page, needed map[workflow.Check]bool, op privread.Operation) bool {
+	switch op {
+	case privread.SMART:
+		return needed[workflow.SSDCheck]
+	case privread.TRIM:
+		return needed[workflow.TRIMCheck]
+	case privread.Power:
+		return needed[workflow.PowerCheck] || needed[workflow.Check(assistant.Recommend)]
+	case privread.Temperature:
+		return page.Snapshot != nil && page.Snapshot.Input.Overview != nil && page.Snapshot.Input.Overview.Temperature.Availability == domain.PermissionRequired
+	default:
+		return needed[workflow.Check(op)]
+	}
+}
+
+func permissionChecks(page Page, intent assistant.Intent) map[workflow.Check]bool {
 	needed := make(map[workflow.Check]bool)
 	for _, check := range page.Coverage {
 		if check.Status == domain.PermissionRequired {
@@ -264,7 +352,11 @@ func permissionChecks(page Page, intent assistant.Intent) int {
 		}
 	}
 	if len(needed) == 0 && page.Availability == domain.PermissionRequired {
-		needed[workflow.Check(intent)] = true
+		if intent == assistant.Storage {
+			needed[workflow.SSDCheck] = true
+		} else {
+			needed[workflow.Check(intent)] = true
+		}
 	}
-	return len(needed)
+	return needed
 }

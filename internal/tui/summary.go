@@ -10,6 +10,7 @@ import (
 	"github.com/christiandoxa/whwmpc/internal/assistant"
 	"github.com/christiandoxa/whwmpc/internal/diagnostics"
 	"github.com/christiandoxa/whwmpc/internal/domain"
+	"github.com/christiandoxa/whwmpc/internal/privread"
 	"github.com/christiandoxa/whwmpc/internal/workflow"
 )
 
@@ -20,7 +21,7 @@ type ResultSummary struct {
 	Statuses           []resultStatus
 	Highlights         []string
 	Primary            Choice
-	RetryRead          bool
+	RetryRead          privread.Operation
 }
 
 type resultMetric struct {

@@ -21,22 +21,28 @@ import (
 
 type Scanner struct {
 	platform.Provider
-	Privilege *privread.Session
-	runner    sysrun.Runner
-	demo      bool
-	cache     sync.Mutex
-	smart     storage.SMARTAudit
+	Privilege           *privread.Session
+	DemoSMARTPermission bool
+	runner              sysrun.Runner
+	demo                bool
+	cache               sync.Mutex
+	smart               storage.SMARTAudit
 }
 
 func (s *Scanner) Overview(ctx context.Context) domain.Overview {
 	o := s.Provider.Overview(ctx)
 	if o.Temperature.Celsius == nil || o.Temperature.Availability != domain.Available {
-		var t domain.Temperature
-		if s.read(ctx, privread.Temperature, &t) && (t.Celsius != nil || o.Temperature.Celsius == nil) {
+		if t, ok := s.PrivilegedTemperature(ctx); ok && (t.Celsius != nil || o.Temperature.Celsius == nil) {
 			o.Temperature = t
 		}
 	}
 	return o
+}
+
+func (s *Scanner) PrivilegedTemperature(ctx context.Context) (domain.Temperature, bool) {
+	var reading domain.Temperature
+	ok := s.read(ctx, privread.Temperature, &reading)
+	return reading, ok
 }
 
 func (s *Scanner) read(ctx context.Context, op privread.Operation, out any) bool {
@@ -70,7 +76,13 @@ func (s *Scanner) CPUTemperatureProbe() func(context.Context) *float64 {
 
 func (s *Scanner) SMART(ctx context.Context, fresh bool) storage.SMARTAudit {
 	if s.demo {
-		return demoSMART()
+		audit := demoSMART()
+		if s.DemoSMARTPermission && (s.Privilege == nil || !s.Privilege.CanRead(privread.SMART)) {
+			audit.Availability = domain.PermissionRequired
+			audit.Drives[0].Availability = domain.PermissionRequired
+			audit.Drives[0].Health = nil
+		}
+		return audit
 	}
 	var privileged storage.SMARTAudit
 	if s.read(ctx, privread.SMART, &privileged) {

@@ -11,8 +11,10 @@ import (
 	"github.com/christiandoxa/whwmpc/internal/assistant"
 	"github.com/christiandoxa/whwmpc/internal/diagnostics"
 	"github.com/christiandoxa/whwmpc/internal/domain"
+	"github.com/christiandoxa/whwmpc/internal/inspection"
 	"github.com/christiandoxa/whwmpc/internal/platform"
 	"github.com/christiandoxa/whwmpc/internal/privread"
+	"github.com/christiandoxa/whwmpc/internal/state"
 	"github.com/christiandoxa/whwmpc/internal/workflow"
 )
 
@@ -115,6 +117,7 @@ func TestFailedAuthorizationKeepsCoverageAndRetry(t *testing.T) {
 	}
 	m := New(t.Context(), platform.Demo{}, nil, Options{Language: "en", Motion: "off", Privilege: access})
 	m.screen, m.active = results, assistant.Overview
+	m.request = &Request{Intent: assistant.Overview}
 	m.page = Page{Availability: domain.Partial, Coverage: []workflow.Coverage{
 		{ID: workflow.SSDCheck, Status: domain.PermissionRequired}, {ID: workflow.SystemCheck, Status: domain.Available},
 	}, Findings: []diagnostics.Finding{{Category: "ssd", Availability: domain.PermissionRequired}, {Category: "ssd", Availability: domain.PermissionRequired}}}
@@ -122,9 +125,108 @@ func TestFailedAuthorizationKeepsCoverageAndRetry(t *testing.T) {
 	m.summarizeReads(&summary)
 	m.page.Summary = &summary
 	got := m.View().Content
-	for _, want := range []string{"1 need permission", "Authorization cancelled", "Retry read authorization", "Ordinary"} {
+	for _, want := range []string{"1 need permission", "Authorization cancelled", "Complete the SSD check", "Ordinary"} {
 		if !strings.Contains(got, want) {
 			t.Fatalf("view missing %q: %s", want, got)
 		}
+	}
+}
+
+func TestSSDRetryKeepsGoalAndOtherReadings(t *testing.T) {
+	access := privread.New(privread.Backend{}, true)
+	defer access.Disable()
+	scanner := inspection.New(true)
+	scanner.Privilege, scanner.DemoSMARTPermission = access, true
+	store := state.Store{}
+	inspect := Inspector(scanner, store, workflow.NewMaintenance(store, true))
+	var requests []Request
+	m := New(t.Context(), scanner, func(ctx context.Context, req Request) Page {
+		requests = append(requests, req)
+		return inspect(ctx, req)
+	}, Options{Demo: true, Language: "en", Motion: "off", Privilege: access})
+	enter := tea.KeyPressMsg{Code: tea.KeyEnter}
+	m = step(m, enter)
+	next, scan := m.Update(enter)
+	m = step(next.(Model), scan())
+	old := m.page.Snapshot
+	if old.Input.SMART.Availability != domain.PermissionRequired || m.page.Summary.RetryRead != privread.SMART {
+		t.Fatal("ordinary access did not offer to complete unread SMART")
+	}
+	for i, choice := range m.choices() {
+		if choice.Kind == "complete-read" {
+			m.choice = i
+			break
+		}
+	}
+	choice, back := m.choice, len(m.back)
+	for _, failure := range []error{privread.ErrCancelled, context.DeadlineExceeded, privread.ErrExpired, nil} {
+		m = step(m, enter)
+		if m.access == nil || m.access.scope != privread.Scope(privread.SMART) || m.choices()[m.choice].Kind != "back" {
+			t.Fatal("retry did not ask for the missing read only")
+		}
+		m = step(m, tea.KeyPressMsg{Code: tea.KeyUp})
+		m = step(m, enter)
+		job := m.job
+		m = step(m, privilegeMsg{job - 1, privread.ErrDenied})
+		if !m.busy || len(requests) != 1 {
+			t.Fatal("obsolete reply interrupted authorization")
+		}
+		if failure == nil {
+			exec := foregroundReads{ctx: t.Context(), access: access, stdin: os.Stdin, scope: m.access.scope}
+			if err := exec.Run(); err != nil {
+				t.Fatal(err)
+			}
+		}
+		next, scan = m.Update(privilegeMsg{job, failure})
+		m = next.(Model)
+		if failure != nil {
+			if scan != nil || m.page.Snapshot != old || m.choice != choice || len(m.back) != back || m.readErr != failure {
+				t.Fatal("failed authorization altered the task or the displayed reading")
+			}
+			continue
+		}
+		if scan == nil || m.request.Snapshot != old || m.request.Complete != privread.SMART || m.request.Plan != nil {
+			t.Fatal("authorization did not resume the requested component")
+		}
+		m = step(m, scan())
+	}
+	in := m.page.Snapshot.Input
+	if m.screen != results || m.active != assistant.Overview || in.SMART.Availability != domain.Available ||
+		in.Overview != old.Input.Overview || in.Power != old.Input.Power || in.Trim != old.Input.Trim || len(requests) != 2 {
+		t.Fatal("completing SMART changed unrelated readings or navigated away")
+	}
+	newSnapshot := m.page.Snapshot
+	m.start(assistant.Settings, Choice{})
+	m.start(assistant.Settings, Choice{Kind: "check-level"})
+	m = step(m, enter)
+	if m.page.Snapshot != newSnapshot || m.active != assistant.Overview || access.State().Active || len(requests) != 2 {
+		t.Fatal("ordinary mode did not restore the same result without reading again")
+	}
+}
+
+func TestRepeatReadingFeedbackAndRollback(t *testing.T) {
+	scanner := inspection.New(true)
+	inspect := Inspector(scanner, state.Store{}, workflow.NewMaintenance(state.Store{}, true))
+	m := New(t.Context(), scanner, inspect, Options{Demo: true, Language: "en", Motion: "off"})
+	enter := tea.KeyPressMsg{Code: tea.KeyEnter}
+	next, scan := m.Update(enter)
+	m = step(next.(Model), scan())
+	old := m.page.Snapshot
+	rescan := Choice{Kind: "rescan"}
+	for _, cancel := range []bool{true, false} {
+		scan = m.start(assistant.Overview, rescan)
+		if !m.busy || scan == nil || !strings.Contains(m.workName, "new measurements") {
+			t.Fatal("repeat check gave no feedback")
+		}
+		if cancel {
+			m = step(m, tea.KeyPressMsg{Code: tea.KeyEsc})
+		}
+		m = step(m, scan())
+		if cancel && (m.page.Snapshot != old || m.toast != "Check stopped") {
+			t.Fatal("cancellation lost the previous result")
+		}
+	}
+	if m.page.Snapshot == old || m.toast != "Repeat check finished" {
+		t.Fatal("the same readings hid the new attempt")
 	}
 }
