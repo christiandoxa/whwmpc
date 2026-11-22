@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.4.0
+
+- Piko menawarkan Pemeriksaan Biasa atau Mendalam saat startup. Mendalam memakai helper baca terbatas melalui `sudo` di Linux dan macOS atau UAC di Windows. Pengguna bisa mengganti mode di Pengaturan. CLI menyediakan `--privileged-read` untuk otorisasi yang sudah tersedia.
+- Ringkasan menampilkan bar CPU, RAM, dan filesystem dari snapshot, waktu sampel, serta jumlah pemeriksaan yang memerlukan izin. Detail membedakan status SMART, dukungan dan bukti TRIM, profil dan clock, estimasi pembersihan, serta hasil verifikasi tindakan.
+- Layout memakai satu area hasil dengan ukuran minimum 48×18. Di bawah ukuran itu, Esc dan `q` tetap dapat digunakan. Ekspor hasil memakai snapshot yang sudah terbuka.
+
 ## 0.3.9
 
 - Rencana batas clock AMDGPU memakai minimum untuk slot Fmax yang terverifikasi. SMU 13.0.0/7/10 dapat memakai layout `pp_table` yang dikenali dan cocok dengan `OD_RANGE`.

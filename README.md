@@ -25,10 +25,10 @@ Gunakan `~/.local/bin/whwmpc --demo` untuk mencoba data simulasi. Jika `~/.local
 Untuk memasang versi tertentu, sertakan tag rilis.
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/christiandoxa/whwmpc/main/install.sh | sh -s -- v0.1.0
+curl -fsSL https://raw.githubusercontent.com/christiandoxa/whwmpc/main/install.sh | sh -s -- v0.4.0
 ```
 
-Jika sudah punya checkout repo, jalankan `./install.sh` atau `./install.sh v0.1.0` dari direktori repo. [Skrip installer](install.sh)
+Jika sudah punya checkout repo, jalankan `./install.sh` atau `./install.sh v0.4.0` dari direktori repo. [Skrip installer](install.sh)
 
 ### Windows
 
@@ -47,10 +47,10 @@ Gunakan `& $exe --demo` untuk mencoba data simulasi. Jalankan ulang `& $installe
 Untuk memasang versi tertentu yang menyediakan arsip Windows, sertakan tag rilis.
 
 ```powershell
-& $installer -Version v0.3.9
+& $installer -Version v0.4.0
 ```
 
-Jika sudah punya checkout repo, jalankan `.\install.ps1` atau `.\install.ps1 -Version v0.3.9` dari direktori repo. [Skrip PowerShell](install.ps1)
+Jika sudah punya checkout repo, jalankan `.\install.ps1` atau `.\install.ps1 -Version v0.4.0` dari direktori repo. [Skrip PowerShell](install.ps1)
 
 ### Instalasi manual
 
@@ -58,7 +58,7 @@ Untuk instalasi dari arsip di Linux, macOS, atau Windows, pilih paket yang cocok
 
 ### Navigasi
 
-Pada build `main` dengan fitur pemeriksaan mendalam, Enter di layar startup memilih **Pemeriksaan biasa**. Pilih **Pemeriksaan mendalam** untuk melihat cakupan baca tambahan dan meminta izin lewat prompt sistem operasi. Ganti mode dari **Lainnya… → Pengaturan → Tingkat pemeriksaan**. [Cakupan Linux, macOS, dan Windows](docs/PRIVILEGE.md)
+Sejak `v0.4.0`, Enter di layar startup memilih **Pemeriksaan biasa**. Pilih **Pemeriksaan mendalam** untuk melihat cakupan baca tambahan dan meminta izin lewat prompt sistem operasi. Ganti mode dari **Lainnya… → Pengaturan → Tingkat pemeriksaan**. [Cakupan Linux, macOS, dan Windows](docs/PRIVILEGE.md)
 
 Beranda menyediakan **Cek kondisi PC**, **PC terasa lambat**, dan **Bersihkan ruang**. Tekan Enter pada pilihan pertama untuk memulai pemeriksaan. Gunakan **Lainnya…** untuk SSD, TRIM, daya, riwayat, laporan, pengaturan, dan pertanyaan bebas. **Tugas lanjutan** membuka GPU, firmware, filesystem, benchmark, dan status observasi terjadwal.
 
