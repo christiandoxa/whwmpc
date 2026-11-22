@@ -6,6 +6,8 @@
 
 [Sebelum](docs/assets/ux/before-80.png) · [Sesudah](docs/assets/ux/after-80.png) · [Demo Piko](docs/assets/piko-demo.gif) · [Alur dan rekaman PTY](docs/UX.md)
 
+Ringkasan hasil menampilkan bar CPU, RAM, dan disk, suhu terbaca, serta status SSD, TRIM, dan profil daya. Gunakan Enter untuk melihat detail dan Esc untuk kembali. [Cek kondisi pada 80×24](docs/assets/ux/results/overview-80x24.after.png) · [Rekaman](docs/assets/ux/results/overview-80x24.cast) · [Perbandingan layar hasil](docs/UX.md#bukti-dari-pty)
+
 ## Mulai
 
 ### Linux
