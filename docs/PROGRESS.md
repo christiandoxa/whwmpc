@@ -66,3 +66,7 @@ Checkpoint awal di `main` mencakup `db4f687` (fondasi), `01f01ca` (asisten), `a5
 Audit akhir menguji pembatas subprocess dengan keluaran yang melampaui kuota pada stdout dan stderr. Buffer penyimpanan memakai field bernama agar fast path `io.Copy` tidak melewati pembatas.
 
 Pemeriksaan ulang overview melalui pilihan tindakan dan tombol `r` memakai jalur yang sama. Esc menghentikan scan dan mempertahankan snapshot terakhir. Diagnosis lambat mengambil sampel baru saat diminta ulang.
+
+## Revamp UX 1 · Beranda dan navigasi
+
+Beranda dengan tiga tujuan dan Lainnya menggantikan dashboard. Satu kolom, daftar vertikal, layar pertanyaan tersendiri, dan back stack menggantikan perpindahan fokus dan carousel. Job mulai setelah pengguna memilih pemeriksaan. Gate mencakup format, vet, tes model/race, build, dan smoke PTY.

@@ -15,13 +15,13 @@ func (w Words) Text(lang string) string {
 }
 
 var menuNames = map[assistant.Intent]Words{
-	assistant.Overview:  {"Cek keseluruhan", "Check overall"},
-	assistant.Slow:      {"Cari penyebab lambat", "Diagnose slowdown"},
+	assistant.Overview:  {"Cek kondisi PC", "Check PC condition"},
+	assistant.Slow:      {"PC terasa lambat", "PC feels slow"},
 	assistant.Storage:   {"Kesehatan SSD", "SSD health"},
-	assistant.Trim:      {"Periksa TRIM", "Check TRIM"},
-	assistant.Power:     {"CPU & daya", "CPU & power"},
+	assistant.Trim:      {"Perawatan SSD / TRIM", "Check TRIM"},
+	assistant.Power:     {"Daya & performa", "CPU & power"},
 	assistant.Cleanup:   {"Bersihkan ruang", "Free up space"},
-	assistant.Recommend: {"Rekomendasi", "Recommendations"},
+	assistant.Recommend: {"Daya & performa", "Power & performance"},
 	assistant.History:   {"Riwayat", "History"},
 	assistant.Settings:  {"Pengaturan", "Settings"},
 	assistant.Report:    {"Laporan", "Report"},

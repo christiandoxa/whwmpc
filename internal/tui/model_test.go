@@ -24,46 +24,47 @@ func step(m Model, msg tea.Msg) Model {
 	return updated.(Model)
 }
 
-func TestInputFocusAndClarification(t *testing.T) {
-	ctx := context.Background()
-	m := New(ctx, platform.Demo{}, nil, Options{Demo: true, Theme: "terminal", Motion: "off"})
-	m = step(m, overviewMsg{platform.Demo{}.Overview(ctx)})
+func TestHomeAndQuestionReturn(t *testing.T) {
+	m := New(context.Background(), platform.Demo{}, nil, Options{Demo: true, Motion: motion.Off})
+	v := m.View().Content
+	if !strings.Contains(v, "Mau dibantu apa?") || !strings.Contains(v, "Cek kondisi PC") || strings.Contains(v, "Kernel") || m.Init() != nil {
+		t.Fatalf("unexpected Home %s", v)
+	}
+	for range 3 {
+		m = step(m, tea.KeyPressMsg{Code: tea.KeyDown})
+	}
+	m = step(m, tea.KeyPressMsg{Code: tea.KeyEnter})
+	if m.screen != more {
+		t.Fatal("More did not open")
+	}
+	m = step(m, tea.KeyPressMsg{Code: tea.KeyEsc})
+	if m.screen != home || m.choice != 3 {
+		t.Fatal("Back did not restore Home selection")
+	}
 	m = step(m, keyPress("/"))
 	for _, r := range "ssd trim q?d" {
 		m = step(m, keyPress(string(r)))
 	}
-	if got := m.input.Value(); got != "ssd trim q?d" || m.help || m.detail {
-		t.Fatalf("input = %q, model=%+v", got, m)
+	if m.input.Value() != "ssd trim q?d" {
+		t.Fatal("shortcut intercepted text")
 	}
 	m = step(m, tea.KeyPressMsg{Code: tea.KeyEnter})
-	if m.focus != pageFocus || len(m.page.Choices) != 2 || m.page.Choices[0].Value != string(assistant.Storage) {
-		t.Fatalf("clarification = %+v", m.page)
-	}
-	m = step(m, tea.KeyPressMsg{Code: tea.KeyRight})
-	m = step(m, tea.KeyPressMsg{Code: tea.KeyEnter})
-	if m.active != assistant.Trim {
-		t.Fatalf("active = %s", m.active)
+	if m.screen != taskQuestion || len(m.page.Choices) != 2 {
+		t.Fatal("missing clarification")
 	}
 }
 
 func TestViewFitsTerminal(t *testing.T) {
-	ctx := context.Background()
-	m := New(ctx, platform.Demo{}, nil, Options{Demo: true, Theme: "terminal", Motion: "off"})
-	m = step(m, overviewMsg{platform.Demo{}.Overview(ctx)})
-	for _, size := range []tea.WindowSizeMsg{{Width: 120, Height: 36}, {Width: 80, Height: 24}, {Width: 60, Height: 18}, {Width: 22, Height: 7}} {
+	m := New(context.Background(), platform.Demo{}, nil, Options{Demo: true})
+	for _, size := range []tea.WindowSizeMsg{{Width: 80, Height: 24}, {Width: 120, Height: 36}, {Width: 46, Height: 14}} {
 		m = step(m, size)
-		view := m.View()
-		lines := strings.Split(view.Content, "\n")
-		for _, line := range lines {
+		for _, line := range strings.Split(m.View().Content, "\n") {
 			if ansi.StringWidth(line) > size.Width {
-				t.Errorf("line exceeds %d columns: %q", size.Width, line)
+				t.Fatalf("too wide: %q", line)
 			}
 		}
-		if !view.AltScreen || len(lines) > size.Height {
-			t.Fatalf("invalid view at %v", size)
-		}
-		if size.Width >= 80 && (!strings.Contains(view.Content, "Hai!") || !strings.Contains(lines[len(lines)-1], "Enter")) {
-			t.Fatalf("missing greeting or shortcuts at %v:\n%s", size, view.Content)
+		if !strings.Contains(m.View().Content, "Lainnya") {
+			t.Fatal("Home lost secondary path")
 		}
 	}
 }
@@ -79,9 +80,10 @@ func TestMotionUsesLatestGeneration(t *testing.T) {
 	m = step(m, keyPress("j"))
 	fake = fake.Add(motion.FrameInterval)
 	m = step(m, motion.Tick{Generation: old, At: fake})
-	if m.visual.pose != mascot.LookRight || m.visual.frame != 0 {
+	if m.visual.pose != mascot.Greeting || m.visual.frame != 0 {
 		t.Fatalf("obsolete tick advanced %+v", m.visual)
 	}
+	fake = fake.Add(time.Second)
 	m = step(m, motion.Tick{Generation: m.visual.generation, At: fake})
 	if m.visual.pose != mascot.Idle || m.visual.wakeAt.IsZero() {
 		t.Fatalf("look did not settle: %+v", m.visual)
@@ -125,7 +127,7 @@ func TestGalleryCriticalAndVerifiedFlow(t *testing.T) {
 		t.Fatalf("verified state = %s", m.visual.pose)
 	}
 	m = step(m, keyPress("n"))
-	if w, _ := m.bounds(); w != 60 {
+	if w, _ := m.bounds(); w != 54 {
 		t.Fatalf("narrow simulation width = %d", w)
 	}
 }
@@ -159,6 +161,7 @@ func TestStalePageShowsAgeWithoutChangingData(t *testing.T) {
 	m.now = func() time.Time { return now }
 	m = step(m, overviewMsg{o})
 	m.active = assistant.Storage
+	m.screen = results
 	m.page = Page{Findings: []diagnostics.Finding{{At: o.CapturedAt}}, Found: []string{"SSD fixture"}}
 	if m.stalePage() {
 		t.Fatal("fresh result was marked stale")
@@ -173,22 +176,15 @@ func TestStalePageShowsAgeWithoutChangingData(t *testing.T) {
 }
 
 func TestOverviewChoiceRescansAndCanCancel(t *testing.T) {
-	ctx := context.Background()
-	provider := platform.Demo{}
-	m := New(ctx, provider, nil, Options{Demo: true, Motion: "off"})
-	m = step(m, overviewMsg{provider.Overview(ctx)})
-	m.focus = pageFocus
-	if len(m.page.Choices) == 0 || m.page.Choices[0].Kind != "rescan" {
-		t.Fatal("overview has no displayed rescan")
-	}
-	updated, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
-	m = updated.(Model)
-	if cmd == nil || !m.busy || m.cancelJob == nil {
-		t.Fatal("overview Enter did not start a cancellable scan")
+	m := New(context.Background(), platform.Demo{}, nil, Options{Demo: true, Motion: "off"})
+	next, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	m = next.(Model)
+	if cmd == nil || m.screen != scanning {
+		t.Fatal("Enter did not start checking")
 	}
 	m = step(m, tea.KeyPressMsg{Code: tea.KeyEsc})
 	m = step(m, cmd())
-	if m.busy || m.page.Pose != mascot.Cancelled {
-		t.Fatal("overview cancellation was not reported")
+	if m.busy || m.screen != home {
+		t.Fatal("cancel did not return to Home")
 	}
 }

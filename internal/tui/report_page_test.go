@@ -9,6 +9,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
+	"github.com/christiandoxa/whwmpc/internal/assistant"
 	"github.com/christiandoxa/whwmpc/internal/inspection"
 	"github.com/christiandoxa/whwmpc/internal/state"
 	"github.com/christiandoxa/whwmpc/internal/tui/mascot"
@@ -23,10 +24,10 @@ func TestExportPickerUsesExplicitPathAndPiko(t *testing.T) {
 	inspector := Inspector(scanner, store, workflow.NewMaintenance(store, true))
 	m := New(ctx, scanner, inspector, Options{Demo: true, Language: "en", Motion: "off"})
 	m = step(m, overviewMsg{scanner.Overview(ctx)})
-	m = step(m, keyPress("e"))
-	m = step(m, tea.KeyPressMsg{Code: tea.KeyRight})
+	m.start(assistant.Report, Choice{})
+	m = step(m, tea.KeyPressMsg{Code: tea.KeyDown})
 	m = step(m, tea.KeyPressMsg{Code: tea.KeyEnter})
-	if m.focus != inputFocus || m.exportType != "json" {
+	if m.screen != fileInput || m.exportType != "json" {
 		t.Fatal("export did not request a user-reviewed path")
 	}
 	path := filepath.Join(dir, "fixture.json")

@@ -131,30 +131,6 @@ func (m *Model) motionTick(msg motion.Tick) {
 	m.scheduleMotion(msg.At)
 }
 
-func (m *Model) showingFocus() {
-	switch m.focus {
-	case inputFocus:
-		m.show(mascot.Listening, "", false)
-	case menuFocus:
-		pose := mascot.LookLeft
-		if m.selected%2 == 1 {
-			pose = mascot.LookRight
-		}
-		if m.busy {
-			m.show(pose, m.activity, false)
-		} else {
-			m.show(pose, replyPose(m.page), false)
-		}
-	default:
-		if m.busy {
-			m.show(m.activity, "", true)
-		} else {
-			m.show(replyPose(m.page), "", false)
-		}
-	}
-	m.accent(true, false)
-}
-
 func poseFor(intent assistant.Intent) mascot.Pose {
 	switch intent {
 	case assistant.Storage:

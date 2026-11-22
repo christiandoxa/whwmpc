@@ -33,11 +33,11 @@ func TestApplyRequiresDisplayedPlanAndConfirmation(t *testing.T) {
 	}
 	m := New(ctx, platform.Demo{}, run, Options{Language: "en", Motion: "off"})
 	m = step(m, overviewMsg{platform.Demo{}.Overview(ctx)})
-	m.active, m.focus, m.page = assistant.Cleanup, pageFocus, planPage(plan, "en")
+	m.active, m.screen, m.page = assistant.Cleanup, reviewPlan, planPage(plan, "en")
 	if cmd := m.start(assistant.Cleanup, Choice{Kind: "apply", Value: plan.ID}); cmd != nil {
 		t.Fatal("preview allowed apply before confirmation")
 	}
-	m = step(m, tea.KeyPressMsg{Code: tea.KeyRight})
+	m = step(m, tea.KeyPressMsg{Code: tea.KeyDown})
 	m = step(m, tea.KeyPressMsg{Code: tea.KeyEnter})
 	if !m.page.Confirm || m.page.Pose != mascot.Confirm || m.page.Choices[m.choice].Kind != "cancel-plan" {
 		t.Fatalf("confirmation is not bound or defaults to apply: %+v", m.page)
@@ -45,13 +45,13 @@ func TestApplyRequiresDisplayedPlanAndConfirmation(t *testing.T) {
 	if cmd := m.start(assistant.Cleanup, Choice{Kind: "apply", Value: "different"}); cmd != nil {
 		t.Fatal("different ID was accepted")
 	}
-	m = step(m, tea.KeyPressMsg{Code: tea.KeyRight})
-	m = step(m, keyPress("d"))
+	m = step(m, tea.KeyPressMsg{Code: tea.KeyDown})
+	m = step(m, keyPress("?"))
 	m = step(m, tea.KeyPressMsg{Code: tea.KeyEnter})
 	if m.busy {
 		t.Fatal("invoked hidden apply from detail panel")
 	}
-	m = step(m, keyPress("d"))
+	m = step(m, keyPress("?"))
 	m = step(m, tea.WindowSizeMsg{Width: 22, Height: 7})
 	m = step(m, tea.KeyPressMsg{Code: tea.KeyEnter})
 	if m.busy {

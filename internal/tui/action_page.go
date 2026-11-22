@@ -71,6 +71,10 @@ func (m *Model) launch(req Request, pose mascot.Pose) tea.Cmd {
 	m.cancelJob = cancel
 	m.show(m.activity, "", req.Choice.Kind != "apply")
 	m.page = Page{}
+	m.screen = scanning
+	if req.Choice.Kind == "apply" {
+		m.screen = executing
+	}
 	sender := m.options.Send
 	if sender != nil {
 		req.Progress = func(stage actions.Stage) { sender(stageMsg{job, stage}) }
@@ -88,7 +92,12 @@ func (m *Model) launch(req Request, pose mascot.Pose) tea.Cmd {
 }
 
 func (m Model) doRequest(ctx context.Context, job uint64, req Request) tea.Cmd {
-	return func() tea.Msg { return replyMsg{job, m.inspect(ctx, req)} }
+	return func() tea.Msg {
+		if req.Intent == assistant.Overview && (req.Choice.Kind == "" || req.Choice.Kind == "rescan") {
+			return replyMsg{job, m.overviewFindingPage(m.source.Overview(ctx))}
+		}
+		return replyMsg{job, m.inspect(ctx, req)}
+	}
 }
 
 func (m *Model) updateStage(msg stageMsg) {
@@ -123,12 +132,6 @@ func (m *Model) cancelCurrent() bool {
 		m.show(mascot.Cancelled, "", false)
 	}
 	return true
-}
-
-func (m *Model) cancelPreview() {
-	m.page = cancellationPage(m.options.Language, m.active)
-	m.choice, m.scroll, m.detail = 0, 0, false
-	m.showReply()
 }
 
 func aimFor(intent assistant.Intent, choice Choice, plan *actions.Plan) mascot.Pose {
@@ -242,7 +245,7 @@ func (m *Model) confirmPage() {
 		{Label: l("Batalkan", "Cancel"), Kind: "cancel-plan"},
 		{Label: l("Terapkan rencana ini", "Apply this plan"), Kind: "apply", Value: page.Plan.ID},
 	}
-	m.choice, m.scroll, m.detail = 0, 0, false
+	m.choice, m.scroll = 0, 0
 	m.showReply()
 }
 

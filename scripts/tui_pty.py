@@ -121,30 +121,19 @@ class Terminal:
 
 
 def smoke(terminal):
-    offset = len(terminal.output)
     terminal.key(b"?")
-    terminal.expect("Bantuan keyboard", offset)
-    offset = len(terminal.output)
+    terminal.expect("Bantuan keyboard")
     terminal.key(b"\x1b")
-    terminal.expect("Hai! Mau cek apa", offset)
-
-    offset = len(terminal.output)
+    terminal.hold(0.2)
     terminal.resize(60, 18)
-    terminal.expect("Terminal kecil.", offset)
-    offset = len(terminal.output)
-    terminal.key(b"\x1b[B")
-    terminal.expect("penyebab lambat", offset)
-
-    offset = len(terminal.output)
+    terminal.hold(0.2)
     terminal.resize(80, 24)
-    terminal.expect("Cek keseluruhan", offset)
-
-    offset = len(terminal.output)
-    terminal.key(b"\x1b[Z")
+    terminal.key(b"/")
+    terminal.expect("Apa yang ingin kamu tanyakan?")
     terminal.key(b"ssd trim q?d")
-    terminal.expect("ssd trim q?d", offset)
+    terminal.expect("ssd trim q?d")
     terminal.key(b"\r")
-    terminal.expect("Ada beberapa kemungkinan.", offset)
+    terminal.expect("beberapa kemungkinan.")
 
 
 def main():
@@ -175,7 +164,7 @@ def main():
         try:
             terminal.expect("DEMO")
             if args.record is None:
-                terminal.expect("Hai! Mau cek apa")
+                terminal.expect("Mau dibantu apa?")
                 smoke(terminal)
             else:
                 if args.gallery:

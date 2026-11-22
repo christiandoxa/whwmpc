@@ -2,7 +2,7 @@ package tui
 
 import (
 	"fmt"
-	"math"
+	"slices"
 	"strings"
 	"time"
 
@@ -11,7 +11,6 @@ import (
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
 
-	"github.com/christiandoxa/whwmpc/internal/assistant"
 	"github.com/christiandoxa/whwmpc/internal/domain"
 	"github.com/christiandoxa/whwmpc/internal/tui/mascot"
 	"github.com/christiandoxa/whwmpc/internal/tui/motion"
@@ -46,443 +45,178 @@ func inputStyles(p palette) textinput.Styles {
 	return textinput.Styles{Focused: focused, Blurred: focused, Cursor: textinput.CursorStyle{Blink: false}}
 }
 
-func (m Model) bounds() (w, h int) {
-	w, h = min(138, max(1, m.width)), min(38, max(1, m.height))
+func (m Model) bounds() (int, int) {
 	if m.narrow {
-		return min(w, 60), min(h, 18)
+		return min(m.width, 58) - 4, min(m.height, 18)
 	}
-	return w, h
+	return max(1, min(m.width-4, 76)), m.height
 }
 
-func (m Model) split() (nav, session, evidence int) {
-	w, h := m.bounds()
-	w -= 2
-	if w < 74 || h < 22 {
-		return 0, max(1, w), 0
-	}
-	nav = 26
-	if w >= 102 {
-		evidence = min(32, w/4)
-	}
-	session = w - nav - evidence - 1
-	if evidence > 0 {
-		session--
-	}
-	return nav, session, evidence
-}
-
-func (m Model) sessionWidth() int {
-	_, session, _ := m.split()
-	return session
-}
-
-func (m Model) panelHeight() int {
-	_, h := m.bounds()
-	if nav, _, _ := m.split(); nav == 0 {
-		return max(4, h-9)
-	}
-	return h - 12
-}
-
-func (m Model) sessionContentHeight() int { return max(1, m.panelHeight()-4) }
-
-func (m Model) View() tea.View {
-	w, h := m.bounds()
-	var lines []string
-	if w < 43 || h < 14 {
-		lines = []string{"What Happens With My PC", "Piko " + mascot.Face(m.visual.pose, m.visual.frame, m.options.ASCII), m.tr(copy.fallback), "q / Ctrl+C"}
-		for i := range lines {
-			lines[i] = ansi.Truncate(lines[i], w, "")
-		}
-		v := tea.NewView(strings.Join(lines[:min(h, len(lines))], "\n"))
-		v.AltScreen = true
-		return v
-	}
-	w -= 2
-	header := m.header(w)
-	lines = append(lines, header...)
-	lines = append(lines, m.palette.frame.Render(strings.Repeat(m.symbol("─", "-"), w)))
-	navW, sessionW, evW := m.split()
-	if navW == 0 {
-		lines = append(lines, m.palette.muted.Render(ansi.Truncate(m.tr(copy.fallback), w, "")))
-		if m.overview.CapturedAt.IsZero() {
-			lines = append(lines, m.palette.muted.Render(m.tr(copy.waiting)))
-		} else {
-			current, _ := m.overview.CPU.Latest()
-			cpu := m.tr(copy.missing)
-			if _, ok := m.overview.CPU.Latest(); ok {
-				cpu = fmt.Sprintf("%.0f%%", current)
-			}
-			lines = append(lines, m.palette.accent.Render("CPU "+cpu)+"  "+m.palette.muted.Render(m.tr(menuNames[assistant.Menu[m.selected]])))
-		}
-	} else {
-		lines = append(lines, strings.Split(m.cards(w), "\n")...)
-	}
-	lines = append(lines, "")
-	parts := []string{m.sessionPanel(sessionW)}
-	if navW > 0 {
-		parts = append([]string{m.navPanel(navW), " "}, parts...)
-	}
-	if evW > 0 {
-		parts = append(parts, " ", m.evidencePanel(evW))
-	}
-	lines = append(lines, strings.Split(lipgloss.JoinHorizontal(lipgloss.Top, parts...), "\n")...)
-	lines = append(lines, "")
-	y := len(lines)
-	lines = append(lines, m.prompt(w), m.footer(w))
-	for i, line := range lines {
-		lines[i] = " " + ansi.Truncate(line, w, "")
-	}
-	v := tea.NewView(strings.Join(lines[:min(h, len(lines))], "\n"))
-	v.AltScreen = true
-	if m.focus == inputFocus && y < h {
-		if c := m.input.Cursor(); c != nil {
-			c.Y = y
-			c.X = min(c.X+ansi.StringWidth(m.tr(copy.ask))+6, w)
-			v.Cursor = c
-		}
-	}
-	return v
-}
-
-func (m Model) symbol(unicode, ascii string) string {
-	if m.options.ASCII {
-		return ascii
-	}
-	return unicode
-}
-
-func (m Model) header(w int) []string {
-	titleStyle := m.palette.accent
-	if m.visual.pose == mascot.Greeting && m.visual.frame < 2 && m.options.Motion == motion.Full {
-		titleStyle = m.palette.secondary
-	}
-	title := titleStyle.Render("WHAT HAPPENS WITH MY PC")
-	host := m.overview.Distro
-	if host == "" {
-		host = m.overview.OS
-	}
-	if m.overview.Arch != "" {
-		host = strings.TrimSpace(host + " / " + m.overview.Arch)
-	}
-	status := m.palette.secondary.Render(m.tr(copy.ready))
-	if m.busy {
-		status = m.palette.secondary.Render(m.tr(copy.scanning))
-		if m.options.Motion == motion.Full {
-			status = m.spinner.View() + " " + status
-		}
-	}
-	if !m.overview.CapturedAt.IsZero() {
-		status += "  " + m.palette.muted.Render(m.overview.CapturedAt.Format("15:04:05"))
-	}
-	if !m.options.Demo && !m.overview.CapturedAt.IsZero() && m.now().Sub(m.overview.CapturedAt) > 30*time.Second {
-		status = m.palette.alert.Render(m.tr(statusNames[domain.Stale])) + "  " + status
-	}
-	if m.critical || m.criticalOverview {
-		status = m.palette.alert.Render(m.tr(Words{"KRITIS", "CRITICAL"})) + "  " + status
-	}
-	sub := m.palette.muted.Render(m.tr(copy.tagline))
-	if m.options.Demo {
-		sub = m.palette.secondary.Render(m.tr(copy.demo))
-	}
-	if _, _, evidence := m.split(); evidence == 0 {
-		status = m.palette.accent.Render(mascot.Face(m.visual.pose, m.visual.frame, m.options.ASCII)+" Piko") + "   " + status
-	}
-	return []string{place(title, m.palette.muted.Render(host), w), place(sub, status, w)}
-}
-
-func place(left, right string, width int) string {
-	right = ansi.Truncate(right, max(0, width-ansi.StringWidth(left)-2), "")
-	spaces := max(0, width-ansi.StringWidth(left)-ansi.StringWidth(right))
-	return left + strings.Repeat(" ", spaces) + right
-}
-
-func (m Model) diskRoot() (domain.Disk, bool) {
-	for _, disk := range m.overview.Disks {
-		if disk.Root && disk.Availability == domain.Available {
-			return disk, true
-		}
-	}
-	return domain.Disk{}, false
-}
-
-func (m Model) cards(w int) string {
-	width := (w - 3) / 4
-	cpu, cpuOK := m.overview.CPU.Latest()
-	mem, memOK := m.overview.Memory.Use.Latest()
-	disk, diskOK := m.diskRoot()
-	temp := m.tr(copy.missing)
-	if m.overview.Temperature.Celsius != nil {
-		temp = fmt.Sprintf("%.0f %s", *m.overview.Temperature.Celsius, m.symbol("°C", "C"))
-	}
-	cpuTrail := m.spark(m.overview.CPU.Samples)
-	memTrail := m.tr(copy.missing)
-	if m.overview.Memory.Availability == domain.Available {
-		memTrail = m.tr(Words{"total", "total"}) + " " + bytesText(m.overview.Memory.TotalBytes)
-	}
-	diskTrail := m.tr(copy.missing)
-	if diskOK {
-		diskTrail = fmt.Sprintf("%s %s", bytesText(disk.FreeBytes), m.tr(Words{"sisa", "free"}))
-	}
-	labels := []string{"CPU", m.tr(copy.memory), m.tr(copy.disk), m.tr(copy.temp)}
-	values := []string{percent(cpu, cpuOK), percent(mem, memOK), percent(disk.UsedPercent, diskOK), temp}
-	trails := []string{cpuTrail, memTrail, diskTrail, m.powerText()}
-	fills := []string{m.meter(cpu, cpuOK, 7), m.meter(mem, memOK, 7), m.meter(disk.UsedPercent, diskOK, 7), ""}
-	var parts []string
-	for i := range labels {
-		if i > 0 {
-			parts = append(parts, " ")
-		}
-		inner := width - 4
-		value := m.palette.text.Bold(true).Render(values[i])
-		if fills[i] != "" {
-			value = place(value, fills[i], inner)
-		}
-		parts = append(parts, m.box(width, 5, labels[i], []string{value, m.palette.muted.Render(trails[i])}, false))
-	}
-	return lipgloss.JoinHorizontal(lipgloss.Top, parts...)
-}
-
-func (m Model) meter(v float64, available bool, width int) string {
-	if !available {
-		return ""
-	}
-	bar := m.meterModel
-	bar.SetWidth(width)
-	return bar.ViewAs(v / 100)
-}
-
-func (m Model) spark(samples []float64) string {
-	if len(samples) == 0 {
-		return m.tr(copy.missing)
-	}
-	shape := []rune(m.symbol("▁▂▃▄▅▆▇█", "._-=+*#@"))
-	var out strings.Builder
-	for _, value := range samples[max(0, len(samples)-10):] {
-		out.WriteRune(shape[int(math.Max(0, math.Min(value/100*float64(len(shape)), float64(len(shape)-1))))])
-	}
-	return m.palette.secondary.Render(out.String())
-}
-
-func (m Model) powerText() string {
-	switch {
-	case m.overview.OnAC != nil && *m.overview.OnAC:
-		if m.overview.Battery != nil {
-			return fmt.Sprintf("AC · %.0f%%", *m.overview.Battery)
-		}
-		return m.tr(copy.connected)
-	case m.overview.Battery != nil:
-		return fmt.Sprintf("%s %.0f%%", m.tr(copy.battery), *m.overview.Battery)
-	default:
-		return m.tr(copy.powerUnknown)
-	}
-}
-
-func (m Model) box(width, height int, title string, lines []string, focus bool) string {
-	border := m.palette.frame
-	head := m.palette.secondary
-	if focus {
-		border, head = m.palette.accent, m.palette.accent
-	}
-	if title == m.tr(copy.session) && !m.visual.panelUntil.IsZero() {
-		border, head = m.palette.secondary, m.palette.secondary
-	}
-	tl, tr := m.symbol("╭", "+"), m.symbol("╮", "+")
-	bl, br := m.symbol("╰", "+"), m.symbol("╯", "+")
-	h, v := m.symbol("─", "-"), border.Render(m.symbol("│", "|"))
-	out := []string{border.Render(tl + strings.Repeat(h, width-2) + tr)}
-	rows := append([]string{head.Render(title)}, lines...)
-	for i := range height - 2 {
-		var text string
-		if i < len(rows) {
-			text = ansi.Truncate(rows[i], width-4, "")
-		}
-		out = append(out, v+" "+text+strings.Repeat(" ", max(0, width-3-ansi.StringWidth(text)))+v)
-	}
-	return strings.Join(append(out, border.Render(bl+strings.Repeat(h, width-2)+br)), "\n")
-}
-
-func (m Model) navPanel(width int) string {
-	var lines []string
-	visible := min(len(assistant.Menu), m.panelHeight()-3)
-	start := max(0, m.selected-visible+1)
-	for index, intent := range assistant.Menu[start : start+visible] {
-		i := start + index
-		name := m.tr(menuNames[intent])
-		line := "  " + name
-		if m.selected == i {
-			style := m.palette.selected
-			if !m.visual.focusUntil.IsZero() && m.focus == menuFocus {
-				style = m.palette.secondary
-			}
-			line = style.Render(m.symbol("›", ">") + " " + name)
-		} else if m.active == intent {
-			line = m.palette.accent.Render(m.symbol("·", "*") + " " + name)
-		}
-		lines = append(lines, line)
-	}
-	return m.box(width, m.panelHeight(), m.tr(copy.menu), lines, m.focus == menuFocus)
-}
-
-func (m Model) sessionPanel(width int) string {
-	height := m.panelHeight()
-	all := m.sessionLines(width - 4)
-	room := m.sessionContentHeight()
-	at := min(m.scroll, max(0, len(all)-room))
-	visible := append([]string(nil), all[at:min(at+room, len(all))]...)
-	action := m.palette.muted.Render(m.tr(menuNames[m.active]))
-	if len(m.page.Choices) > 0 && !m.help && !m.detail && !m.busy {
-		choice := m.page.Choices[m.choice]
-		action = m.palette.secondary.Render(fmt.Sprintf("%s %d/%d %s %s", m.symbol("‹", "<"), m.choice+1, len(m.page.Choices), choice.Label, m.symbol("›", ">")))
-	} else if len(all) > room {
-		action = m.palette.muted.Render(fmt.Sprintf("↕ %d–%d / %d", at+1, min(at+room, len(all)), len(all)))
-	}
-	for len(visible) < room {
-		visible = append(visible, "")
-	}
-	visible = append(visible, action)
-	return m.box(width, height, m.tr(copy.session), visible, m.focus == pageFocus || !m.visual.panelUntil.IsZero())
-}
-
-func (m Model) sessionLines(w int) []string {
-	if w < 1 {
+func (m Model) choices() []Choice {
+	switch m.screen {
+	case scanning, executing, questionInput, fileInput, detail, help:
 		return nil
+	case home, more, gallery, taskQuestion, reviewPlan:
+		return m.page.Choices
 	}
+	choices := slices.Clone(m.page.Choices)
+	if len(m.page.Findings) > 0 || len(m.page.Evidence) > 0 {
+		choices = append(choices, Choice{m.tr(Words{"Lihat semua hasil", "View all results"}), "details", ""})
+	}
+	return append(choices, Choice{m.tr(Words{"Kembali", "Back"}), "back", ""})
+}
+
+func (m Model) reviewFits() bool {
+	w, h := m.bounds()
+	return w >= 40 && len(m.body(w))+len(m.page.Choices) <= h-6
+}
+
+func (m Model) body(w int) []string {
 	var lines []string
-	add := func(s string) {
-		lines = append(lines, strings.Split(ansi.Hardwrap(ansi.Wrap(s, w, ""), w, false), "\n")...)
-	}
-	section := func(title Words, content []string) {
-		if len(content) == 0 {
-			return
-		}
-		add(m.palette.accent.Render(m.tr(title)))
-		for _, entry := range content {
-			add(m.palette.text.Render(domain.SafeText(entry)))
+	l := translator(m.options.Language)
+	text := func(s string, style lipgloss.Style) {
+		for _, line := range strings.Split(ansi.Wrap(domain.SafeText(s), w, ""), "\n") {
+			for _, part := range strings.Split(ansi.Hardwrap(line, w, false), "\n") {
+				lines = append(lines, style.Render(part))
+			}
 		}
 	}
-	switch {
-	case m.help:
-		section(copy.showHelp, []string{
-			"↑/↓ atau j/k · " + m.tr(Words{"navigasi dan gulir", "navigate and scroll"}),
-			"Tab / Shift+Tab · " + m.tr(Words{"pindah fokus", "change focus"}),
-			"Enter · " + m.tr(Words{"buka atau lanjut", "open or continue"}),
-			"/ · " + m.tr(copy.palette),
-			"e · " + m.tr(Words{"ekspor laporan", "export report"}),
-			"s · " + m.tr(Words{"simpan ringkasan", "save summary"}),
-			"m · " + m.tr(Words{"atur mode gerak", "change motion mode"}),
-			"d · " + m.tr(copy.details),
-			"r · " + m.tr(Words{"periksa ulang", "scan again"}),
-			"Esc · " + m.tr(Words{"kembali", "back"}),
-			"q / Ctrl+C · " + m.tr(Words{"keluar", "quit"}),
-		})
-	case m.detail:
-		entries := m.page.Evidence
-		if len(entries) == 0 {
-			entries = []string{m.tr(copy.needsData)}
+	title := func(s string) { text(s, m.palette.accent); lines = append(lines, "") }
+	normal := func(s string) { text(s, m.palette.text) }
+	switch m.screen {
+	case home:
+		title(l("Mau dibantu apa?", "What can I help with?"))
+		text(l("Belum diperiksa", "No checks yet"), m.palette.muted)
+	case more:
+		title(l("Apa yang ingin dibuka?", "What would you like to open?"))
+	case questionInput:
+		title(l("Apa yang ingin kamu tanyakan?", "What would you like to ask?"))
+		text(m.input.View(), m.palette.text)
+	case fileInput:
+		title(l("Simpan ke file mana?", "Where should I save the file?"))
+		text(m.input.View(), m.palette.text)
+	case scanning, executing:
+		label := m.workName
+		if label == "" {
+			label = displayStage(m.activity, m.options.Language)
 		}
-		section(copy.details, entries)
-	case m.overview.CapturedAt.IsZero() && !m.options.Gallery:
-		add(m.palette.text.Bold(true).Render(m.tr(copy.greeting)))
-		add(m.palette.muted.Render(m.tr(copy.initial)))
-		add(m.palette.secondary.Render(m.tr(copy.waiting)))
+		if m.options.Motion == motion.Full && !m.cancelling {
+			label = m.spinner.View() + " " + label
+		}
+		title(label)
+	case help:
+		title(l("Bantuan keyboard", "Keyboard help"))
+		for _, line := range []string{l("↑ / ↓  Pilih atau gulir", "↑ / ↓  Select or scroll"), l("Enter  Buka pilihan", "Enter  Open selection"), l("Esc  Kembali atau minta penghentian", "Esc  Back or request cancellation"), l("/  Buka halaman pertanyaan", "/  Open question entry")} {
+			normal(line)
+		}
+	case detail:
+		title(l("Semua hasil", "All results"))
+		for _, s := range m.page.Evidence {
+			normal(s)
+		}
 	default:
-		if m.question != "" && !m.options.Gallery {
-			add(m.palette.secondary.Render(m.tr(Words{"Kamu", "You"}) + " › " + domain.SafeText(m.question)))
-		}
-		if m.active == assistant.Overview && m.page.Availability != domain.Unknown && !m.options.Gallery {
-			add(m.palette.text.Bold(true).Render(m.tr(copy.greeting)))
-			add("")
-		}
-		if m.busy && m.page.Availability == "" {
-			stage := m.workName
-			if m.activity == mascot.Printing && !m.cancelling {
-				stage = displayStage(mascot.Printing, m.options.Language)
-			}
-			if stage == "" {
-				stage = displayStage(m.activity, m.options.Language)
-			}
-			add(m.palette.secondary.Render(stage))
+		if len(m.page.Found) > 0 {
+			title(m.page.Found[0])
 		}
 		if m.stalePage() {
-			add(m.palette.alert.Render(m.tr(Words{"Data kedaluwarsa · r periksa ulang", "Stale data · r to rescan"})))
+			text(l("Data kedaluwarsa", "Stale data"), m.palette.alert)
 		}
-		if m.page.Priority != "" {
-			add(m.palette.alert.Render(domain.SafeText(m.page.Priority)))
-		}
-		section(copy.found, m.page.Found)
-		section(copy.meaning, m.page.Meaning)
-		section(copy.advice, m.page.Advice)
-		if len(m.page.Choices) > 0 {
-			add(m.palette.muted.Render(m.tr(copy.choices) + " · " + m.tr(copy.choicesHint)))
+		for _, group := range [][]string{m.page.Found[min(1, len(m.page.Found)):], m.page.Meaning, m.page.Advice} {
+			for _, s := range group {
+				normal(s)
+			}
 		}
 	}
 	return lines
 }
 
-func (m Model) evidencePanel(width int) string {
-	override := m.page.Sidebar
-	if len(override) == 0 {
-		override = m.page.Evidence
-	}
-	if len(override) == 0 {
-		override = overviewPage(m.overview, m.options.Language).Evidence
-	}
-	name := m.palette.accent.Render("Piko")
-	lines := []string{name}
-	style := m.palette.secondary
-	if m.visual.pose == mascot.Critical || m.visual.pose == mascot.Warning || m.visual.pose == mascot.Error {
-		style = m.palette.alert
-	}
-	padding := strings.Repeat(" ", max(0, (width-4-mascot.Width)/2))
-	for _, line := range mascot.Render(m.visual.pose, m.visual.frame, m.options.ASCII) {
-		lines = append(lines, padding+style.Render(line))
-	}
-	lines = append(lines, "")
-	for _, evidence := range override {
-		for _, line := range strings.Split(ansi.Wrap(domain.SafeText(evidence), width-4, ""), "\n") {
-			lines = append(lines, m.palette.muted.Render(line))
-		}
-	}
-	return m.box(width, m.panelHeight(), m.tr(copy.evidence), lines, false)
+func (m Model) maxScroll() int {
+	w, h := m.bounds()
+	return max(0, len(m.body(w))-max(1, h-7-min(8, len(m.choices()))))
 }
 
-func (m Model) prompt(width int) string {
-	tag := m.palette.muted
-	label := m.tr(copy.ask)
-	if m.exportType != "" {
-		label = m.tr(Words{"FILE", "FILE"})
+func (m Model) View() tea.View {
+	w, h := m.bounds()
+	if w < 16 || h < 7 {
+		v := tea.NewView(ansi.Truncate(m.tr(copy.fallback), max(1, m.width), ""))
+		v.AltScreen = true
+		return v
 	}
-	if m.focus == inputFocus {
-		tag = m.palette.accent
+	pad := strings.Repeat(" ", max(0, (m.width-w)/2))
+	context := m.tr(menuNames[m.active])
+	label := "whwmpc"
+	if m.options.Demo {
+		label += "  /  DEMO"
 	}
-	return ansi.Truncate(tag.Render(label)+"  "+tag.Render(m.symbol("›", ">"))+"  "+m.input.View(), width, "")
-}
-
-func (m Model) footer(w int) string {
-	var text string
-	if m.toast != "" {
-		return m.palette.secondary.Render(ansi.Truncate(m.toast, w, m.symbol("…", ".")))
+	if context != "" {
+		label += "  /  " + context
 	}
-	if m.options.Gallery && m.focus != inputFocus {
-		return m.palette.muted.Render(ansi.Truncate("←/→  Enter  Esc   m · "+string(m.options.Motion)+"   n · "+m.tr(Words{"ukuran ringkas", "narrow"})+"   q", w, ""))
+	if m.critical {
+		label += "  /  " + m.tr(Words{"KRITIS", "CRITICAL"})
 	}
-	switch m.focus {
-	case inputFocus:
-		if m.exportType != "" {
-			text = m.tr(Words{"Jalur file baru · Enter ekspor   Esc batal", "New file path · Enter export   Esc cancel"})
-		} else {
-			text = m.tr(Words{"Enter kirim   Esc kembali   Tab fokus", "Enter send   Esc back   Tab focus"})
+	face := mascot.Face(m.visual.pose, m.visual.frame, m.options.ASCII)
+	rows := []string{m.palette.secondary.Render(label) + "   " + m.palette.muted.Render(face+" Piko"), ""}
+	body := m.body(w)
+	choices := m.choices()
+	if m.screen == reviewPlan && !m.reviewFits() {
+		choices = nil
+	}
+	optionRows := min(min(len(choices), 8), max(1, h-8))
+	room := max(1, h-7-optionRows)
+	start := min(m.scroll, max(0, len(body)-room))
+	rows = append(rows, body[start:min(len(body), start+room)]...)
+	if len(body) > room {
+		rows = append(rows, m.palette.muted.Render(fmt.Sprintf("%d–%d / %d", start+1, min(len(body), start+room), len(body))))
+	}
+	if m.screen == reviewPlan && !m.reviewFits() {
+		rows = append(rows, m.palette.alert.Render(m.tr(Words{"Perbesar terminal untuk menyetujui.", "Enlarge the terminal to approve."})))
+	}
+	if len(choices) > 0 {
+		rows = append(rows, "")
+		first := max(0, m.choice-optionRows+1)
+		for i := first; i < min(len(choices), first+optionRows); i++ {
+			c := choices[i]
+			mark, style := "  ", m.palette.text
+			if i == m.choice {
+				mark, style = "› ", m.palette.selected
+				if m.options.ASCII {
+					mark = "> "
+				}
+			}
+			rows = append(rows, style.Render(ansi.Truncate(mark+c.Label, w, "…")))
 		}
-	case pageFocus:
-		text = m.tr(Words{"↑↓ gulir   ←→ tindakan   Enter pilih   d bukti   Tab fokus   ?", "↑↓ scroll   ←→ actions   Enter select   d evidence   Tab focus   ?"})
-	default:
-		text = m.tr(Words{"↑↓/jk pilih   Enter buka   Tab fokus   / cari   d bukti   ? bantuan   q keluar", "↑↓/jk select   Enter open   Tab focus   / search   d evidence   ? help   q quit"})
+	}
+	footer := m.tr(Words{"↑↓ Pilih  ·  Enter Buka  ·  Esc Kembali  ·  ? Bantuan", "↑↓ Select  ·  Enter Open  ·  Esc Back  ·  ? Help"})
+	switch m.screen {
+	case home:
+		footer = m.tr(Words{"↑↓ Pilih  ·  Enter Buka  ·  / Tanya  ·  ? Bantuan", "↑↓ Select  ·  Enter Open  ·  / Ask  ·  ? Help"})
+	case scanning, executing:
+		footer = m.tr(Words{"Esc Minta penghentian", "Esc Request cancellation"})
+	case questionInput, fileInput:
+		footer = m.tr(Words{"Enter Lanjut  ·  Esc Kembali", "Enter Continue  ·  Esc Back"})
+	case detail, help:
+		footer = m.tr(Words{"↑↓ Gulir  ·  Esc Kembali", "↑↓ Scroll  ·  Esc Back"})
 	}
 	if m.options.ASCII {
-		text = strings.NewReplacer("↑↓", "up/down", "←→", "left/right").Replace(text)
+		footer = strings.NewReplacer("↑↓", "Up/Down", "·", "|").Replace(footer)
 	}
-	return m.palette.muted.Render(ansi.Truncate(text, w, ""))
+	if m.toast != "" {
+		rows = append(rows, m.palette.secondary.Render(m.toast))
+	}
+	rows = append(rows, "", m.palette.muted.Render(footer))
+	for i, line := range rows {
+		rows[i] = pad + ansi.Truncate(line, w, "")
+	}
+	v := tea.NewView(strings.Join(rows[:min(h, len(rows))], "\n"))
+	v.AltScreen = true
+	if m.typing() && h > 4 {
+		if c := m.input.Cursor(); c != nil {
+			c.X = min(c.X, w-1) + len(pad)
+			c.Y = 4
+			v.Cursor = c
+		}
+	}
+	return v
 }
 
 func overviewPage(o domain.Overview, lang string) Page {
