@@ -182,18 +182,25 @@ func (s Store) History() ([]Entry, error) {
 	return readHistory(root)
 }
 
-func (s Store) FirmwareHandoff(planID string) (string, error) {
+type FirmwareHandoff struct {
+	Target    string
+	CreatedAt time.Time
+	entry     Entry
+}
+
+func (s Store) FirmwareHandoff(planID string) (FirmwareHandoff, error) {
 	if !validPlanID(planID) {
-		return "", errors.New("invalid plan ID")
+		return FirmwareHandoff{}, errors.New("invalid plan ID")
 	}
 	root, err := privateRoot(s.StateDir, false)
 	if err != nil {
-		return "", err
+		return FirmwareHandoff{}, err
 	}
 	defer root.Close()
 	entries, historyErr := readHistory(root)
 	for _, entry := range entries {
-		if entry.PlanID != planID || entry.Action == nil || !entry.Action.VerifyAfterRestart {
+		if entry.PlanID != planID || entry.Category != actions.FirmwareUpdate || entry.Action == nil || !entry.Action.Started ||
+			(entry.Action.Status != actions.Partial && entry.Action.Status != actions.Unknown) {
 			continue
 		}
 		event, err := openEvent(root, entry.dir)
@@ -201,24 +208,52 @@ func (s Store) FirmwareHandoff(planID string) (string, error) {
 			continue
 		}
 		if err != nil {
-			return "", err
+			return FirmwareHandoff{}, err
 		}
 		data, err := readPrivate(event, "receipt.json", 64<<10)
 		event.Close()
 		if err != nil {
-			return "", err
+			return FirmwareHandoff{}, err
 		}
 		var result actions.Result
 		if err = decodeEvent(data, &result); err != nil || result.Plan.ID != planID || result.Plan.Kind != actions.FirmwareUpdate ||
-			!result.Started || (result.Status != actions.Partial && result.Status != actions.Unknown) {
-			return "", errors.New("invalid firmware handoff")
+			!result.Started || (result.Status != actions.Partial && result.Status != actions.Unknown) ||
+			result.Plan.CreatedAt.IsZero() || !result.FinishedAt.Equal(entry.At) {
+			return FirmwareHandoff{}, errors.New("invalid firmware handoff")
 		}
 		if _, _, err := firmware.SplitTarget(result.Plan.Target); err != nil {
-			return "", err
+			return FirmwareHandoff{}, err
 		}
-		return result.Plan.Target, nil
+		return FirmwareHandoff{Target: result.Plan.Target, CreatedAt: result.Plan.CreatedAt, entry: entry}, nil
 	}
-	return "", errors.Join(fs.ErrNotExist, historyErr)
+	return FirmwareHandoff{}, errors.Join(fs.ErrNotExist, historyErr)
+}
+
+// RecordFirmwareVerification links the result to its original action while the caller holds the action lock.
+func (s Store) RecordFirmwareVerification(handoff FirmwareHandoff, result firmware.Verification, at time.Time) error {
+	entry := handoff.entry
+	if entry.Action == nil || result.Target != handoff.Target {
+		return errors.New("invalid firmware verification target")
+	}
+	if !entry.Action.VerifyAfterRestart {
+		return nil
+	}
+	summary := *entry.Action
+	switch {
+	case result.State == "verified" && result.Availability == domain.Available:
+		_, version, _ := firmware.SplitTarget(handoff.Target)
+		if result.Installed != version {
+			return errors.New("invalid firmware verification version")
+		}
+		summary.Status, summary.Changed = actions.Verified, new(true)
+	case result.State == "failed" && result.Availability == domain.Error:
+		summary.Status = actions.Failed
+	default:
+		return nil
+	}
+	summary.VerifyAfterRestart = false
+	entry.Action, entry.At = &summary, at
+	return s.appendEvent(entry, nil)
 }
 
 func (s Store) RollbackReceipt(planID string) (actions.Result, error) {
@@ -271,6 +306,7 @@ func readHistory(root *os.Root) ([]Entry, error) {
 	dirs = dirs[:min(len(dirs), MaxHistory)]
 	out := make([]Entry, 0, len(dirs))
 	restored := make(map[string]bool)
+	finishedFirmware := make(map[string]bool)
 	var errs []error
 	for _, name := range dirs {
 		entry, err := readEntry(root, name)
@@ -285,10 +321,17 @@ func readHistory(root *os.Root) ([]Entry, error) {
 		if entry.Restores != "" {
 			restored[entry.Restores] = true
 		}
+		if entry.Category == actions.FirmwareUpdate && entry.PlanID != "" && entry.Action != nil && entry.Action.Started &&
+			(entry.Action.Status == actions.Verified || entry.Action.Status == actions.Failed) {
+			finishedFirmware[entry.PlanID] = true
+		}
 	}
 	for _, entry := range out {
 		if entry.Action != nil && restored[entry.PlanID] {
 			entry.Action.CanRestore = false
+		}
+		if entry.Action != nil && finishedFirmware[entry.PlanID] {
+			entry.Action.VerifyAfterRestart = false
 		}
 	}
 	return out, errors.Join(errs...)

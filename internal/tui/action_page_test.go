@@ -118,6 +118,52 @@ func TestFirmwareHandoffOnlyCelebratesVerifiedOutcome(t *testing.T) {
 	}
 }
 
+func TestFirmwareResumeReturnsToUpdatedHistory(t *testing.T) {
+	planID := strings.Repeat("1", 40)
+	inspect := func(ctx context.Context, req Request) Page {
+		if req.Intent != assistant.History {
+			t.Fatalf("unexpected intent %s", req.Intent)
+		}
+		switch req.Choice.Kind {
+		case "firmware-resume":
+			if req.Choice.Value != planID {
+				t.Fatalf("wrong handoff %s", req.Choice.Value)
+			}
+			return Page{Availability: domain.Available, Pose: mascot.Success, refreshHistory: true}
+		case "rescan":
+			return Page{Availability: domain.Available, Found: []string{"firmware-update · verified"}}
+		default:
+			t.Fatalf("unexpected request %+v", req.Choice)
+			return Page{}
+		}
+	}
+	m := New(t.Context(), platform.Demo{}, inspect, Options{Language: "en", Motion: "off"})
+	m.active, m.screen, m.page = assistant.History, results, Page{Choices: []Choice{{"Resume", "firmware-resume", planID}}}
+	started, verify := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	m = started.(Model)
+	if verify == nil || !m.runningAction || m.workName != "Verifying the fwupd result" {
+		t.Fatal("resume did not start firmware verification")
+	}
+	m = step(m, verify())
+	returned, reload := m.Update(tea.KeyPressMsg{Code: tea.KeyEsc})
+	if reload == nil {
+		t.Fatal("back restored a stale history page")
+	}
+	m = step(returned.(Model), reload())
+	if m.active != assistant.History || m.screen != results || !strings.Contains(m.View().Content, "firmware-update · verified") {
+		t.Fatalf("unexpected history after back: %+v", m.page)
+	}
+}
+
+func TestCancelledFirmwareResumeShowsCancellation(t *testing.T) {
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+	page := firmwarePage(ctx, &workflow.Maintenance{}, Request{Language: "en", Choice: Choice{Kind: "firmware-resume"}})
+	if page.Pose != mascot.Cancelled || page.Availability != domain.Unknown || page.refreshHistory {
+		t.Fatalf("unexpected cancellation result: %+v", page)
+	}
+}
+
 func TestFirmwareInventoryUnavailableKeepsHonestStatus(t *testing.T) {
 	for _, test := range []struct {
 		status domain.Availability

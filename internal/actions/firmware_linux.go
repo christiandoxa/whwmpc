@@ -207,11 +207,11 @@ func (p linuxPlatform) firmwareUpdate(ctx context.Context, target string) (prepa
 			case "verified":
 				return Result{Status: Verified, Changed: boolPointer(true), Message: "Versi terpasang cocok dan fwupd mencatat hasil berhasil."}
 			case "reboot_required":
-				return Result{Status: Partial, Message: "fwupd mencatat capsule menunggu restart. Sambungkan AC, restart, lalu periksa dengan whwmpc firmware --verify " + target}
+				return Result{Status: Partial, Message: "fwupd mencatat capsule menunggu restart. Sambungkan AC dan restart sebelum memeriksa versi aktif."}
 			case "failed":
 				return Result{Status: Failed, Message: withStepError("fwupd mencatat kegagalan untuk versi terpilih", step)}
 			default:
-				return Result{Status: Unknown, Message: withStepError("Hasil firmware belum terverifikasi. Periksa dengan whwmpc firmware --verify "+target, step)}
+				return Result{Status: Unknown, Message: withStepError("Hasil firmware belum terverifikasi. Periksa hasil sebelum mencoba lagi", step)}
 			}
 		},
 	}, nil

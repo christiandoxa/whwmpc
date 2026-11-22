@@ -50,6 +50,7 @@ type Page struct {
 	Found, Meaning   []string
 	Advice, Evidence []string
 	Choices          []Choice
+	refreshHistory   bool
 }
 
 type Request struct {
@@ -180,6 +181,7 @@ func (m *Model) remember() {
 }
 
 func (m *Model) returnTo() tea.Cmd {
+	refreshHistory := m.screen == results && m.page.refreshHistory
 	m.input.Blur()
 	m.input.Reset()
 	if len(m.back) > 0 {
@@ -190,6 +192,9 @@ func (m *Model) returnTo() tea.Cmd {
 		m.galleryPage()
 	} else {
 		m.homePage()
+	}
+	if refreshHistory && m.active == assistant.History {
+		return m.start(assistant.History, Choice{Kind: "rescan"})
 	}
 	if m.typing() {
 		m.show(mascot.Listening, "", false)

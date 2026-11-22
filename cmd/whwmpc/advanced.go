@@ -117,7 +117,7 @@ func storageActionCommand(ctx context.Context, args []string, m *workflow.Mainte
 		flags.BoolVar(&updates, "updates", false, "baca kandidat yang ada di cache lokal")
 		flags.StringVar(&preview, "update", "", "tinjau kandidat DEVICEID@VERSION")
 		flags.StringVar(&verify, "verify", "", "baca hasil fwupd untuk DEVICEID@VERSION")
-		flags.StringVar(&resume, "resume", "", "baca bukti pascarestart dari ID rencana")
+		flags.StringVar(&resume, "resume", "", "verifikasi rencana setelah restart dan catat hasil akhir lokal")
 	} else {
 		flags.StringVar(&preview, "repair", "", "tinjau perbaikan volume offline")
 		flags.StringVar(&check, "check", "", "periksa filesystem tanpa mengubahnya")
@@ -155,14 +155,20 @@ func storageActionCommand(ctx context.Context, args []string, m *workflow.Mainte
 		plan, err := m.Preview(ctx, kind, target, *path != "")
 		return displayAdvancedPlan(plan, err, *path, *asJSON, out, stderr), true
 	case verify != "" || resume != "":
+		var result firmware.Verification
+		var historyErr error
 		if resume != "" {
-			var err error
-			verify, err = m.Store.FirmwareHandoff(resume)
+			outcome, err := m.ResumeFirmware(ctx, resume)
 			if err != nil {
 				return printError(stderr, err), true
 			}
+			result, historyErr = outcome.Verification, outcome.HistoryErr
+		} else {
+			result = firmware.Outcome(ctx, runner, verify)
 		}
-		result := firmware.Outcome(ctx, runner, verify)
+		if historyErr != nil {
+			fmt.Fprintln(stderr, "Riwayat gagal disimpan ·", domain.SafeText(historyErr.Error()))
+		}
 		if *asJSON {
 			if rc := printJSON(out, stderr, result); rc != 0 {
 				return rc, true
@@ -170,7 +176,7 @@ func storageActionCommand(ctx context.Context, args []string, m *workflow.Mainte
 		} else {
 			fmt.Fprintln(out, domain.SafeText(result.Detail()))
 		}
-		if result.State != "verified" {
+		if result.State != "verified" || historyErr != nil {
 			return 1, true
 		}
 		return 0, true

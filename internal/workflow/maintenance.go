@@ -13,7 +13,9 @@ import (
 
 	"github.com/christiandoxa/whwmpc/internal/actions"
 	"github.com/christiandoxa/whwmpc/internal/domain"
+	"github.com/christiandoxa/whwmpc/internal/firmware"
 	"github.com/christiandoxa/whwmpc/internal/state"
+	"github.com/christiandoxa/whwmpc/internal/sysrun"
 )
 
 type Maintenance struct {
@@ -125,6 +127,34 @@ func (m *Maintenance) Authenticate(ctx context.Context, plan actions.Plan, id st
 type Outcome struct {
 	Result     actions.Result
 	HistoryErr error
+}
+
+type FirmwareOutcome struct {
+	Verification firmware.Verification
+	HistoryErr   error
+}
+
+func (m *Maintenance) ResumeFirmware(ctx context.Context, id string) (FirmwareOutcome, error) {
+	if m.Demo {
+		return FirmwareOutcome{}, errors.New("DEMO: akses firmware terkunci")
+	}
+	if err := ctx.Err(); err != nil {
+		return FirmwareOutcome{}, err
+	}
+	release, err := m.Store.LockActions()
+	if err != nil {
+		return FirmwareOutcome{}, err
+	}
+	defer release()
+	handoff, err := m.Store.FirmwareHandoff(id)
+	if err != nil {
+		return FirmwareOutcome{}, err
+	}
+	verification := firmware.OutcomeSince(ctx, sysrun.Native{}, handoff.Target, handoff.CreatedAt)
+	if err := ctx.Err(); err != nil {
+		return FirmwareOutcome{}, err
+	}
+	return FirmwareOutcome{Verification: verification, HistoryErr: m.Store.RecordFirmwareVerification(handoff, verification, time.Now())}, nil
 }
 
 func (m *Maintenance) Execute(ctx context.Context, plan actions.Plan, id string, notify func(actions.Stage)) (Outcome, error) {

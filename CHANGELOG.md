@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.3.6
+
+- Verifikasi firmware lewat ID rencana mencatat hasil akhir di Riwayat dan melepas pilihan verifikasi setelah restart. Bukti fwupd dari sebelum rencana dibuat tidak menyelesaikan handoff.
+
 ## 0.3.5
 
 - Pemeriksaan CPU macOS mempertahankan interval yang selesai sebagai data parsial ketika `top` mencapai batas waktu.

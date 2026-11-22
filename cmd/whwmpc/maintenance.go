@@ -160,6 +160,13 @@ func actionCommand(ctx context.Context, args []string, m *workflow.Maintenance, 
 		} else {
 			fmt.Fprintf(stdout, "%s · %s\n", result.Status, domain.SafeText(result.Message))
 			fmt.Fprintf(stdout, "Dimulai %t · penghentian diminta %t\n", result.Started, result.CancellationRequested)
+			if plan.Kind == actions.FirmwareUpdate && result.Started && (result.Status == actions.Partial || result.Status == actions.Unknown) {
+				if outcome.HistoryErr == nil {
+					fmt.Fprintf(stdout, "Periksa hasil dengan whwmpc firmware --resume %s\n", plan.ID)
+				} else {
+					fmt.Fprintf(stdout, "Periksa hasil dengan whwmpc firmware --verify %s\n", domain.SafeText(plan.Target))
+				}
+			}
 			if result.PotentialDiscardBytes != nil {
 				fmt.Fprintf(stdout, "%d B berpotensi diajukan untuk discard\n", *result.PotentialDiscardBytes)
 			}

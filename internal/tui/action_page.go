@@ -66,8 +66,11 @@ func (m *Model) launch(req Request, pose mascot.Pose) tea.Cmd {
 	case "save-scan":
 		m.runningAction = true
 		m.workName = m.tr(Words{"Menyimpan ringkasan lokal", "Saving local summary"})
+	case "firmware-resume":
+		m.runningAction = true
+		m.workName = m.tr(Words{"Memverifikasi hasil fwupd", "Verifying the fwupd result"})
 	}
-	if req.Intent == assistant.History && req.Choice.Kind == "" {
+	if req.Intent == assistant.History && (req.Choice.Kind == "" || req.Choice.Kind == "rescan") {
 		m.workName = m.tr(Words{"Membaca riwayat lokal", "Reading local history"})
 	}
 	if req.Choice.Kind == "apply" {
@@ -156,6 +159,8 @@ func aimFor(intent assistant.Intent, choice Choice, plan *actions.Plan) mascot.P
 		}
 	}
 	switch choice.Kind {
+	case "firmware-verify", "firmware-resume":
+		return mascot.Scanning
 	case actions.PowerProfile, actions.TrimMount, actions.EnableTrimTimer, actions.CleanAPT, actions.CleanPacman, actions.CleanDNF,
 		hardware.PowerLimit, hardware.CoreMax, hardware.VoltageOffset, actions.FirmwareUpdate, actions.FirmwareRefresh, actions.FilesystemRepair, "restore":
 		return mascot.Preview
@@ -363,7 +368,11 @@ func resultPage(outcome workflow.Outcome, lang string, intent assistant.Intent) 
 	page.Evidence = []string{"ID · " + result.Plan.ID, result.FinishedAt.Format("2006-01-02 15:04:05 MST")}
 	page.Choices = []Choice{{Label: l("Periksa ulang", "Scan again"), Kind: "navigate", Value: string(intent)}}
 	if result.Plan.Kind == actions.FirmwareUpdate && result.Started && (result.Status == actions.Partial || result.Status == actions.Unknown) {
-		page.Choices = append([]Choice{{l("Periksa versi setelah restart", "Verify version after restart"), "firmware-verify", result.Plan.Target}}, page.Choices...)
+		choice := Choice{l("Periksa versi setelah restart", "Verify version after restart"), "firmware-verify", result.Plan.Target}
+		if outcome.HistoryErr == nil {
+			choice.Kind, choice.Value = "firmware-resume", result.Plan.ID
+		}
+		page.Choices = append([]Choice{choice}, page.Choices...)
 	}
 	if result.Receipt != "" && outcome.HistoryErr == nil {
 		page.Choices = append(page.Choices, Choice{Label: l("Tinjau pemulihan", "Preview restore"), Kind: "restore", Value: result.Plan.ID})

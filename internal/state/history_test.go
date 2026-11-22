@@ -249,14 +249,15 @@ func TestFirmwareHandoffIsPrivateAndReadOnly(t *testing.T) {
 	s := Store{StateDir: filepath.Join(t.TempDir(), "state")}
 	id := "0123456789012345678901234567890123456789"
 	target := "abcdef0123456789abcdef0123456789abcdef01@1.2.3"
-	err := s.RecordAction(actions.Result{Plan: actions.Plan{ID: id, Kind: actions.FirmwareUpdate, Target: target},
-		Status: actions.Partial, Started: true, FinishedAt: time.Now()})
+	now := time.Now()
+	err := s.RecordAction(actions.Result{Plan: actions.Plan{ID: id, Kind: actions.FirmwareUpdate, Target: target, CreatedAt: now},
+		Status: actions.Partial, Started: true, FinishedAt: now})
 	if err != nil {
 		t.Fatal(err)
 	}
 	got, err := s.FirmwareHandoff(id)
-	if err != nil || got != target {
-		t.Fatalf("%s %v", got, err)
+	if err != nil || got.Target != target || !got.CreatedAt.Equal(now) {
+		t.Fatalf("%+v %v", got, err)
 	}
 	if _, err := s.RollbackReceipt(id); err == nil {
 		t.Fatal("firmware handoff accepted as rollback")

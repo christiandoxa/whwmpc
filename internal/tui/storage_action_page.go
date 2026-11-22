@@ -2,10 +2,12 @@ package tui
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
 	"github.com/christiandoxa/whwmpc/internal/actions"
+	"github.com/christiandoxa/whwmpc/internal/assistant"
 	"github.com/christiandoxa/whwmpc/internal/diagnostics"
 	"github.com/christiandoxa/whwmpc/internal/domain"
 	"github.com/christiandoxa/whwmpc/internal/filesystem"
@@ -21,16 +23,26 @@ func firmwarePage(ctx context.Context, m *workflow.Maintenance, req Request) Pag
 	if m.Demo {
 		return Page{Availability: domain.Unsupported, Found: []string{l("DEMO · akses firmware terkunci", "DEMO · firmware access locked")}}
 	}
-	if req.Choice.Kind == "firmware-verify" || req.Choice.Kind == "firmware-resume" {
-		target := req.Choice.Value
-		if req.Choice.Kind == "firmware-resume" {
-			var err error
-			target, err = m.Store.FirmwareHandoff(req.Choice.Value)
-			if err != nil {
-				return unavailableAction(err, req.Language)
-			}
+	if req.Choice.Kind == "firmware-resume" {
+		outcome, err := m.ResumeFirmware(ctx, req.Choice.Value)
+		if errors.Is(err, context.Canceled) {
+			return Page{Availability: domain.Unknown, Pose: mascot.Cancelled,
+				Found: []string{l("Verifikasi firmware dibatalkan.", "Firmware verification cancelled.")}}
 		}
-		return firmwareVerificationPage(firmware.Outcome(ctx, sysrun.Native{}, target), req.Language)
+		if err != nil {
+			return unavailableAction(err, req.Language)
+		}
+		page := firmwareVerificationPage(outcome.Verification, req.Language)
+		if outcome.HistoryErr != nil {
+			page.Advice = append(page.Advice, l("Riwayat gagal disimpan", "Could not save history")+" · "+domain.SafeText(outcome.HistoryErr.Error()))
+		} else {
+			page.refreshHistory = outcome.Verification.State == "verified" || outcome.Verification.State == "failed"
+		}
+		page.Choices = []Choice{{l("Lihat riwayat", "View history"), "navigate", string(assistant.History)}}
+		return page
+	}
+	if req.Choice.Kind == "firmware-verify" {
+		return firmwareVerificationPage(firmware.Outcome(ctx, sysrun.Native{}, req.Choice.Value), req.Language)
 	}
 	updates := req.Choice.Kind == "firmware-cache"
 	return firmwareInventoryPage(firmware.Collect(ctx, sysrun.Native{}, updates), req.Language, updates, m.Available() == nil)

@@ -341,6 +341,11 @@ func (r Remote) Fresh(now time.Time) bool {
 }
 
 func Outcome(ctx context.Context, run sysrun.Runner, target string) Verification {
+	return OutcomeSince(ctx, run, target, time.Time{})
+}
+
+// OutcomeSince excludes history from before the local plan was created.
+func OutcomeSince(ctx context.Context, run sysrun.Runner, target string, since time.Time) Verification {
 	verification := Verification{Target: target, State: "unknown", Availability: domain.Unknown}
 	id, wanted, err := SplitTarget(target)
 	if err != nil {
@@ -369,11 +374,15 @@ func Outcome(ctx context.Context, run sysrun.Runner, target string) Verification
 		return verification
 	}
 	verification.Availability = domain.Unknown
-	var history struct{ Devices []Device }
+	type historyDevice struct {
+		Device
+		Modified int64
+	}
+	var history struct{ Devices []historyDevice }
 	if status != domain.Available || json.Unmarshal(r.Output, &history) != nil {
 		return verification
 	}
-	var record *Device
+	var record *historyDevice
 	for i := range history.Devices {
 		item := &history.Devices[i]
 		if item.ID != id {
@@ -385,7 +394,8 @@ func Outcome(ctx context.Context, run sysrun.Runner, target string) Verification
 		record = item
 	}
 	// A historical device Version is the previous version, and its release holds the attempted one.
-	if record == nil || len(record.Releases) != 1 || record.Releases[0].Version != wanted {
+	if record == nil || len(record.Releases) != 1 || record.Releases[0].Version != wanted ||
+		(!since.IsZero() && record.Modified < since.Unix()) {
 		return verification
 	}
 	switch record.UpdateState {

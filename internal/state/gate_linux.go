@@ -25,38 +25,16 @@ func (s Store) BeginAction(planID string, until time.Time) (func(), error) {
 		return nil, err
 	}
 	defer root.Close()
-	if _, err := root.Lstat(actionLockName); errors.Is(err, fs.ErrNotExist) {
-		if err := atomicWrite(root, actionLockName, nil, false); err != nil && !errors.Is(err, fs.ErrExist) {
-			return nil, err
-		}
-	} else if err != nil {
-		return nil, err
-	}
-	before, err := root.Lstat(actionLockName)
-	if err != nil || !before.Mode().IsRegular() || !private(before) {
-		return nil, errors.New("file lock aksi lokal tidak aman")
-	}
-	file, err := root.OpenFile(actionLockName, os.O_RDWR|syscall.O_NONBLOCK|syscall.O_NOFOLLOW, 0)
+	release, err := lockActions(root)
 	if err != nil {
 		return nil, err
 	}
-	var releaseOnce sync.Once
-	release := func() { releaseOnce.Do(func() { _ = file.Close() }) }
 	ok := false
 	defer func() {
 		if !ok {
 			release()
 		}
 	}()
-	if after, err := file.Stat(); err != nil || !os.SameFile(before, after) {
-		return nil, errors.New("file lock aksi lokal berubah")
-	}
-	if err := syscall.Flock(int(file.Fd()), syscall.LOCK_EX|syscall.LOCK_NB); err != nil {
-		if errors.Is(err, syscall.EWOULDBLOCK) {
-			return nil, errors.New("tindakan lain masih diverifikasi atau sedang berjalan")
-		}
-		return nil, err
-	}
 	if err := pruneClaims(root, now); err != nil {
 		return nil, err
 	}
@@ -74,6 +52,48 @@ func (s Store) BeginAction(planID string, until time.Time) (func(), error) {
 		return nil, err
 	}
 	ok = true
+	return release, nil
+}
+
+// LockActions serializes verification of a saved firmware handoff with new actions.
+func (s Store) LockActions() (func(), error) {
+	root, err := privateRoot(s.StateDir, false)
+	if err != nil {
+		return nil, err
+	}
+	defer root.Close()
+	return lockActions(root)
+}
+
+func lockActions(root *os.Root) (func(), error) {
+	if _, err := root.Lstat(actionLockName); errors.Is(err, fs.ErrNotExist) {
+		if err := atomicWrite(root, actionLockName, nil, false); err != nil && !errors.Is(err, fs.ErrExist) {
+			return nil, err
+		}
+	} else if err != nil {
+		return nil, err
+	}
+	before, err := root.Lstat(actionLockName)
+	if err != nil || !before.Mode().IsRegular() || !private(before) {
+		return nil, errors.New("file lock aksi lokal tidak aman")
+	}
+	file, err := root.OpenFile(actionLockName, os.O_RDWR|syscall.O_NONBLOCK|syscall.O_NOFOLLOW, 0)
+	if err != nil {
+		return nil, err
+	}
+	var releaseOnce sync.Once
+	release := func() { releaseOnce.Do(func() { _ = file.Close() }) }
+	if after, err := file.Stat(); err != nil || !os.SameFile(before, after) {
+		release()
+		return nil, errors.New("file lock aksi lokal berubah")
+	}
+	if err := syscall.Flock(int(file.Fd()), syscall.LOCK_EX|syscall.LOCK_NB); err != nil {
+		release()
+		if errors.Is(err, syscall.EWOULDBLOCK) {
+			return nil, errors.New("tindakan lain masih diverifikasi atau sedang berjalan")
+		}
+		return nil, err
+	}
 	return release, nil
 }
 
