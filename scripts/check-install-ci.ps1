@@ -9,7 +9,11 @@ try {
         throw 'The pinned Windows installation did not run.'
     }
 
-    $latest = (Invoke-RestMethod -UseBasicParsing 'https://api.github.com/repos/christiandoxa/whwmpc/releases/latest').tag_name
+    $releaseHeaders = @{}
+    if ($env:GH_TOKEN) {
+        $releaseHeaders.Authorization = "Bearer $env:GH_TOKEN"
+    }
+    $latest = (Invoke-RestMethod -UseBasicParsing -Headers $releaseHeaders 'https://api.github.com/repos/christiandoxa/whwmpc/releases/latest').tag_name
     & $installer
     if ((& $target --version) -cne "whwmpc $latest" -or $LASTEXITCODE -ne 0) {
         throw "The Windows upgrade did not run version $latest."

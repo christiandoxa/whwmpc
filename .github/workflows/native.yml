@@ -37,10 +37,14 @@ jobs:
       - name: Install and upgrade with Windows PowerShell
         if: runner.os == 'Windows' && runner.environment == 'github-hosted' && github.event_name == 'push'
         shell: powershell
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: ./scripts/check-install-ci.ps1
       - name: Install and upgrade with PowerShell 7
         if: runner.os == 'Windows' && runner.environment == 'github-hosted' && github.event_name == 'push'
         shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: ./scripts/check-install-ci.ps1
       - name: Exercise the native diagnostic CLI
         if: runner.os == 'macOS' || runner.os == 'Windows'
