@@ -3,8 +3,10 @@
 package hardware
 
 import (
+	"encoding/binary"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -15,6 +17,8 @@ const (
 	PerformanceFile      = "power_dpm_force_performance_level"
 	coreRangeUnavailable = "Rentang untuk nilai maksimum clock OverDrive belum terverifikasi pada backend AMDGPU ini."
 )
+
+var errCoreRangeUnavailable = errors.New(coreRangeUnavailable)
 
 type amdState struct {
 	PCI, Device, Subsystem, Mode, Table, Dir string
@@ -80,31 +84,72 @@ func readAMDControl(path string) (string, error) {
 	return readSys(path)
 }
 
-func (a amdState) coreMaxRangeVerified() bool {
+func (a amdState) coreMaxMinimum(control Control) (int64, error) {
 	// Some PMFW backends print the Fmin floor in OD_RANGE. Their setter checks a separate Fmax floor.
 	ip := filepath.Join(a.Dir, "ip_discovery", "die", "0", "MP1", "0")
 	if _, err := os.Stat(ip); errors.Is(err, os.ErrNotExist) {
 		// Older Renoir kernels may lack IP discovery. These IDs all select CHIP_RENOIR.
 		switch a.Device {
 		case "0x15e7", "0x1636", "0x1638", "0x164c":
-			return true
+			return control.Min, nil
 		}
-		return false
+		return 0, errCoreRangeUnavailable
 	}
 	var version [3]string
 	for i, name := range [...]string{"major", "minor", "revision"} {
 		value, err := readSys(filepath.Join(ip, name))
 		if err != nil {
-			return false
+			return 0, errCoreRangeUnavailable
 		}
 		version[i] = value
 	}
 	switch strings.Join(version[:], ".") {
 	case "12.0.0", "12.0.1", "13.0.1", "13.0.3", "13.0.8", "14.0.0", "14.0.1", "14.0.4", "14.0.5":
-		return true
+		return control.Min, nil
+	case "13.0.0", "13.0.10":
+		return a.smu13CoreMaxMinimum(control, 20)
+	case "13.0.7":
+		return a.smu13CoreMaxMinimum(control, 22)
 	default:
-		return false
+		return 0, errCoreRangeUnavailable
 	}
+}
+
+func (a amdState) smu13CoreMaxMinimum(control Control, format byte) (int64, error) {
+	const pageSize = 4096
+	// An AMDGPU pp_table upload cannot fit this 5424-byte table in one 4 KiB sysfs write.
+	if os.Getpagesize() != pageSize {
+		return 0, errCoreRangeUnavailable
+	}
+	file, err := os.Open(filepath.Join(a.Dir, "pp_table"))
+	if errors.Is(err, os.ErrPermission) {
+		return 0, fmt.Errorf("Pembacaan rentang Fmax pp_table memerlukan izin: %w", err)
+	}
+	if err != nil {
+		return 0, errCoreRangeUnavailable
+	}
+	defer file.Close()
+	table, err := io.ReadAll(io.LimitReader(file, pageSize))
+	if err != nil || len(table) != pageSize-1 {
+		return 0, errCoreRangeUnavailable
+	}
+	// The observed combo tables use an 832-byte driver portion before PPTable_t.
+	if binary.LittleEndian.Uint16(table[:2]) != 5424 || table[2] != format || table[3] != 0 || table[4] != 3 ||
+		binary.LittleEndian.Uint16(table[6:8]) != 832 {
+		return 0, errCoreRangeUnavailable
+	}
+	// The kernel reads these fields in SkuTable.OverDriveLimitsMin and OverDriveLimitsBasicMax.
+	fminMin := int64(int16(binary.LittleEndian.Uint16(table[3770:3772])))
+	fmaxMin := int64(int16(binary.LittleEndian.Uint16(table[3772:3774])))
+	fmaxMax := int64(int16(binary.LittleEndian.Uint16(table[3860:3862])))
+	if fminMin != control.reportedClockMin || fmaxMax != control.Max || fmaxMin <= 0 || fmaxMin > fmaxMax {
+		return 0, errCoreRangeUnavailable
+	}
+	minimum := max(control.Min, fmaxMin)
+	if control.Current < minimum || minimum >= control.Max {
+		return minimum, errCoreRangeUnavailable
+	}
+	return minimum, nil
 }
 
 func (a amdState) controls() []Control {
@@ -171,7 +216,8 @@ func (a amdState) controls() []Control {
 	if gfxMin != nil && gfxMax != nil && gfxRangeMin != nil && gfxRangeMax != nil {
 		floor := max(*gfxMin, *gfxRangeMin)
 		if floor < *gfxRangeMax && *gfxMax >= floor && *gfxMax <= *gfxRangeMax {
-			out = append(out, Control{Kind: CoreMax, Label: "Batas clock inti", Unit: "MHz", Current: *gfxMax, Min: floor, Max: *gfxRangeMax})
+			out = append(out, Control{Kind: CoreMax, Label: "Batas clock inti", Unit: "MHz", Current: *gfxMax,
+				Min: floor, Max: *gfxRangeMax, reportedClockMin: *gfxRangeMin})
 		}
 	}
 	if voltage != nil && voltageMin != nil && voltageMax != nil {

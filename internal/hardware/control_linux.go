@@ -17,6 +17,7 @@ type Settings struct {
 	ID, PCI, Hardware, Firmware string
 	Control                     Control
 	Mode, Table, SysfsDir       string
+	CoreMaxMinimum              int64 `json:"-"` // Preserve the identity of previously signed restore receipts.
 }
 
 type Change struct {
@@ -35,8 +36,12 @@ func Prepare(ctx context.Context, runner sysrun.Runner, kind, target string) (Ch
 		return Change{}, err
 	}
 	control := before.Control
-	if value < control.Min || value > control.Max {
-		return Change{}, fmt.Errorf("nilai %d di luar rentang %d–%d %s", value, control.Min, control.Max, control.Unit)
+	minimum := control.Min
+	if before.CoreMaxMinimum > 0 {
+		minimum = max(minimum, before.CoreMaxMinimum)
+	}
+	if value < minimum || value > control.Max {
+		return Change{}, fmt.Errorf("nilai %d di luar rentang %d–%d %s", value, minimum, control.Max, control.Unit)
 	}
 	if control.readbackStep > 0 && value%control.readbackStep != 0 {
 		return Change{}, fmt.Errorf("nilai %d %s memerlukan ketelitian melebihi pembacaan ulang nvidia-smi (%d %s)",
@@ -87,10 +92,18 @@ func amdSettings(pciRoot, kind, id string) (Settings, error) {
 	if i < 0 {
 		return Settings{}, fmt.Errorf("nilai/rentang OverDrive %s tidak tersedia: %w", controlKind, os.ErrNotExist)
 	}
-	if kind == CoreMax && !amd.coreMaxRangeVerified() {
-		return Settings{}, errors.New(coreRangeUnavailable)
+	control := controls[i]
+	settings := Settings{ID: id, PCI: id, Hardware: amd.Device + "/" + amd.Subsystem, Control: control, Mode: amd.Mode, Table: amd.Table, SysfsDir: amd.Dir}
+	if controlKind == CoreMax {
+		minimum, err := amd.coreMaxMinimum(control)
+		if err != nil && kind == CoreMax {
+			return Settings{}, err
+		}
+		if minimum > control.Min {
+			settings.CoreMaxMinimum = minimum
+		}
 	}
-	return Settings{ID: id, PCI: id, Hardware: amd.Device + "/" + amd.Subsystem, Control: controls[i], Mode: amd.Mode, Table: amd.Table, SysfsDir: amd.Dir}, nil
+	return settings, nil
 }
 
 func (s Settings) InitialTarget() string {
@@ -108,7 +121,7 @@ func (s Settings) SameDevice(other Settings) bool {
 	limits.Current, otherLimits.Current = 0, 0
 	return s.ID == other.ID && s.PCI == other.PCI && s.Hardware == other.Hardware && s.Firmware == other.Firmware &&
 		s.SysfsDir == other.SysfsDir && limits.Kind == otherLimits.Kind && limits.Unit == otherLimits.Unit &&
-		limits.Min == otherLimits.Min && limits.Max == otherLimits.Max &&
+		limits.Min == otherLimits.Min && limits.Max == otherLimits.Max && s.CoreMaxMinimum == other.CoreMaxMinimum &&
 		((limits.Default == nil && otherLimits.Default == nil) || (limits.Default != nil && otherLimits.Default != nil && *limits.Default == *otherLimits.Default))
 }
 

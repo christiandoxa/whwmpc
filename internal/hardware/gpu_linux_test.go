@@ -4,6 +4,7 @@ package hardware
 
 import (
 	"context"
+	"encoding/binary"
 	"encoding/json"
 	"errors"
 	"os"
@@ -242,7 +243,89 @@ func TestLinuxScanPreservesBackendCoverage(t *testing.T) {
 	if _, err := amdSettings(root, CoreMax, pci); err == nil || err.Error() != coreRangeUnavailable {
 		t.Fatalf("fresh clock plan accepted an unverified range: %v", err)
 	}
-	if restore, err := amdSettings(root, RestoreCoreMax, pci); err != nil || restore.InitialTarget() != pci+"=2150,auto" {
+	restore, err := amdSettings(root, RestoreCoreMax, pci)
+	if err != nil || restore.InitialTarget() != pci+"=2150,auto" {
 		t.Fatalf("the observed state used by existing signed restore receipts changed: %+v, %v", restore, err)
+	}
+
+	legacyIdentity, err := json.Marshal(restore)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, backend := range []struct {
+		revision string
+		format   byte
+	}{{"0", 20}, {"10", 20}, {"7", 22}} {
+		t.Run("SMU 13.0."+backend.revision, func(t *testing.T) {
+			if os.Getpagesize() != 4096 {
+				t.Skip("pp_table proof depends on the kernel's 4 KiB sysfs write limit")
+			}
+			if err := os.WriteFile(filepath.Join(ip, "revision"), []byte(backend.revision), 0600); err != nil {
+				t.Fatal(err)
+			}
+			table := smu13TableFixture(backend.format)
+			if err := os.WriteFile(filepath.Join(card, "pp_table"), table, 0600); err != nil {
+				t.Fatal(err)
+			}
+			controls := scanAt(t.Context(), &gpuRunner{lookErr: os.ErrNotExist}, root).Devices[1].Controls
+			if len(controls) != 2 {
+				t.Fatalf("expected verified clock and voltage controls: %+v", controls)
+			}
+			clock := controls[0]
+			if clock.Kind != CoreMax || clock.Min != 2000 || clock.Current != 2150 || clock.Max != 2600 {
+				t.Fatalf("GPU inventory did not expose the verified Fmax range: %+v", clock)
+			}
+			settings, err := amdSettings(root, CoreMax, pci)
+			if err != nil || settings.Control.Min != 500 || settings.CoreMaxMinimum != 2000 || settings.SameDevice(restore) {
+				t.Fatalf("verified floor was not kept separate from the legacy identity: %+v, %v", settings, err)
+			}
+			encoded, err := json.Marshal(settings)
+			if err != nil || string(encoded) != string(legacyIdentity) {
+				t.Fatalf("the new floor changed existing restore receipts: %s (%v)", encoded, err)
+			}
+		})
+	}
+}
+
+func smu13TableFixture(format byte) []byte {
+	table := make([]byte, 4095)
+	binary.LittleEndian.PutUint16(table[:2], 5424)
+	table[2], table[4] = format, 3
+	binary.LittleEndian.PutUint16(table[6:8], 832)
+	binary.LittleEndian.PutUint16(table[3770:3772], 400)
+	binary.LittleEndian.PutUint16(table[3772:3774], 2000)
+	binary.LittleEndian.PutUint16(table[3860:3862], 2600)
+	return table
+}
+
+func TestSMU13ClockFloorRejectsUnknownLayoutAndBounds(t *testing.T) {
+	if os.Getpagesize() != 4096 {
+		t.Skip("pp_table proof depends on the kernel's 4 KiB sysfs write limit")
+	}
+	state := amdState{Dir: t.TempDir()}
+	control := Control{Current: 2150, Min: 500, Max: 2600, reportedClockMin: 400}
+	for _, fixture := range []struct {
+		name   string
+		offset int
+		value  uint16
+	}{
+		{"declared size", 0, 4804}, {"format", 2, 20}, {"table revision", 4, 2}, {"SMC offset", 6, 831},
+		{"different Fmin", 3770, 500}, {"invalid Fmax floor", 3772, 65535}, {"initial Fmax below floor", 3772, 2200},
+		{"different Fmax ceiling", 3860, 3000}, {"truncated export", -1, 4094}, {"oversized export", -1, 4096},
+	} {
+		t.Run(fixture.name, func(t *testing.T) {
+			table := smu13TableFixture(22)
+			if fixture.offset >= 0 {
+				binary.LittleEndian.PutUint16(table[fixture.offset:], fixture.value)
+			} else {
+				table = append(table, 0)[:fixture.value]
+			}
+			if err := os.WriteFile(filepath.Join(state.Dir, "pp_table"), table, 0600); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := state.smu13CoreMaxMinimum(control, 22); !errors.Is(err, errCoreRangeUnavailable) {
+				t.Fatalf("unverified range accepted: %v", err)
+			}
+		})
 	}
 }

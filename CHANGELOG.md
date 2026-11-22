@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- Rencana baru untuk batas clock AMDGPU memerlukan rentang yang terverifikasi untuk slot maksimum. Driver yang memakai batas minimum terpisah dapat tetap menyediakan metrik dan kontrol voltase yang valid.
+- Rencana batas clock AMDGPU memakai minimum untuk slot Fmax yang terverifikasi. SMU 13.0.0/7/10 dapat memakai layout `pp_table` yang dikenali dan cocok dengan `OD_RANGE`.
 - Audit storage Windows mempertahankan health dan counter yang sudah terbaca saat inventaris mencapai batas 65 drive, dengan cakupan parsial.
 
 ## 0.3.8

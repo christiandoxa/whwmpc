@@ -229,4 +229,8 @@ Fixture SMU 13.0.7 mereproduksi preview clock pada rentang teks 500–3000 MHz d
 
 ## Cakupan inventaris storage Windows
 
-Fixture respons Storage berisi 65 drive mereproduksi galat yang sebelumnya menyembunyikan seluruh health dan counter. Audit sekarang mempertahankan 65 record, termasuk status `unhealthy` dan tujuh galat baca tak terkoreksi pada record terakhir, serta melaporkan cakupan parsial. Parser menguji batas 64, 65, dan 66 record. [Provider native](NATIVE.md)
+Fixture respons Storage berisi 65 drive mereproduksi galat yang sebelumnya menyembunyikan seluruh health dan counter. Audit dari `8ff338c` mempertahankan 65 record, termasuk status `unhealthy` dan tujuh galat baca tak terkoreksi pada record terakhir, serta melaporkan cakupan parsial. Parser menguji batas 64, 65, dan 66 record. Tes collector lulus di Windows Server 2025 x64 dan Windows 11 ARM64. [Provider native](NATIVE.md) · [CI native](https://github.com/christiandoxa/whwmpc/actions/runs/45032983588)
+
+## Minimum Fmax SMU 13
+
+Kompilasi header AMDGPU 6.8 dan 7.0 menghasilkan offset Fmax yang sama pada dua layout SMU 13. Tiga dump `pp_table` publik lulus parser dan ditolak saat rentang teks pembanding sengaja diubah. Fixture terpisah menguji minimum Fmax 2000 MHz saat minimum Fmin 400 MHz. Inventaris menampilkan 2000 MHz sebagai batas bawah dan encoding state untuk receipt lama tetap cocok. Planner pada namespace privat menolak 1000 MHz, menerima 2200 MHz, dan mempertahankan preview offset voltase negatif serta pemulihan sah. Preview Renoir fisik tetap baca-saja. [Matriks AMDGPU](HARDWARE.md)

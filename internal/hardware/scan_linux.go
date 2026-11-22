@@ -66,9 +66,17 @@ func scanAt(ctx context.Context, runner sysrun.Runner, pciRoot string) Snapshot 
 				case err == nil:
 					gpu.Controls = state.controls()
 					i := slices.IndexFunc(gpu.Controls, func(c Control) bool { return c.Kind == CoreMax })
-					if i >= 0 && !state.coreMaxRangeVerified() {
-						gpu.Controls = slices.Delete(gpu.Controls, i, i+1)
-						gpu.TuningDetail = coreRangeUnavailable
+					if i >= 0 {
+						minimum, err := state.coreMaxMinimum(gpu.Controls[i])
+						if err == nil {
+							gpu.Controls[i].Min = minimum
+						} else {
+							gpu.Controls = slices.Delete(gpu.Controls, i, i+1)
+							gpu.TuningDetail = domain.SafeText(err.Error())
+							if errors.Is(err, os.ErrPermission) {
+								gpu.TuningAvailability = domain.PermissionRequired
+							}
+						}
 					}
 					if len(gpu.Controls) > 0 && gpu.TuningDetail != "" {
 						gpu.TuningAvailability = domain.Partial

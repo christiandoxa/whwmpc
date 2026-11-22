@@ -60,6 +60,9 @@ func (p linuxPlatform) gpu(ctx context.Context, kind, target string) (prepared, 
 			return prepared{}, err
 		}
 		impact += fmt.Sprintf(" Mode DPM %s → %s. Pengaturan berlaku saat driver berjalan.", before.Mode, change.Mode)
+		if before.CoreMaxMinimum > 0 {
+			impact += fmt.Sprintf(" Rentang driver %d–%d %s.", before.CoreMaxMinimum, before.Control.Max, before.Control.Unit)
+		}
 		risk = "Perubahan clock atau voltase bisa menyebabkan hang, reset GPU, atau kehilangan pekerjaan. Rentang driver bukan jaminan stabilitas. Pengaturan dapat berubah saat driver dilepas atau perangkat di-reset."
 		for _, step := range amdWrites(change) {
 			operation = append(operation, strings.Join(inv.spec, " ")+fmt.Sprintf(" of=<descriptor dari %s> status=none conv=notrunc, stdin=%q", step.path, step.value))
