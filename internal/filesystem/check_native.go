@@ -72,7 +72,8 @@ func apfsCheckEvidence(raw sysrun.Result) (string, string) {
 	var severity, evidence string
 	for _, stream := range [][]byte{raw.Output, raw.Stderr} {
 		for line := range strings.SplitSeq(string(stream), "\n") {
-			lower := strings.ToLower(strings.TrimSpace(line))
+			line = strings.TrimSpace(line)
+			lower := strings.ToLower(strings.TrimSpace(strings.TrimPrefix(line, "** ")))
 			switch {
 			case strings.HasPrefix(lower, "error:"):
 				if strings.Contains(lower, "permission denied") || strings.Contains(lower, "operation not permitted") {
@@ -84,7 +85,7 @@ func apfsCheckEvidence(raw sysrun.Result) (string, string) {
 				if severity != "warning" {
 					severity, evidence = "warning", domain.SafeText(line)
 				}
-			case strings.HasPrefix(lower, "the volume ") && strings.Contains(lower, "appears to be ok"):
+			case strings.HasPrefix(lower, "the volume ") && strings.HasSuffix(strings.TrimSuffix(lower, "."), " appears to be ok"):
 				if severity == "" {
 					severity = "complete"
 				}

@@ -89,6 +89,12 @@ def main(checker):
 
             result = json.loads(run("/usr/bin/sudo", "-n", checker, "filesystem", "--check", device, "--json"))
             if (result.get("device"), result.get("availability"), result.get("state"), result.get("exit_code")) != (device, "available", "clean", 0):
+                if result.get("exit_code") == 0 and result.get("state") == "inconclusive":
+                    diagnostic = subprocess.run(
+                        ("/usr/bin/sudo", "-n", "/usr/bin/env", "LC_ALL=C", "/sbin/fsck_apfs", "-n", "/dev/r" + device[5:]),
+                        stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=150,
+                    )
+                    print(f"fsck_apfs fixture diagnostic (exit {diagnostic.returncode}): {diagnostic.stdout[-4096:]!r}")
                 raise RuntimeError(f"Unexpected APFS fixture check result: {result}")
         finally:
             run(HDIUTIL, "detach", whole)

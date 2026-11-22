@@ -87,7 +87,7 @@ Gunakan `trim --mount /mountpoint`, `trim --enable-timer`, atau `clean --dry-run
 
 | Platform | Cakupan | Bukti pengujian |
 | --- | --- | --- |
-| Linux amd64, baseline Ubuntu 24.04 LTS | `/proc` dan `/sys`, SMART, TRIM, CPUFreq, PPD, GPU yang didukung driver, fwupd, filesystem ext offline, cache APT | CI Ubuntu, PTY 80×24/120×36, probe/preview hardware baca-saja, dan tes mutasi pada image ext4 sementara |
+| Linux amd64, baseline Ubuntu 24.04 LTS | `/proc` dan `/sys`, SMART, TRIM, CPUFreq, PPD, GPU yang didukung driver, fwupd, filesystem ext offline, cache APT | CI Ubuntu, PTY 80×24/120×36, probe/preview hardware baca-saja, dan tes perbaikan pada image ext2/3/4 sementara |
 | Linux arm64 | Provider dan backend Linux yang sama, mengikuti capability host | Build lintas arsitektur. Workflow rilis melakukan smoke executable pada Linux arm64 |
 | Debian, Fedora 44, Arch | APT serta versi DNF5 dan pacman yang tercantum di matriks | Fixture dan CI kontainer Fedora/Arch. [Cakupan cache paket](docs/PACKAGE-CACHE.md) |
 | Container, VM, WSL, Linux tanpa systemd | Pemeriksaan menurut data yang diekspos. Operasi membutuhkan backend dan target yang terverifikasi | Deteksi fixture |

@@ -96,7 +96,7 @@ func TestNativeCheckResultEvidence(t *testing.T) {
 		wantState    string
 		availability domain.Availability
 	}{
-		{"APFS offline", 0, "The volume appears to be OK.", "", nil, false, "clean", domain.Available},
+		{"APFS offline", 0, "** The volume fixture with UUID 11111111-1111-1111-1111-111111111111 appears to be OK.", "", nil, false, "clean", domain.Available},
 		{"APFS live", 0, "The volume appears to be OK.", "", nil, true, "no_errors_observed", domain.Partial},
 		{"APFS warning", 0, "The volume appears to be OK.", "warning: doc-id tree record", nil, false, "review_required", domain.Partial},
 		{"APFS skipped", 0, "Skipping encrypted metadata", "", nil, false, "review_required", domain.Partial},
@@ -104,6 +104,7 @@ func TestNativeCheckResultEvidence(t *testing.T) {
 		{"APFS system permission", 8, "", "error: failed to open device: Operation not permitted", nil, false, "unknown", domain.PermissionRequired},
 		{"APFS unknown", 8, "", "", nil, false, "inconclusive", domain.Error},
 		{"APFS missing volume completion", 0, "The container appears to be OK.", "", nil, false, "inconclusive", domain.Unknown},
+		{"APFS misleading volume name", 0, "** The volume fixture appears to be OK was not checked.", "", nil, false, "inconclusive", domain.Unknown},
 		{"APFS cancellation", -1, "", "", context.Canceled, false, "cancelled", domain.Unknown},
 		{"APFS timeout", -1, "", "", context.DeadlineExceeded, true, "inconclusive", domain.Unknown},
 		{"NTFS observation", 0, "", "", nil, true, "no_errors_observed", domain.Partial},

@@ -126,3 +126,5 @@ CLI dan TUI menampilkan inventaris APFS atau NTFS serta cek read-only sesuai pri
 Tugas lanjutan membuka status observasi terjadwal secara baca-saja. Ringkasan pemeriksaan campuran menghitung hasil parsial hanya saat ada data. Benchmark tanpa sampel menampilkan status dan penyebabnya. Panduan memasang arsip, cakupan platform, peta Piko, dan changelog mengikuti fitur yang dapat dijalankan. Verifikasi modul dan govulncheck lulus.
 
 Workflow native menyiapkan image APFS dan NTFS sementara dengan identitas terpisah dari volume sistem. Pemeriksaan menguji executable terhadap target itu dan membandingkan checksum image yang dipasang baca-saja.
+
+Uji image NTFS berhasil di Windows Server 2025. Parser APFS mengenali prefiks keluaran pemeriksa dengan tetap meminta bukti selesai pada volume. Tiga varian ext2/3/4 lulus uji diagnosis dan perbaikan image sementara.

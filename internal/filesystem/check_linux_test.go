@@ -69,8 +69,7 @@ func TestOfflineInterpretationOnlyIgnoresOwnExclusiveReadClaim(t *testing.T) {
 	}
 }
 
-// Only the disposable regular file created here is formatted or modified.
-func TestOfflineToolsOnTemporaryExt4Image(t *testing.T) {
+func TestOfflineToolsOnTemporaryExtImages(t *testing.T) {
 	native := sysrun.Native{}
 	tools := make(map[string]string)
 	for _, name := range []string{"mke2fs", "debugfs", "e2fsck", "env"} {
@@ -80,6 +79,16 @@ func TestOfflineToolsOnTemporaryExt4Image(t *testing.T) {
 		}
 		tools[name] = p
 	}
+	for _, filesystem := range []string{"ext2", "ext3", "ext4"} {
+		t.Run(filesystem, func(t *testing.T) {
+			checkTemporaryExtImage(t, native, tools, filesystem)
+		})
+	}
+}
+
+// Only the disposable regular file created here is formatted or modified.
+func checkTemporaryExtImage(t *testing.T, native sysrun.Native, tools map[string]string, filesystem string) {
+	t.Helper()
 	img := filepath.Join(t.TempDir(), "volume.img")
 	file, err := os.OpenFile(img, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0600)
 	if err != nil {
@@ -101,7 +110,7 @@ func TestOfflineToolsOnTemporaryExt4Image(t *testing.T) {
 		}
 		return result
 	}
-	run("mke2fs", 0, "-q", "-t", "ext4", "-F", img)
+	run("mke2fs", 0, "-q", "-t", filesystem, "-F", img)
 	held, err := os.Open(img)
 	if err != nil {
 		t.Fatal(err)
