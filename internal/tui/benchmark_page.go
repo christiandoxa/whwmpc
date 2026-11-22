@@ -37,7 +37,7 @@ func runBenchmark(ctx context.Context, scanner *inspection.Scanner, store state.
 	c := benchmark.Config{Mode: mode, Bytes: 16 << 20, Path: req.Output, Duration: 3 * time.Second}
 	if mode == benchmark.Stress {
 		c.Duration = 15 * time.Second
-		c.Temperature = func(ctx context.Context) *float64 { return scanner.Overview(ctx).Temperature.Celsius }
+		c.Temperature = scanner.CPUTemperatureProbe()
 	}
 	result, err := benchmark.Run(ctx, c)
 	status := domain.Available

@@ -37,6 +37,16 @@ func (s *Scanner) Now() time.Time {
 	return time.Now().UTC()
 }
 
+func (s *Scanner) CPUTemperatureProbe() func(context.Context) *float64 {
+	source, ok := s.Provider.(interface {
+		CPUTemperatureProbe() func(context.Context) *float64
+	})
+	if !ok || s.demo {
+		return nil
+	}
+	return source.CPUTemperatureProbe()
+}
+
 func (s *Scanner) SMART(ctx context.Context, fresh bool) storage.SMARTAudit {
 	if s.demo {
 		return demoSMART()

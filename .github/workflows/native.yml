@@ -37,6 +37,10 @@ jobs:
         if: runner.os == 'Linux' && runner.environment == 'github-hosted' && github.event_name == 'push'
         timeout-minutes: 3
         run: bash scripts/check-daemon-ci.sh ./whwmpc
+      - name: Check the thermal guard with fixture sensors
+        if: runner.os == 'Linux' && runner.environment == 'github-hosted' && github.event_name == 'push'
+        timeout-minutes: 3
+        run: python3 scripts/check-benchmark-ci.py ./whwmpc
       - name: Check a temporary APFS image
         if: runner.os == 'macOS' && runner.environment == 'github-hosted'
         timeout-minutes: 5

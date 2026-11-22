@@ -2,9 +2,12 @@ package benchmark
 
 import (
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
+	"sync/atomic"
 	"testing"
+	"testing/synctest"
 	"time"
 )
 
@@ -50,5 +53,47 @@ func TestCPUClockAndThermalPrecondition(t *testing.T) {
 	stop()
 	if _, err := run(cancelled, Config{Mode: CPU, Duration: time.Second}, clock); err != context.Canceled {
 		t.Fatal(err)
+	}
+}
+
+func TestStressStopsAfterThermalGuardFails(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		next func(context.Context, context.CancelFunc) *float64
+		err  error
+		peak float64
+	}{
+		{"hot", func(context.Context, context.CancelFunc) *float64 { return new(86.0) }, errTemperatureLimit, 86},
+		{"missing", func(context.Context, context.CancelFunc) *float64 { return nil }, errTemperatureUnavailable, 55},
+		{"timeout", func(ctx context.Context, _ context.CancelFunc) *float64 {
+			<-ctx.Done()
+			return new(60.0)
+		}, errTemperatureTimeout, 55},
+		{"cancel", func(_ context.Context, stop context.CancelFunc) *float64 {
+			stop()
+			return new(60.0)
+		}, context.Canceled, 55},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			synctest.Test(t, func(t *testing.T) {
+				ctx, stop := context.WithCancel(t.Context())
+				defer stop()
+				var reads atomic.Int32
+				var now time.Time
+				got, err := run(ctx, Config{
+					Mode: Stress, Duration: 3 * time.Second,
+					Temperature: func(ctx context.Context) *float64 {
+						if reads.Add(1) == 1 {
+							return new(55.0)
+						}
+						return tc.next(ctx, stop)
+					},
+				}, func() time.Time { now = now.Add(250 * time.Millisecond); return now })
+				if !errors.Is(err, tc.err) || got.Complete || !got.ThermalGuard ||
+					got.ProcessedBytes != 3*block || got.PeakCelsius == nil || *got.PeakCelsius != tc.peak || reads.Load() != 2 {
+					t.Fatalf("unsafe continuation after second reading: %+v, err=%v, reads=%d", got, err, reads.Load())
+				}
+			})
+		})
 	}
 }

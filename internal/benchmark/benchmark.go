@@ -5,23 +5,31 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"errors"
-	"github.com/christiandoxa/whwmpc/internal/state"
 	"io"
 	"os"
 	"runtime"
 	"time"
+
+	"github.com/christiandoxa/whwmpc/internal/state"
 )
 
 type Mode string
 
 const (
-	CPU              Mode = "cpu"
-	Stress           Mode = "stress"
-	Read             Mode = "read"
-	Write            Mode = "write"
-	block                 = 1 << 20
-	maxBytes              = 64 * block
-	temperatureLimit      = 85.0
+	CPU                 Mode = "cpu"
+	Stress              Mode = "stress"
+	Read                Mode = "read"
+	Write               Mode = "write"
+	block                    = 1 << 20
+	maxBytes                 = 64 * block
+	temperatureLimit         = 85.0
+	temperatureInterval      = time.Second
+)
+
+var (
+	errTemperatureUnavailable = errors.New("pembacaan sensor suhu CPU tidak tersedia")
+	errTemperatureTimeout     = errors.New("pembacaan sensor suhu CPU melewati batas waktu")
+	errTemperatureLimit       = errors.New("suhu CPU mencapai batas penghentian 85 °C")
 )
 
 type Config struct {
@@ -60,46 +68,26 @@ func run(ctx context.Context, c Config, now func() time.Time) (Result, error) {
 		if c.Duration <= 0 || c.Duration > 30*time.Second || (c.Mode == CPU && c.Duration > 5*time.Second) {
 			return out, errors.New("batas CPU 5 detik dan stress 30 detik")
 		}
-		var temperatures <-chan *float64
 		if c.Mode == Stress {
-			if c.Temperature == nil {
-				return out, errors.New("stress memerlukan sensor suhu CPU")
+			if err := out.checkTemperature(ctx, c.Temperature, temperatureInterval); err != nil {
+				return out, err
 			}
-			temp := c.Temperature(ctx)
-			if !validTemperature(temp) {
-				return out, errors.New("stress memerlukan data suhu CPU")
-			}
-			out.ThermalGuard, out.PeakCelsius = true, temp
-			if *temp >= temperatureLimit {
-				return out, errors.New("suhu CPU mencapai batas penghentian 85 °C")
-			}
-			guardCtx, stop := context.WithCancel(ctx)
-			defer stop()
-			temperatures = sampleTemperature(guardCtx, c.Temperature)
 		}
 		begin = now()
+		nextTemperature := begin.Add(temperatureInterval)
 		data := make([]byte, block)
-		for now().Sub(begin) < c.Duration {
-			var stop error
-			select {
-			case <-ctx.Done():
-				stop = ctx.Err()
-			case current := <-temperatures:
-				if !validTemperature(current) {
-					stop = errors.New("sensor suhu tidak lagi tersedia")
-				} else {
-					if *current > *out.PeakCelsius {
-						out.PeakCelsius = current
-					}
-					if *current >= temperatureLimit {
-						stop = errors.New("stress dihentikan pada batas 85 °C")
-					}
-				}
-			default:
-			}
-			if stop != nil {
-				err = stop
+		for at := now(); at.Sub(begin) < c.Duration; at = now() {
+			if err = ctx.Err(); err != nil {
 				break
+			}
+			if c.Mode == Stress && !at.Before(nextTemperature) {
+				// Hold the workload while a fresh temperature reading is pending.
+				remaining := c.Duration - at.Sub(begin)
+				if err = out.checkTemperature(ctx, c.Temperature, min(remaining, temperatureInterval)); err != nil {
+					break
+				}
+				nextTemperature = at.Add(temperatureInterval)
+				continue
 			}
 			out.Digest = sha256.Sum256(data)
 			copy(data, out.Digest[:])
@@ -132,26 +120,36 @@ func run(ctx context.Context, c Config, now func() time.Time) (Result, error) {
 
 func validTemperature(t *float64) bool { return t != nil && *t >= -30 && *t <= 150 }
 
-func sampleTemperature(ctx context.Context, probe func(context.Context) *float64) <-chan *float64 {
+func (out *Result) checkTemperature(ctx context.Context, probe func(context.Context) *float64, timeout time.Duration) error {
+	if probe == nil {
+		return errTemperatureUnavailable
+	}
+	probeCtx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
 	results := make(chan *float64, 1)
-	go func() {
-		ticker := time.NewTicker(time.Second)
-		defer ticker.Stop()
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case <-ticker.C:
-				t := probe(ctx)
-				select {
-				case <-ctx.Done():
-					return
-				case results <- t:
-				}
-			}
-		}
-	}()
-	return results
+	go func() { results <- probe(probeCtx) }()
+	var current *float64
+	select {
+	case current = <-results:
+	case <-probeCtx.Done():
+	}
+	if ctx.Err() != nil {
+		return ctx.Err()
+	}
+	if probeCtx.Err() != nil {
+		return errTemperatureTimeout
+	}
+	if !validTemperature(current) {
+		return errTemperatureUnavailable
+	}
+	out.ThermalGuard = true
+	if out.PeakCelsius == nil || *current > *out.PeakCelsius {
+		out.PeakCelsius = new(*current)
+	}
+	if *current >= temperatureLimit {
+		return errTemperatureLimit
+	}
+	return nil
 }
 
 func read(ctx context.Context, path string, n int64) (int64, error) {

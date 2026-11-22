@@ -49,7 +49,7 @@ func benchmarkCommand(ctx context.Context, args []string, scanner *inspection.Sc
 	}
 	c := benchmark.Config{Mode: mode, Path: path, Bytes: int64(*mib) << 20, Duration: *duration}
 	if mode == benchmark.Stress {
-		c.Temperature = func(ctx context.Context) *float64 { return scanner.Overview(ctx).Temperature.Celsius }
+		c.Temperature = scanner.CPUTemperatureProbe()
 	}
 	r, err := benchmark.Run(ctx, c)
 	code := printJSON(stdout, stderr, r)

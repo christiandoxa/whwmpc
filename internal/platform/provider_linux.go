@@ -23,6 +23,10 @@ func (Native) Overview(ctx context.Context) domain.Overview {
 	return (linuxProvider{fs: os.DirFS("/"), now: time.Now, wait: wait, statfs: syscall.Statfs}).collect(ctx)
 }
 
+func (Native) CPUTemperatureProbe() func(context.Context) *float64 {
+	return (linuxProvider{fs: os.DirFS("/")}).temperatureProbe()
+}
+
 type linuxProvider struct {
 	fs     fs.FS
 	now    func() time.Time
@@ -290,38 +294,82 @@ func (p linuxProvider) disks(ctx context.Context) ([]domain.Disk, domain.Availab
 }
 
 func (p linuxProvider) temperature() domain.Temperature {
+	got := p.readTemperatures(p.hwmonInputs(), false)
+	if got.Celsius == nil {
+		return p.readTemperatures(p.thermalInputs(), false)
+	}
+	return got
+}
+
+type temperatureInput struct {
+	file, sourceFile, source string
+}
+
+func (p linuxProvider) temperatureProbe() func(context.Context) *float64 {
+	var inputs []temperatureInput
+	return func(ctx context.Context) *float64 {
+		if ctx.Err() != nil {
+			return nil
+		}
+		if inputs == nil {
+			inputs = p.hwmonInputs()
+			if len(inputs) == 0 {
+				inputs = p.thermalInputs()
+			}
+		}
+		return p.readTemperatures(inputs, true).Celsius
+	}
+}
+
+func (p linuxProvider) readTemperatures(inputs []temperatureInput, requireAll bool) domain.Temperature {
 	got := domain.Temperature{Availability: domain.Unknown}
-	read := func(file, source string) {
-		n, err := strconv.ParseInt(strings.TrimSpace(p.read(file)), 10, 32)
+	for _, input := range inputs {
+		if requireAll && strings.TrimSpace(p.read(input.sourceFile)) != input.source {
+			return domain.Temperature{Availability: domain.Unknown}
+		}
+		n, err := strconv.ParseInt(strings.TrimSpace(p.read(input.file)), 10, 32)
 		if err != nil || n < -30000 || n > 150000 {
-			return
+			if requireAll {
+				return domain.Temperature{Availability: domain.Unknown}
+			}
+			continue
 		}
 		reading := float64(n) / 1000
 		if got.Celsius == nil || reading > *got.Celsius {
-			got = domain.Temperature{Availability: domain.Available, Celsius: &reading, Source: source}
+			got = domain.Temperature{Availability: domain.Available, Celsius: &reading, Source: input.source}
 		}
 	}
+	return got
+}
+
+func (p linuxProvider) hwmonInputs() []temperatureInput {
+	var found []temperatureInput
 	entries, _ := fs.Glob(p.fs, "sys/class/hwmon/hwmon*")
 	for _, dir := range entries {
-		name := strings.TrimSpace(p.read(dir + "/name"))
+		source := dir + "/name"
+		name := strings.TrimSpace(p.read(source))
 		switch name {
 		case "coretemp", "k10temp", "zenpower", "k8temp", "cpu_thermal":
 			inputs, _ := fs.Glob(p.fs, dir+"/temp*_input")
 			for _, input := range inputs {
-				read(input, name)
+				found = append(found, temperatureInput{input, source, name})
 			}
 		}
 	}
-	if got.Celsius == nil {
-		zones, _ := fs.Glob(p.fs, "sys/class/thermal/thermal_zone*")
-		for _, dir := range zones {
-			switch kind := strings.TrimSpace(p.read(dir + "/type")); kind {
-			case "x86_pkg_temp", "cpu-thermal", "cpu_thermal", "soc_thermal":
-				read(dir+"/temp", kind)
-			}
+	return found
+}
+
+func (p linuxProvider) thermalInputs() []temperatureInput {
+	var found []temperatureInput
+	zones, _ := fs.Glob(p.fs, "sys/class/thermal/thermal_zone*")
+	for _, dir := range zones {
+		source := dir + "/type"
+		switch kind := strings.TrimSpace(p.read(source)); kind {
+		case "x86_pkg_temp", "cpu-thermal", "cpu_thermal", "soc_thermal":
+			found = append(found, temperatureInput{dir + "/temp", source, kind})
 		}
 	}
-	return got
+	return found
 }
 
 func (p linuxProvider) power() (ac *bool, battery *float64) {

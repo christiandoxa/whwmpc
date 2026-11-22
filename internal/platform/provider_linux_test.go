@@ -71,3 +71,35 @@ func TestMemorySeparatesUnreadableSwapFromNoSwap(t *testing.T) {
 		t.Fatalf("no swap sample = %+v", m)
 	}
 }
+
+func TestStressTemperatureKeepsInitialCPUInputs(t *testing.T) {
+	const hwmon = "sys/class/hwmon/hwmon0/"
+	const fallback = "sys/class/thermal/thermal_zone0/"
+	files := fstest.MapFS{
+		hwmon + "name":                       {Data: []byte("coretemp\n")},
+		hwmon + "temp1_input":                {Data: []byte("65000\n")},
+		hwmon + "temp2_input":                {Data: []byte("55000\n")},
+		"sys/class/hwmon/hwmon1/name":        {Data: []byte("amdgpu\n")},
+		"sys/class/hwmon/hwmon1/temp1_input": {Data: []byte("88000\n")},
+		fallback + "type":                    {Data: []byte("x86_pkg_temp\n")},
+		fallback + "temp":                    {Data: []byte("58000\n")},
+	}
+	p := linuxProvider{fs: files}
+	probe := p.temperatureProbe()
+	if got := probe(t.Context()); got == nil || *got != 65 {
+		t.Fatalf("expected hottest CPU input: %v", got)
+	}
+	files[hwmon+"name"].Data = []byte("amdgpu\n")
+	if got := probe(t.Context()); got != nil {
+		t.Fatalf("accepted replaced CPU sensor: %v", *got)
+	}
+	files[hwmon+"name"].Data = []byte("coretemp\n")
+	delete(files, hwmon+"temp1_input")
+	if got := probe(t.Context()); got != nil {
+		t.Fatalf("lost sensor was hidden by a lower reading: %v", *got)
+	}
+	delete(files, hwmon+"name")
+	if got := p.temperatureProbe()(t.Context()); got == nil || *got != 58 {
+		t.Fatalf("missing supported thermal zone: %v", got)
+	}
+}
