@@ -16,6 +16,9 @@ const (
 )
 
 func (a Analyzer) Power(p power.Snapshot) []Finding {
+	if !p.LinuxInterfaces() {
+		return []Finding{a.powerSupply(p)}
+	}
 	out := a.cpuPolicies(p)
 	out = append(out, a.powerSupply(p), a.powerProfiles(p))
 	return ranked(out)
@@ -104,8 +107,16 @@ func (a Analyzer) powerSupply(p power.Snapshot) Finding {
 			fields[0] = a.text("Daya baterai", "Battery power")
 		}
 		for i, battery := range p.Batteries {
+			label := a.textf("baterai #%d", "battery #%d", i+1)
+			var details []string
 			if battery.Percent != nil && *battery.Percent <= 100 {
-				fields = append(fields, a.textf("baterai #%d %d%%", "battery #%d %d%%", i+1, *battery.Percent))
+				details = append(details, fmt.Sprintf("%d%%", *battery.Percent))
+			}
+			if status := strings.ToLower(battery.Status); slices.Contains([]string{"charging", "discharging", "full", "not charging"}, status) {
+				details = append(details, status)
+			}
+			if len(details) > 0 {
+				fields = append(fields, label+" "+strings.Join(details, " · "))
 			}
 		}
 		if p.PowerSource != "ac" && p.PowerSource != "battery" {
@@ -142,6 +153,12 @@ func (a Analyzer) powerSupply(p power.Snapshot) Finding {
 		f.Availability = domain.Partial
 	}
 	f.Observation = strings.Join(fields, " · ")
+	if !p.LinuxInterfaces() {
+		f.Meaning = a.text("Sumber daya dan status baterai dibaca dari sistem operasi.", "Power source and battery status come from the operating system.")
+		f.Limits = a.text("Cakupan baterai mengikuti data yang dilaporkan perangkat.", "Battery coverage depends on the readings exposed by the device.")
+		f.Recommendation = a.text("Ambil sampel baru setelah sumber daya berubah.", "Take another reading after the power source changes.")
+		return f
+	}
 	f.Meaning = a.text("Sumber daya, platform profile, dan EPB berasal dari antarmuka yang terpisah.", "Power source, platform profile, and EPB come from separate interfaces.")
 	f.Limits = a.text("Driver dan firmware menentukan efek setiap pilihan pada perangkat.", "Driver and firmware determine how each setting affects the hardware.")
 	f.Recommendation = a.text("Pilih profil berdasarkan beban kerja, suhu, dan prioritas daya.", "Choose a profile using workload, temperature, and power priorities.")

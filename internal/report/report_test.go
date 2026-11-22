@@ -105,3 +105,26 @@ func TestDemoIsLabeledAndOmitsLiveActions(t *testing.T) {
 		t.Fatal("accepted unknown export format")
 	}
 }
+
+func TestNativeMarkdownUsesReportedPowerAndStorageEvidence(t *testing.T) {
+	p := power.Snapshot{OS: "windows", PowerSource: "ac", PowerStatus: domain.Available, CPUFreqStatus: domain.Unsupported,
+		Batteries: []power.Battery{{Name: "private-battery-label", Status: "Not charging", Percent: new(uint64(0))}}}
+	trim := storage.TrimAudit{Source: storage.WindowsTRIMSource, Availability: domain.Partial,
+		Policy: []storage.TrimPolicy{{Scope: "ntfs", Enabled: true}}}
+	smart := storage.SMARTAudit{Source: storage.WindowsStorageSource, Availability: domain.Partial,
+		Drives: []storage.Drive{{HealthStatus: "warning", Availability: domain.Partial, Health: &storage.SMART{ReadErrorsUncorrected: "2"}}}}
+	raw, err := Encode(Build(Input{Power: &p, Trim: &trim, SMART: &smart}), "markdown")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{"Baterai 1** · 0% · not charging", "Notifikasi penghapusan NTFS", "Kesehatan yang dilaporkan** · warning", "Galat baca tak terkoreksi** · 2"} {
+		if !strings.Contains(string(raw), want) {
+			t.Errorf("missing %q in native report\n%s", want, raw)
+		}
+	}
+	for _, unwanted := range []string{"CPUFreq", "Scheduler", "exit mask", "private-battery-label"} {
+		if strings.Contains(string(raw), unwanted) {
+			t.Errorf("native report emitted %q\n%s", unwanted, raw)
+		}
+	}
+}

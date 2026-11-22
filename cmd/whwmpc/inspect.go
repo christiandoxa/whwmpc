@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/christiandoxa/whwmpc/internal/actions"
+	"github.com/christiandoxa/whwmpc/internal/diagnostics"
 	"github.com/christiandoxa/whwmpc/internal/domain"
 	"github.com/christiandoxa/whwmpc/internal/inspection"
 	"github.com/christiandoxa/whwmpc/internal/workflow"
@@ -70,6 +71,13 @@ func readCommand(ctx context.Context, args []string, source *inspection.Scanner,
 				Data any  `json:"power"`
 			}{demo, p}), true
 		}
+		if !p.LinuxInterfaces() {
+			fmt.Fprintln(out, "Status daya", p.PowerStatus)
+			for _, f := range (diagnostics.Analyzer{Now: source.Now()}).Power(p) {
+				fmt.Fprintln(out, f.Observation)
+			}
+			return 0, true
+		}
 		fmt.Fprintf(out, "CPUFreq %s · %d policy · daya %s\n", p.CPUFreqStatus, len(p.Policies), p.PowerSource)
 		for _, policy := range p.Policies {
 			fmt.Fprintf(out, "%s: %s, %s, EPP %s\n", policy.Name, domain.SafeText(policy.Driver), domain.SafeText(policy.Governor), domain.SafeText(policy.EPP))
@@ -88,6 +96,14 @@ func readCommand(ctx context.Context, args []string, source *inspection.Scanner,
 				Demo bool `json:"demo"`
 				Data any  `json:"trim"`
 			}{demo, a}), true
+		}
+		if a.Source != "" {
+			fmt.Fprintf(out, "Audit TRIM %s · %s\n", a.Availability, a.Source)
+			for _, f := range (diagnostics.Analyzer{Now: source.Now()}).TRIM(a) {
+				fmt.Fprintln(out, f.Observation)
+				fmt.Fprintln(out, f.Limits)
+			}
+			return 0, true
 		}
 		fmt.Fprintf(out, "TRIM %s · fstrim %s · jadwal %s (%s/%s)\n",
 			a.Availability, a.Manual, a.Timer.Availability, a.Timer.UnitFileState, a.Timer.ActiveState)

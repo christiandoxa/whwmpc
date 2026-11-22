@@ -72,7 +72,9 @@ func Inspector(scanner *inspection.Scanner, store state.Store, maintenance *work
 			snapshot := scanner.Power(ctx)
 			page := withFindings(powerPage(snapshot, req.Language), a.Power(snapshot), req.Language)
 			page.Snapshot = &workflow.Snapshot{Input: report.Input{At: scanner.Now(), Demo: maintenance.Demo, Power: &snapshot, Findings: page.Findings}}
-			page.Choices = append(page.Choices, Choice{translator(req.Language)("Pilih profil yang cocok", "Choose a suitable profile"), "navigate", string(assistant.Recommend)})
+			if snapshot.LinuxInterfaces() {
+				page.Choices = append(page.Choices, Choice{translator(req.Language)("Pilih profil yang cocok", "Choose a suitable profile"), "navigate", string(assistant.Recommend)})
+			}
 			if allowActions {
 				page.Choices = actionChoices(page.Choices, page.Findings, nil)
 			}
@@ -251,8 +253,11 @@ func appendKnown(lines []string, value, label string) []string {
 }
 
 func trimPage(audit storage.TrimAudit, lang string) Page {
-	l := translator(lang)
 	page := Page{Availability: audit.Availability}
+	if audit.Source != "" {
+		return page // Native TRIM policy is presented by its diagnostic finding.
+	}
+	l := translator(lang)
 	timer := audit.Timer
 	if timer.Availability == domain.Available {
 		page.Found = append(page.Found, fmt.Sprintf("fstrim.timer · %s / %s", timer.UnitFileState, timer.ActiveState))
@@ -287,12 +292,6 @@ func trimPage(audit storage.TrimAudit, lang string) Page {
 			page.Evidence = append(page.Evidence, l("Belum ada bukti TRIM untuk mount ini.", "No TRIM evidence for this mount."))
 		}
 	}
-	if audit.Source != "" {
-		page.Evidence = append(page.Evidence, audit.Source)
-	}
-	for _, policy := range audit.Policy {
-		page.Evidence = append(page.Evidence, fmt.Sprintf("%s · %t", policy.Scope, policy.Enabled))
-	}
 	page.Meaning = []string{l("Timer aktif menunjukkan jadwal. Bukti discard dinilai per filesystem.",
 		"An active timer shows scheduling. Discard evidence is evaluated per filesystem.")}
 	return page
@@ -303,7 +302,7 @@ func powerPage(snapshot power.Snapshot, lang string) Page {
 	page := Page{Availability: snapshot.CPUFreqStatus}
 	p := snapshot.Profiles
 	page.Found = []string{fmt.Sprintf("CPUFreq · %s · %d %s", statusNames[snapshot.CPUFreqStatus].Text(lang), len(snapshot.Policies), l("policy", "policies"))}
-	if snapshot.OS == "darwin" || snapshot.OS == "windows" {
+	if !snapshot.LinuxInterfaces() {
 		page.Availability = snapshot.PowerStatus
 		page.Found = []string{l("Status daya", "Power status") + " · " + statusNames[snapshot.PowerStatus].Text(lang)}
 	}
@@ -322,7 +321,23 @@ func powerPage(snapshot power.Snapshot, lang string) Page {
 			}
 		}
 	}
-	page.Evidence = []string{"CPUFreq · " + snapshot.At.Format("15:04:05 MST"), "PPD · " + statusNames[p.Status].Text(lang)}
+	for _, battery := range snapshot.Batteries {
+		line := battery.Name
+		if line == "" {
+			line = l("Baterai", "Battery")
+		}
+		if battery.Status != "" {
+			line += " · " + battery.Status
+		}
+		if battery.Percent != nil {
+			line += fmt.Sprintf(" · %d%%", *battery.Percent)
+		}
+		page.Evidence = append(page.Evidence, line)
+	}
+	if !snapshot.LinuxInterfaces() {
+		return page
+	}
+	page.Evidence = append(page.Evidence, "CPUFreq · "+snapshot.At.Format("15:04:05 MST"), "PPD · "+statusNames[p.Status].Text(lang))
 	page.Evidence = appendKnown(page.Evidence, p.Detail, l("Backend", "Backend"))
 	page.Evidence = appendKnown(page.Evidence, p.Degraded, l("Performa menurun", "Performance degraded"))
 	page.Evidence = appendKnown(page.Evidence, p.Inhibited, l("Performa dibatasi", "Performance inhibited"))
@@ -332,13 +347,6 @@ func powerPage(snapshot power.Snapshot, lang string) Page {
 		page.Evidence = append(page.Evidence, fmt.Sprintf("Boost %t · %s", *snapshot.Boost, snapshot.BoostSource))
 	}
 	page.Evidence = appendKnown(page.Evidence, snapshot.PlatformProfile, "Platform profile")
-	for _, battery := range snapshot.Batteries {
-		line := fmt.Sprintf("%s · %s", battery.Name, battery.Status)
-		if battery.Percent != nil {
-			line += fmt.Sprintf(" · %d%%", *battery.Percent)
-		}
-		page.Evidence = append(page.Evidence, line)
-	}
 	for _, policy := range snapshot.Policies {
 		page.Evidence = append(page.Evidence, fmt.Sprintf("%s · %s / %s · EPP %s", policy.Name, policy.Driver, policy.Governor, policy.EPP))
 		page.Evidence = append(page.Evidence, fmt.Sprintf("%s %s · %s %s · %s %s",

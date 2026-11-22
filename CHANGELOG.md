@@ -1,5 +1,9 @@
 # Changelog
 
+## Belum dirilis
+
+- Pemeriksaan daya dan TRIM macOS/Windows menampilkan sumber serta status native di CLI, TUI, dan laporan. Bacaan baterai tanpa sumber daya tetap parsial. Laporan Windows mencantumkan kesehatan drive dan counter reliabilitas yang tersedia.
+
 ## 0.3.0
 
 - Stress CPU memakai kanal suhu yang sama sepanjang uji. Guard menghentikan beban saat pembacaan hilang, terlambat, atau mencapai 85 °C.

@@ -31,6 +31,11 @@ jobs:
         run: ./whwmpc --version
       - if: runner.os == 'Windows'
         run: ./whwmpc.exe --version
+      - name: Exercise the native diagnostic CLI
+        if: runner.os == 'macOS' || runner.os == 'Windows'
+        env:
+          WHWMPC_NATIVE_BINARY: ${{ github.workspace }}/whwmpc${{ runner.os == 'Windows' && '.exe' || '' }}
+        run: go test -count=1 -v -run '^TestNativeCLI$' ./cmd/whwmpc
       - name: Repair a temporary ext4 partition
         if: runner.os == 'Linux' && runner.environment == 'github-hosted' && github.event_name == 'push'
         timeout-minutes: 5

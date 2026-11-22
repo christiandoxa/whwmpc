@@ -110,8 +110,10 @@ func darwinPower(out string) PowerReading {
 			}
 		}
 	}
-	if reading.OnAC != nil || reading.Percent != nil {
+	if reading.OnAC != nil {
 		reading.Availability = domain.Available
+	} else if reading.Percent != nil {
+		reading.Availability = domain.Partial
 	}
 	return reading
 }

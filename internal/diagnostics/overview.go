@@ -247,8 +247,14 @@ func (a Analyzer) overviewPower(o domain.Overview) Finding {
 		f.Availability = domain.Unknown
 		return a.unavailable(f, component)
 	}
-	f.Meaning = a.text("Sumber daya dapat memengaruhi profil yang cocok untuk pekerjaan saat ini.", "Power source can affect which profile suits the current workload.")
 	f.Limits = a.text("Durasi baterai dan kapasitas adaptor perlu pengukuran terpisah.", "Battery runtime and adapter capacity require separate measurements.")
+	if o.OS == "darwin" || o.OS == "windows" {
+		f.Meaning = a.text("Bacaan mengikuti sumber daya yang dilaporkan saat sampel dicatat.", "The reading reflects the power source reported at sample time.")
+		f.Recommendation = a.text("Tinjau status baterai di pemeriksaan daya.", "Review battery status in the power check.")
+		f.Actions = []Action{a.navigate(assistant.Power, "Tinjau daya", "Review power")}
+		return f
+	}
+	f.Meaning = a.text("Sumber daya dapat memengaruhi profil yang cocok untuk pekerjaan saat ini.", "Power source can affect which profile suits the current workload.")
 	f.Recommendation = a.text("Lihat profil yang tersedia sebelum mengubah pengaturan daya.", "Review available profiles before changing power settings.")
 	f.Actions = []Action{a.navigate(assistant.Power, "Tinjau profil daya", "Review power profiles")}
 	return f

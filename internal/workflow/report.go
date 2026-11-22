@@ -58,12 +58,16 @@ func Collect(ctx context.Context, scanner *inspection.Scanner, overview domain.O
 	}
 	step(PowerCheck, 2)
 	p := scanner.Power(ctx)
+	powerCoverage := p.PowerStatus
+	if p.LinuxInterfaces() {
+		powerCoverage = combine(p.PowerStatus, p.Profiles.Status, p.CPUFreqStatus)
+	}
 	snap := Snapshot{
 		Input: report.Input{Demo: demo, Overview: &overview, Power: &p},
 		Coverage: []Coverage{
 			{SystemCheck, combine(overview.CPU.Availability, overview.Memory.Availability)},
 			{DiskCheck, overview.DiskStatus},
-			{PowerCheck, combine(p.PowerStatus, p.Profiles.Status, p.CPUFreqStatus)},
+			{PowerCheck, powerCoverage},
 		},
 	}
 	if full && ctx.Err() == nil {

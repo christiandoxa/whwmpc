@@ -25,6 +25,10 @@ type Snapshot struct {
 	Profiles        Profiles            `json:"profiles"`
 }
 
+func (p Snapshot) LinuxInterfaces() bool {
+	return p.OS == "linux" || p.OS == ""
+}
+
 type Policy struct {
 	Name           string   `json:"name"`
 	CPUs           []string `json:"cpus,omitempty"`

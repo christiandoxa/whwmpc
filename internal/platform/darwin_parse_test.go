@@ -30,6 +30,10 @@ func TestDarwinSensorParsers(t *testing.T) {
 	if unknown := darwinPower("garbage 99%;"); unknown.Percent != nil || unknown.Availability != domain.Unknown {
 		t.Fatalf("unidentified power source was treated as a battery")
 	}
+	if partial := darwinPower("-InternalBattery-0 (id=314)\t66%; not charging;"); partial.OnAC != nil ||
+		partial.Availability != domain.Partial || partial.Percent == nil || partial.BatteryStatus != "Not charging" {
+		t.Fatalf("battery reading without a power source was lost or marked complete: %+v", partial)
+	}
 	for _, input := range []struct{ raw, want string }{
 		{"charging", "Charging"}, {"not charging", "Not charging"}, {"charged", "Full"}, {"unknown", ""},
 	} {

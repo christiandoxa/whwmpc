@@ -225,6 +225,7 @@ func projectPower(p power.Snapshot, private map[string]bool) *power.Snapshot {
 		addPrivate(private, p.PlatformProfile)
 	}
 	out := &power.Snapshot{
+		OS: allowed(p.OS, "linux", "darwin", "windows"),
 		At: p.At.UTC(), CPUFreqStatus: availability(p.CPUFreqStatus), Boost: p.Boost,
 		PlatformProfile: allowed(p.PlatformProfile, platformProfiles...), PlatformChoices: choices(p.PlatformChoices, platformProfiles...),
 		PowerStatus: availability(p.PowerStatus), PowerSource: allowed(p.PowerSource, "ac", "battery", "unknown"),

@@ -30,6 +30,10 @@ func TestWindowsTelemetryUnits(t *testing.T) {
 	if got.Percent == nil || *got.Percent != 53 || got.BatteryStatus != "" {
 		t.Fatalf("unknown flags masked independent percentage or invented charging: %+v", got)
 	}
+	got = windowsPower(powerStatus{255, 0, 53, 0, 0, 0})
+	if got.OnAC != nil || got.Availability != domain.Partial || got.Percent == nil || got.BatteryStatus != "Not charging" {
+		t.Fatalf("known battery flags obscured by an unknown source: %+v", got)
+	}
 	pr := windowsProcesses(map[uint32]windowsProc{1: {10, 0, 0, "one"}, 2: {10, 0, 0, "old"}},
 		map[uint32]windowsProc{1: {10, 5_000_000, 1024, "one"}, 2: {20, 5_000_000, 0, "reused"}}, time.Second, 2)
 	if len(pr) != 1 || pr[0].CPU != 25 || pr[0].RSS != 1024 {

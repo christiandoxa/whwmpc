@@ -204,9 +204,10 @@ func ReadPower(_ context.Context, _ sysrun.Runner) PowerReading {
 
 func windowsPower(state powerStatus) PowerReading {
 	const (
-		charging  = 8
-		noBattery = 128
-		unknown   = 255
+		charging          = 8
+		knownBatteryFlags = 1 | 2 | 4 | charging
+		noBattery         = 128
+		unknown           = 255
 	)
 	reading := PowerReading{Availability: domain.Unknown}
 	if state.acLine <= 1 {
@@ -216,12 +217,17 @@ func windowsPower(state powerStatus) PowerReading {
 		if state.batteryPercent <= 100 {
 			reading.Percent = new(float64(state.batteryPercent))
 		}
-		if state.batteryFlags != unknown && state.batteryFlags&charging != 0 {
-			reading.BatteryStatus = "Charging"
+		if state.batteryFlags&^knownBatteryFlags == 0 {
+			reading.BatteryStatus = "Not charging"
+			if state.batteryFlags&charging != 0 {
+				reading.BatteryStatus = "Charging"
+			}
 		}
 	}
-	if reading.OnAC != nil || reading.Percent != nil || reading.BatteryStatus != "" {
+	if reading.OnAC != nil {
 		reading.Availability = domain.Available
+	} else if reading.Percent != nil || reading.BatteryStatus != "" {
+		reading.Availability = domain.Partial
 	}
 	return reading
 }

@@ -7,6 +7,7 @@ import (
 
 	"github.com/christiandoxa/whwmpc/internal/actions"
 	"github.com/christiandoxa/whwmpc/internal/domain"
+	"github.com/christiandoxa/whwmpc/internal/storage"
 )
 
 var markdownPunctuation = strings.NewReplacer(
@@ -63,17 +64,25 @@ func markdown(report Report) string {
 	}
 	if audit := report.SMART; audit != nil {
 		fmt.Fprintf(&out, "\n## SSD dan SMART\n\nCakupan %s · Sampel %s\n\n", md(string(audit.Availability)), stamp(audit.CapturedAt))
+		bullet(&out, "Sumber", audit.Source)
 		for i, drive := range audit.Drives {
 			fmt.Fprintf(&out, "### Drive %d\n\n", i+1)
 			bullet(&out, "Perangkat", nonempty(drive.DeviceID, drive.Transport, drive.Protocol, string(drive.Availability)))
+			bullet(&out, "Kesehatan yang dilaporkan", drive.HealthStatus)
 			if h := drive.Health; h != nil {
-				bullet(&out, "SMART", nonempty(optional(h.Passed, "lulus %t"), fmt.Sprintf("exit mask 0x%02X", h.ExitCode),
+				exit := ""
+				if audit.Source == "" {
+					exit = fmt.Sprintf("exit mask 0x%02X", h.ExitCode)
+				}
+				bullet(&out, "Indikator drive", nonempty(optional(h.Passed, "lulus %t"), exit,
 					optional(h.CriticalWarning, "peringatan NVMe 0x%02X"), optional(h.TemperatureC, "%d °C")))
 				bullet(&out, "Spare", nonempty(optional(h.Spare, "%d%% tersedia"), optional(h.SpareThreshold, "ambang %d%%")))
 				bullet(&out, "Estimasi endurance terpakai", optional(h.PercentageUsed, "%d%%"))
 				bullet(&out, "Kesalahan media", h.MediaErrors)
 				bullet(&out, "Shutdown tak aman", h.UnsafeShutdowns)
 				bullet(&out, "Jam menyala", h.PowerOnHours)
+				bullet(&out, "Galat baca tak terkoreksi", h.ReadErrorsUncorrected)
+				bullet(&out, "Galat tulis tak terkoreksi", h.WriteErrorsUncorrected)
 				bullet(&out, "Unit data baca", h.DataUnitsRead)
 				bullet(&out, "Unit data tulis", h.DataUnitsWritten)
 			}
@@ -82,14 +91,30 @@ func markdown(report Report) string {
 	}
 	if audit := report.Trim; audit != nil {
 		fmt.Fprintf(&out, "\n## TRIM\n\nCakupan %s · Sampel %s\n\n", md(string(audit.Availability)), stamp(audit.CapturedAt))
-		t := audit.Timer
-		bullet(&out, "Scheduler", nonempty(t.Scheduler, string(t.Availability)))
-		bullet(&out, "Saat boot", t.UnitFileState)
-		bullet(&out, "Saat ini", t.ActiveState)
-		bullet(&out, "Jadwal berikutnya", nonempty(t.NextElapse, t.NextMonotonic))
-		bullet(&out, "Pemicu terakhir", t.LastTrigger)
-		bullet(&out, "Hasil service terakhir", nonempty(t.ServiceResult, t.LastServiceExit))
-		bullet(&out, "Bukti jurnal", string(t.Journal))
+		if audit.Source == "" {
+			t := audit.Timer
+			bullet(&out, "Scheduler", nonempty(t.Scheduler, string(t.Availability)))
+			bullet(&out, "Saat boot", t.UnitFileState)
+			bullet(&out, "Saat ini", t.ActiveState)
+			bullet(&out, "Jadwal berikutnya", nonempty(t.NextElapse, t.NextMonotonic))
+			bullet(&out, "Pemicu terakhir", t.LastTrigger)
+			bullet(&out, "Hasil service terakhir", nonempty(t.ServiceResult, t.LastServiceExit))
+			bullet(&out, "Bukti jurnal", string(t.Journal))
+		} else {
+			bullet(&out, "Sumber", audit.Source)
+			label, enabled, disabled := "Notifikasi penghapusan", "aktif", "nonaktif"
+			if audit.Source == storage.DarwinTRIMSource {
+				label, enabled, disabled = "Dukungan TRIM", "didukung", "belum didukung"
+			}
+			for _, policy := range audit.Policy {
+				status := disabled
+				if policy.Enabled {
+					status = enabled
+				}
+				bullet(&out, label+" "+strings.ToUpper(policy.Scope), status)
+			}
+			bullet(&out, "Cakupan", "Bukti eksekusi discard per volume belum tersedia.")
+		}
 		for i, mount := range audit.Mounts {
 			fields := []string{mount.FSType, mount.DeviceID, string(mount.Discard), mount.DiscardMode}
 			if mount.LastTrim != nil {
@@ -102,14 +127,19 @@ func markdown(report Report) string {
 	if p := report.Power; p != nil {
 		fmt.Fprintf(&out, "\n## CPU dan daya\n\nSampel %s\n\n", stamp(p.At))
 		bullet(&out, "Sumber daya", nonempty(p.PowerSource, string(p.PowerStatus)))
-		bullet(&out, "CPUFreq", string(p.CPUFreqStatus))
-		bullet(&out, "Boost", optional(p.Boost, "%t"))
-		bullet(&out, "Profil platform", p.PlatformProfile)
-		bullet(&out, "Pengelola profil", nonempty(p.Profiles.Backend, string(p.Profiles.ManagerStatus)))
-		bullet(&out, "Profil aktif", p.Profiles.Active)
-		bullet(&out, "Profil tersedia", strings.Join(p.Profiles.Available, ", "))
-		bullet(&out, "Konflik pengelola", strings.Join(p.Profiles.Conflicts, ", "))
-		bullet(&out, "Pembatasan", nonempty(p.Profiles.Degraded, p.Profiles.Inhibited))
+		for i, battery := range p.Batteries {
+			bullet(&out, fmt.Sprintf("Baterai %d", i+1), nonempty(optional(battery.Percent, "%d%%"), battery.Status))
+		}
+		if p.LinuxInterfaces() {
+			bullet(&out, "CPUFreq", string(p.CPUFreqStatus))
+			bullet(&out, "Boost", optional(p.Boost, "%t"))
+			bullet(&out, "Profil platform", p.PlatformProfile)
+			bullet(&out, "Pengelola profil", nonempty(p.Profiles.Backend, string(p.Profiles.ManagerStatus)))
+			bullet(&out, "Profil aktif", p.Profiles.Active)
+			bullet(&out, "Profil tersedia", strings.Join(p.Profiles.Available, ", "))
+			bullet(&out, "Konflik pengelola", strings.Join(p.Profiles.Conflicts, ", "))
+			bullet(&out, "Pembatasan", nonempty(p.Profiles.Degraded, p.Profiles.Inhibited))
+		}
 		for i, policy := range p.Policies {
 			bullet(&out, fmt.Sprintf("Policy CPU %d", i+1), nonempty(policy.Driver, policy.Governor, policy.EPP,
 				optional(policy.ObservedKHz, "%d kHz teramati"), optional(policy.AverageKHz, "%d kHz rata-rata hardware"),
