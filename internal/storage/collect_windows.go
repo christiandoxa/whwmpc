@@ -65,8 +65,7 @@ func (c Collector) InspectSMART(ctx context.Context) SMARTAudit {
 	if native, ok := runner.(sysrun.Native); ok && native.Timeout <= 0 {
 		runner = sysrun.Native{Timeout: 20 * time.Second}
 	}
-	result := runner.Run(ctx, filepath.Join(system, "WindowsPowerShell", "v1.0", "powershell.exe"),
-		"-NoProfile", "-NoLogo", "-NonInteractive", "-Command", windowsStorageRead)
+	result := runner.Run(ctx, filepath.Join(system, "WindowsPowerShell", "v1.0", "powershell.exe"), WindowsSMARTReadArgs()...)
 	audit.Availability = nativeCommandStatus(result)
 	if audit.Availability != domain.Available {
 		if errors.Is(result.Err, context.DeadlineExceeded) {
@@ -87,6 +86,10 @@ func (c Collector) InspectSMART(ctx context.Context) SMARTAudit {
 		audit.Detail = fmt.Sprintf("Pemeriksaan mencapai batas %d drive. Jumlah drive yang terlihat mungkin lebih besar.", windowsSMARTDriveLimit)
 	}
 	return audit
+}
+
+func WindowsSMARTReadArgs() []string {
+	return []string{"-NoProfile", "-NoLogo", "-NonInteractive", "-Command", windowsStorageRead}
 }
 
 func (c Collector) InspectTrim(ctx context.Context) TrimAudit {

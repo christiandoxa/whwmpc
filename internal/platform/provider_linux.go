@@ -27,6 +27,10 @@ func (Native) CPUTemperatureProbe() func(context.Context) *float64 {
 	return (linuxProvider{fs: os.DirFS("/")}).temperatureProbe()
 }
 
+func (Native) Temperature() domain.Temperature {
+	return (linuxProvider{fs: os.DirFS("/")}).temperature()
+}
+
 type linuxProvider struct {
 	fs     fs.FS
 	now    func() time.Time
