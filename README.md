@@ -30,16 +30,25 @@ Jika sudah punya checkout repo, jalankan `./install.sh` atau `./install.sh v0.1.
 
 ### Windows
 
-Jalankan di Windows PowerShell 5.1 atau PowerShell 7 pada Windows 11 atau Windows Server 2025. Installer memilih paket amd64 atau arm64, memeriksa SHA-256, dan memasang `whwmpc.exe` ke `%LOCALAPPDATA%\Programs\whwmpc` tanpa Administrator atau Go.
+Pasang rilis standalone terbaru dengan Windows PowerShell 5.1 atau PowerShell 7 dan `curl.exe`. Installer memilih paket amd64 atau arm64, memeriksa SHA-256, dan memasang `whwmpc.exe` ke `%LOCALAPPDATA%\Programs\whwmpc` tanpa Administrator atau Go. Installer telah diuji pada Windows 11 dan Windows Server 2025.
 
 ```powershell
 $installer = [scriptblock]::Create((Invoke-WebRequest -UseBasicParsing 'https://raw.githubusercontent.com/christiandoxa/whwmpc/main/install.ps1').Content)
 & $installer
-& "$env:LOCALAPPDATA\Programs\whwmpc\whwmpc.exe" --version
-& "$env:LOCALAPPDATA\Programs\whwmpc\whwmpc.exe"
+$exe = Join-Path $env:LOCALAPPDATA 'Programs\whwmpc\whwmpc.exe'
+& $exe --version
+& $exe
 ```
 
-Jalankan ulang `& $installer` untuk memperbarui. Gunakan `& $installer -Version v0.3.9` untuk memilih tag yang menyediakan arsip Windows, atau jalankan `.\install.ps1` dari checkout repo. Tambahkan `--demo` ke perintah executable untuk mencoba data simulasi. [Skrip PowerShell](install.ps1)
+Gunakan `& $exe --demo` untuk mencoba data simulasi. Jalankan ulang `& $installer` untuk memperbarui binari.
+
+Untuk memasang versi tertentu yang menyediakan arsip Windows, sertakan tag rilis.
+
+```powershell
+& $installer -Version v0.3.9
+```
+
+Jika sudah punya checkout repo, jalankan `.\install.ps1` atau `.\install.ps1 -Version v0.3.9` dari direktori repo. [Skrip PowerShell](install.ps1)
 
 ### Instalasi manual
 
