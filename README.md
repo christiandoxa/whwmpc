@@ -58,6 +58,8 @@ Untuk instalasi dari arsip di Linux, macOS, atau Windows, pilih paket yang cocok
 
 ### Navigasi
 
+Pada build `main` dengan fitur pemeriksaan mendalam, Enter di layar startup memilih **Pemeriksaan biasa**. Pilih **Pemeriksaan mendalam** untuk melihat cakupan baca tambahan dan meminta izin lewat prompt sistem operasi. Ganti mode dari **Lainnya… → Pengaturan → Tingkat pemeriksaan**. [Cakupan Linux, macOS, dan Windows](docs/PRIVILEGE.md)
+
 Beranda menyediakan **Cek kondisi PC**, **PC terasa lambat**, dan **Bersihkan ruang**. Tekan Enter pada pilihan pertama untuk memulai pemeriksaan. Gunakan **Lainnya…** untuk SSD, TRIM, daya, riwayat, laporan, pengaturan, dan pertanyaan bebas. **Tugas lanjutan** membuka GPU, firmware, filesystem, benchmark, dan status observasi terjadwal.
 
 | Tombol | Fungsi |
@@ -89,6 +91,8 @@ whwmpc clean --dry-run
 whwmpc report --format markdown --output pc.md
 whwmpc history
 ```
+
+Untuk membaca data tambahan dari CLI tanpa prompt, gunakan `whwmpc --privileged-read check --json` dengan otorisasi sistem yang sudah tersedia. [Cara kerja CLI mendalam](docs/PRIVILEGE.md#cli-tanpa-prompt)
 
 `check --json` dan `report --format json` menghasilkan laporan berskema dengan sumber `live` atau `demo`. Laporan menyaring nama pengguna, hostname, serial, label perangkat, path pribadi, dan nama proses. Riwayat menyimpan ringkasan hingga 100 entri. Di detail, Enter membuka pilihan penyimpanan. **Simpan hasil ini** mengekspor data yang sudah terbuka. **Buat laporan lengkap** melakukan pemeriksaan tambahan. Pilih **Simpan ringkasan** atau gunakan `check --record` jika ingin menyimpan hasil scan. Hasil aksi yang diajukan dicatat otomatis. Laporan tanpa `--output` ditulis ke stdout.
 

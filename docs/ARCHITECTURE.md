@@ -4,6 +4,7 @@
 
 - `internal/domain` menyimpan jenis metrik, waktu, ketersediaan, dan sanitasi teks. `internal/platform` memiliki provider untuk Linux, macOS, Windows, dan fixture demo. [Cakupan native](NATIVE.md)
 - `internal/inspection` menghubungkan overview, `internal/storage`, dan `internal/power`. SMART dibaca ketika diminta. Cache sesi berumur dua menit dengan opsi pembacaan ulang. Bukti detail memakai sysfs, smartctl JSON, mountinfo, journal, dan D-Bus.
+- `internal/privread` menyediakan sesi baca terbatas. `internal/inspection` memakai respons bertipe dari helper ketika cakupan telah disetujui dan beralih ke collector biasa jika akses gagal. `cmd/whwmpc` menangani entry point helper sebelum memuat konfigurasi, riwayat, atau UI. [Cakupan dan autentikasi](PRIVILEGE.md)
 - `internal/diagnostics` membaca snapshot tanpa I/O. Aturan menghasilkan temuan ber-ID dengan severity dan availability yang terpisah. [Daftar aturan dan sumber](DIAGNOSTICS.md)
 - `internal/actions` menyiapkan operasi dari allowlist. `internal/workflow` mengikatnya ke kunci lokal, konfirmasi, klaim satu kali, verifikasi, dan riwayat. `internal/state` memeriksa lokasi privat, membatasi retensi, dan mempublikasikan file baru secara atomik.
 - `internal/report` memakai proyeksi redaksi untuk JSON dan Markdown. Snapshot mentah hanya dipakai lokal untuk bukti yang diminta pengguna. Tidak ada telemetry.

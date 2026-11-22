@@ -1,5 +1,7 @@
 # Alur TUI
 
+Saat startup interaktif, Piko menawarkan **Pemeriksaan mendalam** serta **Pemeriksaan biasa** sebagai pilihan awal. Memilih Mendalam membuka cakupan baca dan konfirmasi sebelum autentikasi OS. Sesudah itu tugas dipilih dari beranda. Judul menunjukkan mode sesi, hasil menghitung pemeriksaan yang perlu izin, dan **Coba izin baca lagi** tersedia bila sesi gagal. Tingkat pemeriksaan dapat diganti di Pengaturan. [Cakupan dan autentikasi](PRIVILEGE.md)
+
 Beranda menanyakan **Mau dibantu apa?** dan memilih **Cek kondisi PC** sebagai posisi awal. Cek kondisi memeriksa CPU/memori, ruang simpan, daya, SSD, dan perawatan storage. Pemeriksaan read-only berlangsung tanpa otentikasi. **PC terasa lambat** langsung mengukur sampel karena gejala awal belum mengubah pengukuran yang didukung. **Bersihkan ruang** membuka inventaris sebelum membuat rencana. Kemampuan lanjutan ada di **Lainnya…**.
 
 Gunakan ↑/↓ untuk daftar, Enter untuk membuka pilihan, dan Esc untuk kembali. Pertanyaan bebas ada di halaman tersendiri melalui `/`. Kolom utama memakai maksimum 76 sel. Pada 120×36 Piko memakai margin kanan. Pada 80×24 wajah dan aksesori Piko berada di dekat judul. Ukuran minimum 48×18. Di bawah batas itu, layar meminta terminal diperbesar dan Esc serta `q` tetap berfungsi.
@@ -21,6 +23,8 @@ Detail mengelompokkan observasi, makna, saran, sumber, waktu, dan keterbatasan p
 Satu layar review menampilkan target, kondisi sebelum dan sesudah, dampak, risiko, izin, dan kemungkinan pemulihan. **Kembali** menjadi pilihan awal. Rencana panjang perlu dibaca dengan gulir sebelum opsi tindakan bisa digunakan. Resize mempertahankan pilihan dan mengharuskan peninjauan kembali bila pembungkusan berubah. Selama aksi, Esc meminta penghentian dan hasil verifikasi tetap ditunggu. Demo cleanup mengunci Apply.
 
 ## Bukti dari PTY
+
+Alur startup Mendalam direkam dari build `e220915` dengan versi `whwmpc dev` di `/tmp/whwmpc-privilege-evidence.hJGYSPKF/whwmpc`. Rekaman 80×24 memakai fixture, termasuk perpindahan terminal saat otorisasi dan ringkasan sesudah memilih **Cek kondisi PC**. [Rekaman pemeriksaan mendalam](assets/ux/deep-check-80x24.cast)
 
 Ringkasan sebelum perubahan dicuplik dari build `5f4a8d7` di `/tmp/whwmpc-visual-before.WtSEAd7M/whwmpc`. Ringkasan sesudah perubahan dicuplik dari build `c0eb036` di `/tmp/whwmpc-visual-after.JJNTZPHv/whwmpc`. Keduanya menampilkan `whwmpc dev` dan berjalan dalam PTY Linux dengan `--demo --motion off --theme dark`. PNG berasal dari frame akhir asciicast sebelum keluar.
 

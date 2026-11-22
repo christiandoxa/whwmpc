@@ -31,6 +31,9 @@ jobs:
         run: ./whwmpc --version
       - if: runner.os == 'Windows'
         run: ./whwmpc.exe --version
+      - name: Exercise non-interactive privileged reads
+        if: runner.environment == 'github-hosted' && github.event_name == 'push'
+        run: python scripts/check-privread-ci.py ./whwmpc${{ runner.os == 'Windows' && '.exe' || '' }}
       - name: Install and upgrade with Windows PowerShell
         if: runner.os == 'Windows' && runner.environment == 'github-hosted' && github.event_name == 'push'
         shell: powershell

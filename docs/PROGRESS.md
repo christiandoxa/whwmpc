@@ -247,3 +247,6 @@ Binari Linux amd64 lulus PTY 80×24 dan 120×36. Urutan 61 event terminal dari g
 ## Revamp ringkasan hasil
 
 `d778974` menambahkan bar penggunaan dan keterangan sampel dari snapshot. `b0a300f` menambahkan ringkasan per tugas serta hasil aksi berdasarkan pengukuran dan verifikasi. `c0eb036` menambahkan ringkasan lanjutan dan fallback ukuran minimum 48×18. Sebanyak 322 tes race, `go vet`, build, dan PTY Linux demo lulus. Tiga workflow main untuk `c0eb036` lulus. Rilis stabil yang tersedia saat bukti dibuat adalah `v0.3.9`. [Perbandingan PTY](UX.md#bukti-dari-pty) · [CI](https://github.com/christiandoxa/whwmpc/actions/runs/45039009835)
+## Pemeriksaan mendalam
+
+`340d065` menambahkan helper baca lintas platform. `e220915` menghubungkan pilihan startup, izin native, scope baca, dan ringkasan ketersediaan ke collector. Build bersih `e220915` lulus `go test ./...`, race detector, `go vet`, verifikasi modul, govulncheck, dan PTY. Linux lulus handshake serta pembacaan suhu dalam user namespace. Saat otorisasi native tidak tersedia di lingkungan ini, PTY kembali ke mode Biasa dan atribut terminal pulih saat keluar. CI Windows menguji named pipe dengan pegangan proses asli. [Model izin](PRIVILEGE.md) · [Rekaman](UX.md#bukti-dari-pty) · [CI native](https://github.com/christiandoxa/whwmpc/actions/runs/45041399336)

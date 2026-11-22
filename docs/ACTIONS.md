@@ -4,6 +4,8 @@ Jalankan aplikasi sebagai user biasa. Pemeriksaan dan preview hanya membaca kead
 
 CLI memerlukan rencana yang ditulis eksplisit ke file baru dan ID yang disalin setelah meninjau isinya. Rencana berlaku sepuluh menit dan terikat pada host, target, kondisi awal, versi, dan operasi yang diperbolehkan. Aplikasi memverifikasi autentikasi HMAC lokal, mengunci eksekusi per state pengguna, mengklaim ID sekali, lalu menyiapkan operasi kembali dari target yang masih cocok. Rencana tidak mengizinkan argv kustom. Jika revalidasi gagal atau hasil belum diketahui, periksa keadaan dan buat preview baru sebelum mencoba lagi. Aksi dengan sudo memakai autentikasi OS dari terminal yang disuspensi. Pada non-TTY, autentikasi yang sudah tersedia melalui kebijakan sudo/polkit diperlukan.
 
+Izin **Pemeriksaan mendalam** berlaku untuk daftar operasi baca helper. Pipeline tindakan memakai identitas target, persetujuan, dan otorisasi sendiri. Seluruh perubahan tetap melewati preview, konfirmasi, revalidasi, eksekusi, dan verifikasi. [Model akses baca](PRIVILEGE.md)
+
 Pemulihan yang terverifikasi tercatat bersama ID tindakan asal. Riwayat melepas pilihan pemulihan untuk tindakan tersebut. Executor memeriksa kaitan ini setelah memperoleh lock, termasuk untuk rencana pemulihan lain yang sudah ditandatangani sebelumnya. Riwayat lama tanpa kaitan memakai pemeriksaan keadaan backend ketika pemulihan ditinjau.
 
 | Tindakan | Cakupan dan pemeriksaan |
