@@ -104,6 +104,41 @@ func TestInventorySelectsTrustedExactUpgrade(t *testing.T) {
 	}
 }
 
+func TestMixedCatalogKeepsEligibleCapsules(t *testing.T) {
+	if runtime.GOOS != "linux" {
+		t.Skip("Linux fwupd inventory")
+	}
+	const nvmeID = "2222222222222222222222222222222222222222"
+	withNVMe := func(capsule, updates string) string {
+		nvme := fmt.Sprintf(`{"DeviceId":%q,"Plugin":"nvme","Version":"MU05","Guid":["nvme-guid"],"Flags":["supported","updatable"]`, nvmeID)
+		if updates != "" {
+			nvme += `,"Releases":[` + updates + `]`
+		}
+		return strings.TrimSuffix(capsule, `]}`) + "," + nvme + `}]}`
+	}
+	signed := release(LVFS, `["trusted-metadata","is-upgrade"]`)
+	valid := strings.Replace(signed, `"2.0"`, `"R2.0"`, 1)
+	readOnly := strings.Replace(signed, `"2.0"`, `"3.0 "`, 1)
+	nvme := strings.Replace(signed, `"2.0"`, `"MU05.1"`, 1)
+	snapshot := Collect(t.Context(), runner{responses: map[string]sysrun.Result{
+		"get-devices": result(withNVMe(inventory(""), "")),
+		"get-updates": result(withNVMe(inventory(valid+","+readOnly), nvme)),
+	}}, true)
+	if snapshot.Updates != domain.Available || len(snapshot.Devices) != 2 || len(snapshot.Devices[0].Releases) != 2 ||
+		len(snapshot.Devices[1].Releases) != 1 || snapshot.Devices[1].Releases[0].Version != "MU05.1" {
+		t.Fatalf("mixed catalog lost data: %+v", snapshot)
+	}
+	_, selected, err := Select(snapshot, testID+"@R2.0")
+	if err != nil || selected.Version != "R2.0" || selected.SHA256 != testDigest {
+		t.Fatalf("eligible capsule lost: %+v, %v", selected, err)
+	}
+	for _, target := range []string{testID + "@3.0 ", testID + "@3.0", nvmeID + "@MU05.1"} {
+		if _, _, err := Select(snapshot, target); err == nil {
+			t.Fatalf("read-only release accepted as update target: %q", target)
+		}
+	}
+}
+
 func TestUnknownMissingPermissionAndMalformed(t *testing.T) {
 	if runtime.GOOS != "linux" {
 		t.Skip("Linux fwupd inventory")

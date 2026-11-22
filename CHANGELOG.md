@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.3.7
+
+- Katalog fwupd mempertahankan kandidat UEFI capsule saat perangkat lain memakai versi alfanumerik seperti `MU05.1`. Versi dengan format di luar token rencana tetap dapat diperiksa sebagai metadata.
+
 ## 0.3.6
 
 - Verifikasi firmware lewat ID rencana mencatat hasil akhir di Riwayat dan melepas pilihan verifikasi setelah restart. Bukti fwupd dari sebelum rencana dibuat tidak menyelesaikan handoff.

@@ -2,6 +2,8 @@
 
 Dukungan pembacaan adalah Linux amd64 dan arm64 dengan `fwupdmgr`. Inventaris menggunakan `get-devices --json`, sedangkan daftar kandidat memakai `get-updates --json` dan metadata lokal yang sudah tersedia. Baris `Kandidat` di CLI menandai rilis yang memenuhi syarat pemilihan UEFI capsule. JSON juga memuat metadata plugin lain. Inventaris tidak menyertakan nama akun atau nomor seri perangkat.
 
+Versi target `ID@VERSI` dicocokkan persis dan dapat diawali huruf atau digit. Versi di luar format token rencana dipertahankan sebagai metadata tampilan. Entri semacam itu tidak menghalangi kandidat pada perangkat lain. [Format versi LVFS](https://lvfs.readthedocs.io/en/latest/metainfo.html#version-format)
+
 Jalur tulis mendukung UEFI capsule perangkat dengan plugin `uefi_capsule` di fwupd 2.0.x. Aksi memakai ID perangkat dan versi yang dipilih, satu komponen, metadata LVFS stabil yang divalidasi fwupd, SHA-256 CAB, dan payload bertanda tangan. Mesin harus memakai daya AC yang terdeteksi. Jika kapasitas baterai tidak diketahui, UPower harus mengonfirmasi bahwa baterai tidak ada. Daemon harus memiliki `OnlyTrusted=true`. Cabang alternatif, downgrade, perangkat yang terkunci, emulasi, dan paket dengan hasil pencocokan ambigu ditolak.
 
 Metadata dapat diminta melalui aksi refresh LVFS. Rencana memperlihatkan akses jaringan dan perubahan cache lokal. Remote unduhan aktif harus LVFS stabil dan URL metadata serta tanda tangan harus sesuai konfigurasi resmi. JSON mode fwupd melewati alur pelaporan otomatis pada perintah refresh. Pemeriksaan offline tidak mengunduh metadata ataupun firmware.

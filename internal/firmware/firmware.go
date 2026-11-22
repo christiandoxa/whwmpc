@@ -23,7 +23,7 @@ const LVFS = "lvfs"
 var (
 	deviceID       = regexp.MustCompile(`^[a-f0-9]{40}$`)
 	releaseBackend = regexp.MustCompile(`^2\.0\.[0-9]+$`)
-	version        = regexp.MustCompile(`^[0-9][a-zA-Z0-9.+_-]{0,79}$`)
+	version        = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9.+_-]{0,79}$`)
 	checksum       = regexp.MustCompile(`^[a-fA-F0-9]{64}$`)
 	cabName        = regexp.MustCompile(`^[a-zA-Z0-9_.+-]+\.[cC][aA][bB]$`)
 )
@@ -130,7 +130,9 @@ func decodeDevices(data []byte) ([]Device, error) {
 		for j := range d.Releases {
 			r := &d.Releases[j]
 			if !version.MatchString(r.Version) {
-				return nil, errors.New("versi firmware dari fwupd tidak valid")
+				// Keep display metadata without making the sanitized value an action target.
+				r.Version = domain.SafeText(r.Version)
+				continue
 			}
 			r.SHA256, r.URL = usablePackage(*r)
 		}
