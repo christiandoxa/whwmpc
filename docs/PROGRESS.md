@@ -250,3 +250,7 @@ Binari Linux amd64 lulus PTY 80×24 dan 120×36. Urutan 61 event terminal dari g
 ## Pemeriksaan mendalam
 
 `340d065` menambahkan helper baca lintas platform. `e220915` menghubungkan pilihan startup, izin native, scope baca, dan ringkasan ketersediaan ke collector. Build bersih `e220915` lulus `go test ./...`, race detector, `go vet`, verifikasi modul, govulncheck, dan PTY. Linux lulus handshake serta pembacaan suhu dalam user namespace. Saat otorisasi native tidak tersedia di lingkungan ini, PTY kembali ke mode Biasa dan atribut terminal pulih saat keluar. CI Windows menguji named pipe dengan pegangan proses asli. [Model izin](PRIVILEGE.md) · [Rekaman](UX.md#bukti-dari-pty) · [CI native](https://github.com/christiandoxa/whwmpc/actions/runs/45041399336)
+
+## Revamp perjalanan tugas
+
+Build `b29e21a` menyelesaikan perjalanan biasa, mendalam, SSD dengan percobaan ulang izin, pengamatan kelambatan, dan cleanup fixture pada 80×24 dan 120×36. Checkout bersih lulus 343 tes Go dengan race detector, vet, build, verifikasi modul, dan govulncheck. Hasil PTY dan hitungan langkah dibandingkan dengan `a50c1ee`. [Walkthrough](UX.md#bukti-dari-pty) · [CI](https://github.com/christiandoxa/whwmpc/actions/runs/45051531066)

@@ -30,3 +30,11 @@ Audit baseline `854f277` di `christiandoxa/whwmpc`. GitHub tidak menampilkan iss
 | K.1 | Pilihan awal Biasa atau Mendalam, cakupan baca, pilihan ulang di Pengaturan, hasil dan alasan izin. | verified · `e220915`. Fixture dan PTY Linux 80×24 serta 120×36 mencakup pilihan awal, pengukuran, dan pemulihan terminal. [CI](https://github.com/christiandoxa/whwmpc/actions/runs/45041402937) · [Rekaman](UX.md#bukti-dari-pty) |
 | K.2 | Helper baca lokal Linux, macOS, Windows. Protokol tertutup, pembatasan executable dan argv, kedaluwarsa, dan penutupan sesi. | implemented · `340d065`, `e220915`. Protokol lulus fixture lintas platform. Linux lulus pembacaan di user namespace dan pemulihan terminal ketika otorisasi native tidak tersedia. Validasi pemberian izin di perangkat desktop tetap terbuka. [Cakupan](PRIVILEGE.md) · [CI native](https://github.com/christiandoxa/whwmpc/actions/runs/45041399336) |
 | K.3 | Collector biasa dan yang diberi izin, ketersediaan parsial, CLI opt-in, persetujuan mutasi terpisah. | verified · `e220915` untuk jalur fixture dan CLI. Fixture mencakup ketujuh jenis pengukuran/inventaris, respons tidak valid, dan penolakan opsi mutasi. [Uji collector](../internal/inspection/inspection_test.go) · [Model tindakan](ACTIONS.md) |
+
+## Perjalanan dari tujuan ke hasil
+
+| Cakupan | Status dan bukti |
+| --- | --- |
+| Tujuan sebelum akses dan pemeriksaan langsung | `6a29979`. PTY biasa dan mendalam serta fixture penolakan, pembatalan, dan batas waktu. Alur ini tersedia di `v0.5.0`. [Rilis](https://github.com/christiandoxa/whwmpc/releases/tag/v0.5.0) |
+| Melengkapi pembacaan yang terhalang izin | `cd29d33`, `b29e21a`. Scope SSD terpisah, snapshot komponen lain tetap sama, waktu sampel dipertahankan, dan mode bisa diganti dari hasil. Fixture mencakup jawaban terlambat, akses kedaluwarsa, dan rollback saat batal. [CI](https://github.com/christiandoxa/whwmpc/actions/runs/45049317374) · [Bukti PTY](UX.md#bukti-dari-pty) |
+| Pengamatan kelambatan dan akhir tugas | `b1ba780`, `21137ca`. Baseline dan pengamatan 12 detik, rekomendasi terkait temuan, detail komponen, serta cleanup sampai verifikasi fixture. Bukti mencakup PTY dan pembacaan native Linux. [CI](https://github.com/christiandoxa/whwmpc/actions/runs/45051276425) · [Walkthrough](UX.md#bukti-dari-pty) |

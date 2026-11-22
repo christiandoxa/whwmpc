@@ -58,11 +58,15 @@ Untuk instalasi dari arsip di Linux, macOS, atau Windows, pilih paket yang cocok
 
 ### Navigasi
 
+Panduan ini mengikuti `main`. Installer mengambil rilis stabil terbaru dari GitHub. [Rilis stabil](https://github.com/christiandoxa/whwmpc/releases/latest)
+
 Pilih tujuan lebih dulu. Layar akses muncul sebelum pemeriksaan pertama dengan **Mulai tanpa administrator** sebagai pilihan awal. Pilihan administrator memakai prompt sistem operasi dan melanjutkan tujuan yang sudah dipilih. Dari hasil yang terhalang izin, **Lengkapi pemeriksaan** membaca ulang komponen terkait. Ganti tingkat akses sesi dari Pengaturan. [Cakupan Linux, macOS, dan Windows](docs/PRIVILEGE.md)
 
 Beranda menyediakan **Cek kondisi PC**, **Cari penyebab PC lambat**, dan **Bersihkan ruang**. **Pemeriksaan lain** membuka SSD, TRIM, dan daya. Dari sana, **Pemeriksaan lanjutan** membuka GPU, firmware, filesystem, uji kinerja, dan observasi terjadwal. **Alat bantu** memuat riwayat, laporan, pengaturan, serta pertanyaan bebas.
 
 Di **Cari penyebab PC lambat**, pilih apakah gejalanya sedang terjadi. **Ya, pantau sekarang** mengukur CPU, RAM, dan proses sekitar 12 detik serta membaca konteks daya. **Belum, ambil kondisi awal** mengambil sampel pembanding. Tekan Esc untuk menghentikan pengamatan.
+
+[Cek biasa](docs/assets/ux/journey/after-condition.cast) · [Cek mendalam](docs/assets/ux/journey/after-deep.cast) · [Lengkapi SSD](docs/assets/ux/journey/after-ssd.cast) · [Amati PC lambat](docs/assets/ux/journey/after-slow.cast) · [Simulasi cleanup](docs/assets/ux/journey/after-cleanup.cast)
 
 | Tombol | Fungsi |
 | --- | --- |

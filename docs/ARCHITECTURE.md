@@ -9,6 +9,7 @@
 - `internal/actions` menyiapkan operasi dari allowlist. `internal/workflow` mengikatnya ke kunci lokal, konfirmasi, klaim satu kali, verifikasi, dan riwayat. `internal/state` memeriksa lokasi privat, membatasi retensi, dan mempublikasikan file baru secara atomik.
 - `internal/report` memakai proyeksi redaksi untuk JSON dan Markdown. Snapshot mentah hanya dipakai lokal untuk bukti yang diminta pengguna. Tidak ada telemetry.
 - `internal/tui` menerima snapshot, progress, dan hasil sebagai pesan Bubble Tea. Probe dan subprocess berjalan sebagai command asinkron. Pemeriksaan dimulai dari pilihan pengguna. Pengumpulan snapshot dan timer animasi memakai lifecycle terpisah. Satu foreground job dapat dihentikan dan diselesaikan hingga hasilnya jelas. [Siklus motion](MOTION.md)
+- `internal/workflow` merangkai snapshot dan cakupan per pemeriksaan. Percobaan ulang izin mengganti komponen yang diminta dengan hasil baru. Pengamatan kelambatan memakai interval provider yang lebih panjang dan mengirim waktu aktual ke job aktif. TUI mempertahankan konteks tujuan, snapshot, dan pilihan melalui autentikasi serta navigasi detail. [Alur tugas](UX.md)
 - `internal/hardware`, `internal/firmware`, dan `internal/filesystem` membaca kemampuan backend resmi dan memeriksa identitas target. Mutasi Linux masuk melalui action service yang sama.
 - `internal/daemon` mengatur systemd user timer secara eksplisit. Timer menjalankan pengumpulan snapshot read-only dengan lock. `internal/benchmark` mengukur workload terbatas di bawah konteks yang dapat dibatalkan.
 

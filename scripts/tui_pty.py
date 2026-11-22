@@ -122,7 +122,7 @@ class Terminal:
 
 def press(terminal, key):
     terminal.key(key)
-    terminal.hold(0.22)
+    terminal.hold(0.8 if terminal.recording else 0.22)
 
 
 def choose_level(terminal, deep, scope="SMART"):
@@ -299,6 +299,8 @@ def main():
         try:
             terminal.expect("DEMO")
             if args.flow:
+                if args.record is not None:
+                    terminal.hold(1.2)
                 task_flow(terminal, args.flow, resize=args.record is None, deep=args.deep, observe=args.observe,
                           cleanup_result=args.cleanup_result)
                 if args.record is not None:
