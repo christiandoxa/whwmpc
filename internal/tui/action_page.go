@@ -63,6 +63,9 @@ func (m *Model) launch(req Request, pose mascot.Pose) tea.Cmd {
 	m.request = &request
 	m.busy, m.cancelling, m.workName = true, false, ""
 	m.activity = pose
+	if req.ObserveFor > 0 && req.Complete == "" {
+		m.workName = m.observationLabel(0, req.ObserveFor)
+	}
 	switch req.Choice.Kind {
 	case "benchmark-run":
 		m.runningAction = true

@@ -15,13 +15,13 @@ import (
 )
 
 type ResultSummary struct {
-	Headline, Coverage string
-	At                 time.Time
-	Metrics            []resultMetric
-	Statuses           []resultStatus
-	Highlights         []string
-	Primary            Choice
-	RetryRead          privread.Operation
+	Headline, Coverage, Advice string
+	At                         time.Time
+	Metrics                    []resultMetric
+	Statuses                   []resultStatus
+	Highlights                 []string
+	Primary                    Choice
+	RetryRead                  privread.Operation
 }
 
 type resultMetric struct {
@@ -169,6 +169,9 @@ func summarize(page Page, intent assistant.Intent, lang string) ResultSummary {
 				summary.Metrics = overviewMetrics(*in.Overview, lang)
 			}
 			summary.Statuses = overviewStatuses(in.SMART, in.Trim, in.Power, lang)
+			if intent == assistant.Slow {
+				summarizeObservation(&summary, *page.Snapshot, lang)
+			}
 		}
 	}
 	findings := sortedFindings(page.Findings)
@@ -202,7 +205,7 @@ func summarize(page Page, intent assistant.Intent, lang string) ResultSummary {
 	case incomplete:
 		summary.Headline = l("Sebagian pemeriksaan perlu ditinjau", "Some checks need review")
 	case intent == assistant.Slow:
-		summary.Headline = l("Gejala lambat belum terlihat pada sampel ini", "Slowdown was not observed in this sample")
+		summary.Headline = l("Belum terlihat tanda beban berlebih", "No signs of sustained load in this sample")
 	default:
 		summary.Headline = l("Tidak ada peringatan pada sampel ini", "No warnings in this sample")
 	}
@@ -232,7 +235,7 @@ func summarize(page Page, intent assistant.Intent, lang string) ResultSummary {
 		}
 	}
 	if intent == assistant.Slow && summary.Primary.Kind == "details" {
-		summary.Primary = Choice{l("Periksa ulang saat gejala muncul", "Check again during the slowdown"), "rescan", ""}
+		summary.Primary = observeChoice(lang)
 	}
 	return summary
 }

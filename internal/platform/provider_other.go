@@ -18,6 +18,8 @@ func (Native) Overview(context.Context) domain.Overview {
 	return o
 }
 
+func (n Native) Observe(ctx context.Context, _ time.Duration) domain.Overview { return n.Overview(ctx) }
+
 func ReadPower(context.Context, sysrun.Runner) PowerReading {
 	return PowerReading{Availability: domain.Unsupported}
 }

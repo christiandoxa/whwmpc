@@ -124,6 +124,9 @@ func (m Model) summaryBody(s ResultSummary, w, room int) []string {
 	for _, status := range s.Statuses {
 		text := label(status.Label)
 		style, priority := m.palette.text, 3
+		if status.Category == "process" {
+			priority = 1
+		}
 		switch status.Severity {
 		case diagnostics.Critical:
 			text += l("KRITIS", "CRITICAL") + " · "
@@ -143,6 +146,11 @@ func (m Model) summaryBody(s ResultSummary, w, room int) []string {
 			style, priority = m.palette.alert, min(priority, 2)
 		}
 		add(text, style, priority)
+	}
+	if s.Advice != "" {
+		for i, line := range wrap(s.Advice) {
+			add(line, m.palette.text, 1+i)
+		}
 	}
 	if m.question != "" {
 		add(l("Pertanyaan", "Question")+" · "+m.question, m.palette.muted, 5)

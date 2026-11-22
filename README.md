@@ -62,6 +62,8 @@ Pilih tujuan lebih dulu. Layar akses muncul sebelum pemeriksaan pertama dengan *
 
 Beranda menyediakan **Cek kondisi PC**, **Cari penyebab PC lambat**, dan **Bersihkan ruang**. Gunakan **Pemeriksaan lain** untuk SSD, TRIM, daya, riwayat, laporan, pengaturan, dan pertanyaan bebas. **Tugas lanjutan** membuka GPU, firmware, filesystem, benchmark, dan status observasi terjadwal.
 
+Di **Cari penyebab PC lambat**, pilih apakah gejalanya sedang terjadi. **Ya, pantau sekarang** mengukur CPU, RAM, dan proses sekitar 12 detik serta membaca konteks daya. **Belum, ambil kondisi awal** mengambil sampel pembanding. Tekan Esc untuk menghentikan pengamatan.
+
 | Tombol | Fungsi |
 | --- | --- |
 | ↑/↓ atau j/k | Pilih dari daftar atau gulir detail |

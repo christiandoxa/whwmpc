@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/binary"
 	"math"
+	"strconv"
 	"time"
 
 	"github.com/christiandoxa/whwmpc/internal/domain"
@@ -13,7 +14,11 @@ import (
 
 type Native struct{}
 
-func (Native) Overview(ctx context.Context) domain.Overview {
+func (n Native) Overview(ctx context.Context) domain.Overview {
+	return n.Observe(ctx, time.Second)
+}
+
+func (Native) Observe(ctx context.Context, interval time.Duration) domain.Overview {
 	runner := sysrun.Native{}
 	o := baseOverview(time.Now(), domain.Unknown)
 	o.Distro, o.DistroID = "macOS", "darwin"
@@ -30,11 +35,19 @@ func (Native) Overview(ctx context.Context) domain.Overview {
 		}
 	}
 
+	var initialMemory domain.Percent
+	if interval > time.Second {
+		initialMemory = darwinMemory(ctx, runner).Use
+	}
 	cpuStart := time.Now().UTC()
-	sample := (sysrun.Native{Timeout: 12 * time.Second}).Run(ctx, "/usr/bin/top", "-l", "4", "-s", "1", "-n", "0", "-F", "-R")
+	sample := (sysrun.Native{Timeout: max(12*time.Second, 3*interval+4*time.Second)}).Run(ctx, "/usr/bin/top", "-l", "4", "-s", strconv.Itoa(max(1, int(interval/time.Second))), "-n", "0", "-F", "-R")
 	o.CPU = darwinCPUResult(sample)
 	o.CPU.StartedAt, o.CPU.CapturedAt = cpuStart, time.Now().UTC()
 	o.Memory = darwinMemory(ctx, runner)
+	if first, ok := initialMemory.Latest(); ok && len(o.Memory.Use.Samples) > 0 {
+		o.Memory.Use.StartedAt = initialMemory.StartedAt
+		o.Memory.Use.Samples = append([]float64{first}, o.Memory.Use.Samples...)
+	}
 	o.Disks, o.DiskStatus = darwinDisks()
 	power := ReadPower(ctx, runner)
 	o.OnAC, o.Battery, o.PowerStatus = power.OnAC, power.Percent, power.Availability

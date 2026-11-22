@@ -68,7 +68,7 @@ func startsInspection(req Request) bool {
 	switch req.Choice.Kind {
 	case "export":
 		return req.Snapshot == nil
-	case "", "rescan", "workload":
+	case "", "rescan", "workload", "slow-baseline", "slow-observe":
 		if req.Intent == assistant.Recommend {
 			return req.Workload != ""
 		}

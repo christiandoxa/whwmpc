@@ -69,6 +69,7 @@ type Request struct {
 	Workload     assistant.Workload
 	Language     string
 	Complete     privread.Operation
+	ObserveFor   time.Duration
 }
 
 type Inspect func(context.Context, Request) Page
@@ -339,6 +340,14 @@ func (m *Model) start(intent assistant.Intent, choice Choice) tea.Cmd {
 		intent = assistant.Intent(choice.Value)
 		choice = Choice{}
 	}
+	if intent == assistant.Slow && choice.Kind == "" {
+		return m.slowdownQuestion()
+	}
+	if choice.Kind == "slow-observe" && m.screen == results && m.active == assistant.Slow && m.request != nil {
+		req := *m.request
+		req.Choice, req.Complete, req.Snapshot, req.ObserveFor = choice, "", nil, workflow.ObservationWindow
+		return m.repeatCheck(req)
+	}
 	if choice.Kind == "rescan" && m.page.Summary != nil && m.request != nil && m.request.Intent == intent && m.request.Plan == nil && startsInspection(*m.request) {
 		req := *m.request
 		req.Choice, req.Complete, req.Snapshot = choice, "", nil
@@ -350,6 +359,9 @@ func (m *Model) start(intent assistant.Intent, choice Choice) tea.Cmd {
 	}
 	req := Request{Intent: intent, Choice: choice, Output: m.pendingOutput, Overview: m.overview, Plan: plan, Findings: m.page.Findings,
 		Language: m.options.Language, Workload: m.options.Workload}
+	if choice.Kind == "slow-observe" {
+		req.ObserveFor = workflow.ObservationWindow
+	}
 	m.screenState = screenState{screen: results, active: intent, question: question}
 	if choice.Kind == "" && intent == assistant.Settings {
 		m.settingsPage()
@@ -418,7 +430,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	case scanMsg:
 		if m.busy && msg.job == m.job && !m.cancelling {
-			m.workName = fmt.Sprintf(m.tr(Words{"Memeriksa %s · tahap %d/%d", "Checking %s · stage %d/%d"}), m.tr(checkNames[msg.progress.Check]), msg.progress.Step, msg.progress.Total)
+			if p := msg.progress; p.Window > 0 {
+				m.workName = m.observationLabel(p.Elapsed, p.Window)
+			} else {
+				m.workName = fmt.Sprintf(m.tr(Words{"Memeriksa %s · tahap %d/%d", "Checking %s · stage %d/%d"}), m.tr(checkNames[msg.progress.Check]), msg.progress.Step, msg.progress.Total)
+			}
 		}
 	case stageMsg:
 		m.updateStage(msg)

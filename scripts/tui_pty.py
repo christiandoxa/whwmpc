@@ -80,9 +80,9 @@ class Terminal:
             if text:
                 self.events.append((round(time.monotonic() - self.started, 6), "o", text))
 
-    def expect(self, label, start=0):
+    def expect(self, label, start=0, timeout=8):
         marker = label.encode()
-        deadline = time.monotonic() + 8
+        deadline = time.monotonic() + timeout
         while time.monotonic() < deadline:
             if marker in ANSI.sub(b"", self.output[start:]):
                 return
@@ -125,10 +125,10 @@ def press(terminal, key):
     terminal.hold(0.22)
 
 
-def choose_level(terminal, deep):
+def choose_level(terminal, deep, scope="SMART"):
     terminal.expect("Mulai tanpa administrator")
     if deep:
-        terminal.expect("SMART")
+        terminal.expect(scope)
         press(terminal, b"\x1b[A")
     offset = len(terminal.output)
     press(terminal, b"\r")
@@ -138,7 +138,7 @@ def choose_level(terminal, deep):
     return offset
 
 
-def task_flow(terminal, flow, resize=False, deep=False):
+def task_flow(terminal, flow, resize=False, deep=False, observe=False):
     terminal.expect("Mau dibantu apa?")
     index = ("condition", "slow", "cleanup", "ssd").index(flow)
     for _ in range(index):
@@ -164,7 +164,13 @@ def task_flow(terminal, flow, resize=False, deep=False):
         if terminal.output.count(ENTER_ALT) < 2 or LEAVE_ALT not in terminal.output:
             raise RuntimeError("SSD authorization did not restore the alternate screen")
         return
-    offset = choose_level(terminal, deep and flow != "cleanup")
+    if flow == "slow":
+        terminal.expect("Apakah kelambatannya sedang terjadi?")
+        if not observe:
+            press(terminal, b"\x1b[B")
+        press(terminal, b"\r")
+    started = time.monotonic()
+    offset = choose_level(terminal, deep and flow != "cleanup", "CPU dan daya" if flow == "slow" else "SMART")
     if flow == "cleanup":
         terminal.expect("file teramati", offset)
         offset = len(terminal.output)
@@ -179,11 +185,18 @@ def task_flow(terminal, flow, resize=False, deep=False):
         press(terminal, b"\r")
         terminal.expect("file teramati", offset)
         return
+    if observe:
+        terminal.expect("Memantau CPU, RAM, proses", offset)
+        terminal.expect("build-worker", offset, timeout=25)
+        if time.monotonic() - started < 11.5:
+            raise RuntimeError("observation did not wait for its sampling window")
     terminal.expect("selesai", offset)
-    for measurement in ("24%", "56%", "71%", "148.0 GiB"):
+    for measurement in (("41%", "59%") if observe else ("24%", "56%")) + ("71%", "148.0 GiB"):
         terminal.expect(measurement, offset)
     if flow == "slow":
-        terminal.expect("Periksa ulang saat gejala muncul", offset)
+        terminal.expect("Pantau saat PC lambat", offset)
+        if not observe:
+            terminal.expect("Kondisi awal", offset)
         press(terminal, b"\x1b[B")
     terminal.expect("Lihat semua hasil", offset)
     offset = len(terminal.output)
@@ -228,9 +241,12 @@ def main():
     parser.add_argument("--app-arg", action="append", default=[], help="extra demo flag in a recording")
     parser.add_argument("--flow", choices=("condition", "slow", "cleanup", "ssd"))
     parser.add_argument("--deep", action="store_true", help="choose deep inspection using fixtures")
+    parser.add_argument("--observe", action="store_true", help="observe a slowdown in real time")
     args = parser.parse_args()
     if not 80 <= args.width <= 240 or not 24 <= args.height <= 80 or not 0.5 <= args.duration <= 30:
         parser.error("use 80–240 columns, 24–80 rows and 0.5–30 seconds")
+    if args.observe and args.flow != "slow":
+        parser.error("--observe requires --flow slow")
     if args.app_arg and (args.record is None or any(
         not arg.startswith("--") or arg == "--" or arg.startswith("--demo") for arg in args.app_arg
     )):
@@ -249,7 +265,7 @@ def main():
         try:
             terminal.expect("DEMO")
             if args.flow:
-                task_flow(terminal, args.flow, resize=args.record is None, deep=args.deep)
+                task_flow(terminal, args.flow, resize=args.record is None, deep=args.deep, observe=args.observe)
                 if args.record is not None:
                     terminal.hold(1)
                     recording = terminal.events[:]

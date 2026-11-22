@@ -26,7 +26,11 @@ var (
 	getProcessMemoryInfo = kernel32.NewProc("K32GetProcessMemoryInfo")
 )
 
-func (Native) Overview(ctx context.Context) domain.Overview {
+func (n Native) Overview(ctx context.Context) domain.Overview {
+	return n.Observe(ctx, 240*time.Millisecond)
+}
+
+func (Native) Observe(ctx context.Context, interval time.Duration) domain.Overview {
 	start := time.Now().UTC()
 	o := baseOverview(start, domain.Unknown)
 	version := windows.RtlGetVersion()
@@ -60,14 +64,9 @@ func (Native) Overview(ctx context.Context) domain.Overview {
 	}
 	before, beforeOK := systemTicks()
 	firstProcAt := time.Now()
-loop:
 	for range 3 {
-		timer := time.NewTimer(240 * time.Millisecond)
-		select {
-		case <-ctx.Done():
-			timer.Stop()
-			break loop
-		case <-timer.C:
+		if wait(ctx, interval) != nil {
+			break
 		}
 		after, ok := systemTicks()
 		if busy, valid := windowsBusy(before, after); o.LogicalCPUs > 0 && beforeOK && ok && valid {

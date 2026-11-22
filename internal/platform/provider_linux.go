@@ -19,8 +19,12 @@ import (
 
 type Native struct{}
 
-func (Native) Overview(ctx context.Context) domain.Overview {
-	return (linuxProvider{fs: os.DirFS("/"), now: time.Now, wait: wait, statfs: syscall.Statfs}).collect(ctx)
+func (n Native) Overview(ctx context.Context) domain.Overview {
+	return n.Observe(ctx, 260*time.Millisecond)
+}
+
+func (Native) Observe(ctx context.Context, interval time.Duration) domain.Overview {
+	return (linuxProvider{fs: os.DirFS("/"), now: time.Now, wait: wait, statfs: syscall.Statfs}).collect(ctx, interval)
 }
 
 func (Native) CPUTemperatureProbe() func(context.Context) *float64 {
@@ -38,18 +42,7 @@ type linuxProvider struct {
 	statfs func(string, *syscall.Statfs_t) error
 }
 
-func wait(ctx context.Context, d time.Duration) error {
-	timer := time.NewTimer(d)
-	defer timer.Stop()
-	select {
-	case <-timer.C:
-		return nil
-	case <-ctx.Done():
-		return ctx.Err()
-	}
-}
-
-func (p linuxProvider) collect(ctx context.Context) domain.Overview {
+func (p linuxProvider) collect(ctx context.Context, interval time.Duration) domain.Overview {
 	o := baseOverview(p.now(), domain.Unknown)
 	info := keyValues(p.read("etc/os-release"), "=")
 	if len(info) == 0 {
@@ -88,7 +81,7 @@ func (p linuxProvider) collect(ctx context.Context) domain.Overview {
 	procs := p.processes(ctx)
 	previous, previousOK := cpuCounters(p.read("proc/stat"))
 	for range 3 {
-		if p.wait(ctx, 260*time.Millisecond) != nil {
+		if p.wait(ctx, interval) != nil {
 			break
 		}
 		next, ok := cpuCounters(p.read("proc/stat"))

@@ -10,6 +10,18 @@ import (
 
 type Provider interface {
 	Overview(context.Context) domain.Overview
+	Observe(context.Context, time.Duration) domain.Overview
+}
+
+func wait(ctx context.Context, d time.Duration) error {
+	timer := time.NewTimer(d)
+	defer timer.Stop()
+	select {
+	case <-timer.C:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
 }
 
 type PowerReading struct {
@@ -32,6 +44,20 @@ func baseOverview(now time.Time, status domain.Availability) domain.Overview {
 type Demo struct{}
 
 var DemoTime = time.Date(2026, time.November, 22, 9, 41, 0, 0, time.UTC)
+
+func (d Demo) Observe(ctx context.Context, interval time.Duration) domain.Overview {
+	if wait(ctx, 3*interval) != nil {
+		return baseOverview(DemoTime, domain.Unknown)
+	}
+	o := d.Overview(ctx)
+	o.CPU.StartedAt = o.CPU.CapturedAt.Add(-3 * interval)
+	o.Memory.Use.StartedAt = o.CPU.StartedAt
+	o.CPU.Samples = []float64{29, 67, 41}
+	o.Memory.Use.Samples = []float64{56, 58, 59}
+	o.Memory.FreeBytes = o.Memory.TotalBytes * 41 / 100
+	o.Processes = []domain.Process{{Name: "build-worker", CPU: 32, RSS: 720 << 20}, {Name: "browser", CPU: 6, RSS: 1024 << 20}}
+	return o
+}
 
 func (Demo) Overview(context.Context) domain.Overview {
 	up, battery, temp, ac := 56240.0, 78.0, 54.0, true

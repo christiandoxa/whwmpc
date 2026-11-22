@@ -30,13 +30,15 @@ type Coverage struct {
 }
 
 type ScanProgress struct {
-	Check       Check
-	Step, Total int
+	Check           Check
+	Step, Total     int
+	Elapsed, Window time.Duration
 }
 
 type Snapshot struct {
-	Input    report.Input
-	Coverage []Coverage
+	Input       report.Input
+	Coverage    []Coverage
+	ObservedFor time.Duration
 }
 
 func Collect(ctx context.Context, scanner *inspection.Scanner, overview domain.Overview, lang string, demo, full, fresh bool, progress func(ScanProgress)) (Snapshot, error) {
@@ -48,7 +50,7 @@ func Collect(ctx context.Context, scanner *inspection.Scanner, overview domain.O
 	}
 	step := func(check Check, n int) {
 		if progress != nil && ctx.Err() == nil {
-			progress(ScanProgress{check, n, total})
+			progress(ScanProgress{Check: check, Step: n, Total: total})
 		}
 	}
 	step(SystemCheck, 1)
@@ -84,7 +86,7 @@ func Complete(ctx context.Context, scanner *inspection.Scanner, snap Snapshot, o
 	defer cancel()
 	step := func(check Check) {
 		if progress != nil && ctx.Err() == nil {
-			progress(ScanProgress{check, 1, 1})
+			progress(ScanProgress{Check: check, Step: 1, Total: 1})
 		}
 	}
 	switch op {

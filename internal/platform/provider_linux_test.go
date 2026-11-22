@@ -40,10 +40,10 @@ func TestLinuxOverviewUsesSamplesAndReportsMissingData(t *testing.T) {
 			return nil
 		},
 	}
-	got := p.collect(context.Background())
+	got := p.collect(context.Background(), 4*time.Second)
 	cpu, hasCPU := got.CPU.Latest()
 	if got.Distro != "Fixture Ubuntu" || got.Environment != "wsl" || !hasCPU || math.Abs(cpu-100.0/3) > 0.0001 ||
-		len(got.CPU.Samples) != 3 || len(got.Memory.Use.Samples) != 3 || len(got.Disks) != 1 ||
+		len(got.CPU.Samples) != 3 || got.CPU.CapturedAt.Sub(got.CPU.StartedAt) != 12*time.Second || len(got.Memory.Use.Samples) != 3 || len(got.Disks) != 1 ||
 		got.Disks[0].FreeBytes != 40*4096 || got.Memory.SwapStatus != domain.Available || got.Memory.SwapUsed != 256*1024 {
 		t.Fatalf("overview = %+v", got)
 	}

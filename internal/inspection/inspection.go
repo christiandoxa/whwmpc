@@ -30,7 +30,14 @@ type Scanner struct {
 }
 
 func (s *Scanner) Overview(ctx context.Context) domain.Overview {
-	o := s.Provider.Overview(ctx)
+	return s.withTemperature(ctx, s.Provider.Overview(ctx))
+}
+
+func (s *Scanner) Observe(ctx context.Context, interval time.Duration) domain.Overview {
+	return s.withTemperature(ctx, s.Provider.Observe(ctx, interval))
+}
+
+func (s *Scanner) withTemperature(ctx context.Context, o domain.Overview) domain.Overview {
 	if o.Temperature.Celsius == nil || o.Temperature.Availability != domain.Available {
 		if t, ok := s.PrivilegedTemperature(ctx); ok && (t.Celsius != nil || o.Temperature.Celsius == nil) {
 			o.Temperature = t

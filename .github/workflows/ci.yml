@@ -24,6 +24,7 @@ jobs:
       - name: Exercise the terminal
         run: python3 scripts/tui_pty.py ./whwmpc --width 120 --height 36
       - run: python3 scripts/tui_pty.py ./whwmpc --width 80 --height 24 --flow slow
+      - run: python3 scripts/tui_pty.py ./whwmpc --width 80 --height 24 --flow slow --observe
       - run: python3 scripts/tui_pty.py ./whwmpc --width 80 --height 24 --flow cleanup
       - run: python3 scripts/tui_pty.py ./whwmpc --width 80 --height 24 --flow condition --deep
       - run: python3 scripts/tui_pty.py ./whwmpc --width 80 --height 24 --flow ssd
