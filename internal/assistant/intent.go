@@ -8,35 +8,39 @@ import (
 type Intent string
 
 const (
-	Overview  Intent = "overview"
-	Slow      Intent = "slow"
-	Storage   Intent = "ssd"
-	Trim      Intent = "trim"
-	Power     Intent = "power"
-	Cleanup   Intent = "cleanup"
-	Recommend Intent = "recommend"
-	History   Intent = "history"
-	Settings  Intent = "settings"
-	Report    Intent = "report"
-	Benchmark Intent = "benchmark"
-	GPU       Intent = "gpu"
+	Overview   Intent = "overview"
+	Slow       Intent = "slow"
+	Storage    Intent = "ssd"
+	Trim       Intent = "trim"
+	Power      Intent = "power"
+	Cleanup    Intent = "cleanup"
+	Recommend  Intent = "recommend"
+	History    Intent = "history"
+	Settings   Intent = "settings"
+	Report     Intent = "report"
+	Benchmark  Intent = "benchmark"
+	GPU        Intent = "gpu"
+	Firmware   Intent = "firmware"
+	Filesystem Intent = "filesystem"
 )
 
-var Menu = []Intent{Overview, Slow, Storage, Trim, Power, Cleanup, Recommend, History, Report, Settings, Benchmark, GPU}
+var Menu = []Intent{Overview, Slow, Storage, Trim, Power, Cleanup, Recommend, History, Report, Settings, Benchmark, GPU, Firmware, Filesystem}
 
 var phrases = map[Intent][]string{
-	GPU:       {"gpu", "graphics", "kartu grafis"},
-	Benchmark: {"benchmark", "stress test", "uji kinerja"},
-	Overview:  {"overview", "check everything", "system status", "health check", "keseluruhan", "ringkasan", "kondisi komputer"},
-	Slow:      {"slow", "lag", "sluggish", "bottleneck", "lambat", "lemot", "macet"},
-	Storage:   {"ssd", "nvme", "smart", "drive health", "kesehatan disk"},
-	Trim:      {"trim", "fstrim", "discard"},
-	Power:     {"power", "clock", "governor", "cpu", "baterai", "battery", "daya", "frequency", "frekuensi"},
-	Cleanup:   {"cleanup", "clean", "free up", "cache", "disk space", "bersihkan", "hapus cache", "ruang"},
-	Recommend: {"recommend", "recommendation", "suggestions", "rekomendasi", "saran", "profil cocok"},
-	History:   {"history", "riwayat", "audit log"},
-	Settings:  {"settings", "motion", "pengaturan", "animasi"},
-	Report:    {"report", "export", "laporan", "ekspor"},
+	Firmware:   {"firmware", "uefi", "bios"},
+	Filesystem: {"filesystem", "fsck", "perbaikan storage"},
+	GPU:        {"gpu", "graphics", "kartu grafis"},
+	Benchmark:  {"benchmark", "stress test", "uji kinerja"},
+	Overview:   {"overview", "check everything", "system status", "health check", "keseluruhan", "ringkasan", "kondisi komputer"},
+	Slow:       {"slow", "lag", "sluggish", "bottleneck", "lambat", "lemot", "macet"},
+	Storage:    {"ssd", "nvme", "smart", "drive health", "kesehatan disk"},
+	Trim:       {"trim", "fstrim", "discard"},
+	Power:      {"power", "clock", "governor", "cpu", "baterai", "battery", "daya", "frequency", "frekuensi"},
+	Cleanup:    {"cleanup", "clean", "free up", "cache", "disk space", "bersihkan", "hapus cache", "ruang"},
+	Recommend:  {"recommend", "recommendation", "suggestions", "rekomendasi", "saran", "profil cocok"},
+	History:    {"history", "riwayat", "audit log"},
+	Settings:   {"settings", "motion", "pengaturan", "animasi"},
+	Report:     {"report", "export", "laporan", "ekspor"},
 }
 
 func Route(input string) []Intent {

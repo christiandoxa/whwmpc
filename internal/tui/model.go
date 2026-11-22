@@ -227,7 +227,7 @@ func (m *Model) start(intent assistant.Intent, choice Choice) tea.Cmd {
 	case "advanced":
 		m.remember()
 		m.screenState = screenState{screen: taskQuestion, page: Page{Found: []string{m.tr(Words{"Apa yang ingin ditinjau?", "What would you like to review?"})}}}
-		for _, id := range []assistant.Intent{assistant.GPU, assistant.Benchmark} {
+		for _, id := range []assistant.Intent{assistant.GPU, assistant.Firmware, assistant.Filesystem, assistant.Benchmark} {
 			m.page.Choices = append(m.page.Choices, Choice{m.tr(menuNames[id]), "navigate", string(id)})
 		}
 		return nil

@@ -25,6 +25,9 @@ const (
 	TrimMount        = "trim-mount"
 	EnableTrimTimer  = "enable-trim-timer"
 	CleanAPT         = "clean-apt"
+	FirmwareUpdate   = "firmware-update"
+	FirmwareRefresh  = "firmware-refresh"
+	FilesystemRepair = "filesystem-repair"
 	RestorePower     = "restore-power-profile"
 	RestoreTrimTimer = "restore-trim-timer"
 
@@ -89,6 +92,7 @@ type Result struct {
 }
 
 type Cleanup struct {
+	Kind         string              `json:"kind,omitempty"`
 	Availability domain.Availability `json:"availability"`
 	Category     string              `json:"category"`
 	Scope        []string            `json:"scope,omitempty"`
@@ -155,7 +159,7 @@ func (s *Service) TrimTargets(ctx context.Context) ([]TrimTarget, error) {
 
 func (s *Service) Preview(ctx context.Context, kind, target string) (Plan, error) {
 	switch kind {
-	case PowerProfile, TrimMount, EnableTrimTimer, CleanAPT, hardware.PowerLimit, hardware.CoreMax, hardware.VoltageOffset:
+	case PowerProfile, TrimMount, EnableTrimTimer, CleanAPT, FirmwareUpdate, FirmwareRefresh, FilesystemRepair, hardware.PowerLimit, hardware.CoreMax, hardware.VoltageOffset:
 		return s.preview(ctx, kind, target, "", "")
 	default:
 		return Plan{}, errors.New("tindakan tidak dikenal")
@@ -280,7 +284,11 @@ func (s *Service) ExecuteWithProgress(ctx context.Context, plan Plan, confirmedI
 	}
 	s.used[plan.ID] = plan.ExpiresAt
 	progress(Verifying)
-	verifyCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 15*time.Second)
+	verifyTimeout := 15 * time.Second
+	if plan.Kind == FilesystemRepair {
+		verifyTimeout = 2 * time.Minute
+	}
+	verifyCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), verifyTimeout)
 	defer cancel()
 	result := action.verify(verifyCtx, step)
 	result.Plan = plan
@@ -296,7 +304,7 @@ func (s *Service) ExecuteWithProgress(ctx context.Context, plan Plan, confirmedI
 
 func (s *Service) validate(plan Plan, confirmedID string) error {
 	switch plan.Kind {
-	case PowerProfile, TrimMount, EnableTrimTimer, CleanAPT, hardware.PowerLimit, hardware.CoreMax, hardware.VoltageOffset:
+	case PowerProfile, TrimMount, EnableTrimTimer, CleanAPT, FirmwareUpdate, FirmwareRefresh, FilesystemRepair, hardware.PowerLimit, hardware.CoreMax, hardware.VoltageOffset:
 		if plan.Restores != "" {
 			return errors.New("jenis rencana tidak valid untuk pemulihan")
 		}

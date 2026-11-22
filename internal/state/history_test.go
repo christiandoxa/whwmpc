@@ -1,6 +1,7 @@
 package state
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"io/fs"
@@ -158,5 +159,31 @@ func TestWriteNewNeverReplacesExistingFile(t *testing.T) {
 	}
 	if err := WriteNew(link, []byte("replacement")); !errors.Is(err, fs.ErrExist) {
 		t.Fatalf("symlink destination write = %v", err)
+	}
+}
+
+func TestFirmwareHandoffIsPrivateAndReadOnly(t *testing.T) {
+	s := Store{StateDir: filepath.Join(t.TempDir(), "state")}
+	id := "0123456789012345678901234567890123456789"
+	target := "abcdef0123456789abcdef0123456789abcdef01@1.2.3"
+	err := s.RecordAction(actions.Result{Plan: actions.Plan{ID: id, Kind: actions.FirmwareUpdate, Target: target},
+		Status: actions.Partial, Started: true, FinishedAt: time.Now()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := s.FirmwareHandoff(id)
+	if err != nil || got != target {
+		t.Fatalf("%s %v", got, err)
+	}
+	if _, err := s.RollbackReceipt(id); err == nil {
+		t.Fatal("firmware handoff accepted as rollback")
+	}
+	history, err := s.History()
+	if err != nil || len(history) != 1 || !history[0].Action.VerifyAfterRestart {
+		t.Fatalf("%v %v", history, err)
+	}
+	raw, err := json.Marshal(history)
+	if err != nil || bytes.Contains(raw, []byte(target)) {
+		t.Fatal("target leaked into public history")
 	}
 }

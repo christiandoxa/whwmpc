@@ -100,3 +100,7 @@ Discovery GPU, metrik vendor, batas daya NVIDIA, dan kontrol OverDrive AMD terhu
 Provider native membaca CPU, memori, disk, proses, uptime, dan daya sesuai API host. Disk Utility dan Windows Storage Provider memperluas audit storage. Kebijakan atau dukungan TRIM dibedakan dari bukti pelaksanaan. Fixture dan kompilasi lulus. Workflow native mencakup macOS 15 dan Windows Server 2025; uji perangkat fisik tetap terpisah.
 
 CI native pada `584472c` menemukan fixture macOS memakai nama properti yang berbeda dari Disk Utility. Parser sekarang membaca `WholeDisk` dan tetap menolak partisi dalam inventaris disk fisik. Model CPU/memori dan runtime Windows sudah lulus pada run tersebut.
+
+## Backlog C dan E · Firmware dan perawatan filesystem
+
+Jalur CLI/TUI mengaudit inventaris. Metadata LVFS dan staging firmware memerlukan rencana terpisah. Firmware menunggu bukti fwupd setelah restart, dengan handoff privat dari Riwayat. Filesystem ext offline memakai descriptor terpin, cek read-only, koreksi terbatas e2fsck, dan verifikasi ulang. Fixture aksi dan image ext4 sementara melewati diagnosis baca-saja dan perbaikan metadata. Tidak ada flash atau perbaikan block device pada host.

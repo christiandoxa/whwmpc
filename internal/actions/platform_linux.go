@@ -39,6 +39,12 @@ func (p linuxPlatform) prepare(ctx context.Context, kind, target string) (prepar
 		return p.trimMount(ctx, target)
 	case EnableTrimTimer, RestoreTrimTimer:
 		return p.trimTimer(ctx, kind, target)
+	case FirmwareUpdate:
+		return p.firmwareUpdate(ctx, target)
+	case FirmwareRefresh:
+		return p.firmwareRefresh(ctx, target)
+	case FilesystemRepair:
+		return p.filesystemRepair(ctx, target)
 	case CleanAPT:
 		return p.apt(ctx, target)
 	case hardware.PowerLimit, hardware.CoreMax, hardware.VoltageOffset, hardware.RestorePowerLimit, hardware.RestoreCoreMax, hardware.RestoreVoltageOffset:
@@ -82,6 +88,8 @@ var executablePaths = map[string][]string{
 	"fwupdmgr":   {"/usr/bin/fwupdmgr"},
 	"journalctl": {"/usr/bin/journalctl", "/bin/journalctl"},
 	"lsblk":      {"/usr/bin/lsblk", "/bin/lsblk"},
+	"pacman":     {"/usr/bin/pacman"},
+	"pacman-conf": {"/usr/bin/pacman-conf"},
 	"sudo":       {"/usr/bin/sudo", "/bin/sudo"},
 	"systemctl":  {"/usr/bin/systemctl", "/bin/systemctl"},
 }

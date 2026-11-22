@@ -1,0 +1,203 @@
+package firmware
+
+import (
+	"bytes"
+	"context"
+	"crypto/sha256"
+	"encoding/hex"
+	"errors"
+	"fmt"
+	"io"
+	"net/http"
+	"os"
+	"runtime"
+	"slices"
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/christiandoxa/whwmpc/internal/domain"
+	"github.com/christiandoxa/whwmpc/internal/sysrun"
+)
+
+const testID = "1111111111111111111111111111111111111111"
+const testDigest = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+const testURL = "https://cdn.fwupd.org/downloads/example.cab"
+
+type runner struct {
+	responses map[string]sysrun.Result
+	commands  *[]string
+	missing   bool
+}
+
+func (r runner) LookPath(string) (string, error) {
+	if r.missing {
+		return "", os.ErrNotExist
+	}
+	return "/usr/bin/fwupdmgr", nil
+}
+
+func (r runner) Run(_ context.Context, _ string, args ...string) sysrun.Result {
+	if !slices.Contains(args, "--no-metadata-check") || !slices.Contains(args, "--no-unreported-check") {
+		return sysrun.Result{Err: errors.New("missing offline guards")}
+	}
+	if r.commands != nil {
+		*r.commands = append(*r.commands, args[5])
+	}
+	if got, ok := r.responses[args[5]]; ok {
+		return got
+	}
+	return sysrun.Result{Err: errors.New("unexpected command")}
+}
+
+func result(contents string) sysrun.Result { return sysrun.Result{Output: []byte(contents)} }
+
+func inventory(release string) string {
+	candidate := ""
+	if release != "" {
+		candidate = `,"Releases":[` + release + `]`
+	}
+	return `{"Devices":[{"DeviceId":"` + testID + `","Plugin":"uefi_capsule","Version":"1.0","Guid":["firmware-guid"],"Flags":["supported","updatable"],"Serial":"omit-me"` + candidate + `}]}`
+}
+
+func release(remote, flags string) string {
+	return `{"Version":"2.0","RemoteId":"` + remote + `","Flags":` + flags +
+		`,"Checksum":["` + testDigest + `"],"Locations":["` + testURL + `"]}`
+}
+
+func TestInventorySelectsTrustedExactUpgrade(t *testing.T) {
+	if runtime.GOOS != "linux" {
+		t.Skip("Linux fwupd inventory")
+	}
+	const flags = `["trusted-metadata","is-upgrade"]`
+	ctx := context.Background()
+	var calls []string
+	r := runner{responses: map[string]sysrun.Result{
+		"get-devices": result(inventory("")),
+		"get-updates": result(inventory(release("lvfs", flags))),
+	}, commands: &calls}
+	s := Collect(ctx, r, false)
+	if !slices.Equal(calls, []string{"get-devices"}) || s.Availability != domain.Available || len(s.Devices) != 1 {
+		t.Fatalf("installed-only query %#v :: %#v", calls, s)
+	}
+	s = Collect(ctx, r, true)
+	id, got, err := Select(s, testID+"@2.0")
+	if err != nil || id.ID != testID || got.SHA256 != testDigest || got.URL != testURL {
+		t.Fatalf("selection %#v, %#v, %v", id, got, err)
+	}
+	for _, candidate := range []string{
+		release("private", flags),
+		release("lvfs", `["is-upgrade"]`),
+		release("lvfs", `["trusted-metadata","is-downgrade"]`),
+		strings.Replace(release("lvfs", flags), "cdn.fwupd.org", "cdn.fwupd.org.invalid", 1),
+	} {
+		r.responses["get-updates"] = result(inventory(candidate))
+		if _, _, err := Select(Collect(ctx, r, true), testID+"@2.0"); err == nil {
+			t.Fatalf("unverified catalog accepted: %s", candidate)
+		}
+	}
+	for _, target := range []string{"--force@1", testID + "@--force", testID + "@2/3"} {
+		if _, _, err := SplitTarget(target); err == nil {
+			t.Fatalf("unsafe target %q accepted", target)
+		}
+	}
+}
+
+func TestUnknownMissingPermissionAndMalformed(t *testing.T) {
+	if runtime.GOOS != "linux" {
+		t.Skip("Linux fwupd inventory")
+	}
+	ctx := context.Background()
+	if s := Collect(ctx, runner{missing: true}, false); s.Availability != domain.DependencyMissing {
+		t.Fatalf("unexpected missing result: %+v", s)
+	}
+	for _, pair := range []struct {
+		in   sysrun.Result
+		want domain.Availability
+	}{
+		{sysrun.Result{ExitCode: 1, Stderr: []byte("Permission denied")}, domain.PermissionRequired},
+		{result(`{}`), domain.Error},
+		{result(`{"Devices":[{"Version":"1"}]}`), domain.Error},
+	} {
+		got := Collect(ctx, runner{responses: map[string]sysrun.Result{"get-devices": pair.in}}, false)
+		if got.Availability != pair.want {
+			t.Fatalf("unexpected %s, want %s", got.Availability, pair.want)
+		}
+	}
+}
+
+func TestRebootHandoffUsesVerifiedInstalledAndLastResult(t *testing.T) {
+	if runtime.GOOS != "linux" {
+		t.Skip("Linux fwupd inventory")
+	}
+	for _, step := range []struct {
+		installed, returned string
+		state               int
+		want                string
+	}{
+		{"1.0", "2.0", 1, "reboot_required"},
+		{"2.0", "2.0", 4, "reboot_required"},
+		{"1.0", "2.0", 2, "unknown"},
+		{"2.0", "1.0", 2, "unknown"},
+		{"2.0", "2.0", 2, "verified"},
+		{"1.0", "2.0", 3, "failed"},
+	} {
+		got := Outcome(context.Background(), runner{responses: map[string]sysrun.Result{
+			"get-devices": result(strings.Replace(inventory(""), `"1.0"`, fmt.Sprintf("%q", step.installed), 1)),
+			"get-results": result(fmt.Sprintf(`{"DeviceId":%q,"Version":%q,"UpdateState":%d}`, testID, step.returned, step.state)),
+		}}, testID+"@2.0")
+		if got.State != step.want {
+			t.Fatalf("handoff state %+v, want %q", got, step.want)
+		}
+	}
+}
+
+type transport func(*http.Request) (*http.Response, error)
+
+func (f transport) RoundTrip(r *http.Request) (*http.Response, error) { return f(r) }
+
+func TestPackageDigestAndTargetBinding(t *testing.T) {
+	ctx := context.Background()
+	cab := []byte("fixture cabinet data")
+	sum := sha256.Sum256(cab)
+	selected := Release{Version: "2.0", URL: testURL, SHA256: hex.EncodeToString(sum[:])}
+	transport := transport(func(req *http.Request) (*http.Response, error) {
+		if req.URL.String() != testURL || req.Method != http.MethodGet {
+			t.Fatalf("unbound request %v", req.URL)
+		}
+		return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(bytes.NewReader(cab))}, nil
+	})
+	client := &http.Client{Transport: transport}
+	var payload bytes.Buffer
+	if err := download(ctx, client, selected, &payload); err != nil || !bytes.Equal(payload.Bytes(), cab) {
+		t.Fatalf("valid download: %v", err)
+	}
+	selected.SHA256 = testDigest
+	if err := download(ctx, client, selected, io.Discard); err == nil {
+		t.Fatal("changed bytes accepted")
+	}
+	details := inventory(release("lvfs", `["trusted-payload"]`))
+	dev := Device{ID: testID, GUIDs: []string{"firmware-guid"}}
+	r := runner{responses: map[string]sysrun.Result{"get-details": result(details)}}
+	if err := PackageMatches(ctx, r, "/tmp/demo.cab", dev, selected); err != nil {
+		t.Fatalf("valid package %v", err)
+	}
+	for _, bad := range []string{
+		strings.Replace(details, "trusted-payload", "trusted-metadata", 1),
+		strings.Replace(details, "firmware-guid", "wrong-device", 1),
+		strings.Replace(details, testDigest, strings.Repeat("b", 64), 1),
+	} {
+		r.responses["get-details"] = result(bad)
+		if err := PackageMatches(ctx, r, "/tmp/demo.cab", dev, selected); err == nil {
+			t.Fatalf("unmatched cabinet accepted: %s", bad)
+		}
+	}
+}
+
+func TestOfficialRemoteMustRemainFresh(t *testing.T) {
+	now := time.Unix(1_800_000_000, 0)
+	remote := Remote{Mtime: now.Add(-5 * time.Hour).Unix(), ChecksumSig: testDigest}
+	if !remote.Fresh(now) || remote.Fresh(now.Add(8*24*time.Hour)) || remote.Fresh(now.Add(-6*time.Hour)) {
+		t.Fatal("metadata freshness misclassified")
+	}
+}

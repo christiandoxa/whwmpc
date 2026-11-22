@@ -172,7 +172,7 @@ func previewAction(ctx context.Context, m *workflow.Maintenance, req Request) (P
 	}
 
 	switch req.Choice.Kind {
-	case actions.PowerProfile, actions.TrimMount, actions.CleanAPT, actions.EnableTrimTimer, hardware.PowerLimit, hardware.CoreMax, hardware.VoltageOffset:
+	case actions.PowerProfile, actions.TrimMount, actions.CleanAPT, actions.EnableTrimTimer, hardware.PowerLimit, hardware.CoreMax, hardware.VoltageOffset, actions.FirmwareUpdate, actions.FirmwareRefresh, actions.FilesystemRepair:
 		p, err := m.Preview(ctx, req.Choice.Kind, req.Choice.Value, false)
 		if err != nil {
 			return unavailableAction(err, req.Language), true
@@ -219,6 +219,12 @@ func actionLabel(kind, lang string) string {
 	switch kind {
 	case actions.CleanAPT:
 		return l("Bersihkan cache paket", "Clean package cache")
+	case actions.FirmwareUpdate:
+		return l("Jadwalkan pembaruan firmware", "Schedule firmware update")
+	case actions.FirmwareRefresh:
+		return l("Unduh katalog LVFS", "Refresh LVFS catalog")
+	case actions.FilesystemRepair:
+		return l("Perbaiki partisi offline", "Repair offline partition")
 	case hardware.PowerLimit:
 		return l("Ubah batas daya GPU", "Change GPU power limit")
 	case hardware.CoreMax:
@@ -255,6 +261,12 @@ func planPage(plan actions.Plan, lang string) Page {
 		restore = l("Dapat ditinjau untuk pemulihan setelah verifikasi", "Restore can be reviewed after verification")
 	}
 	switch plan.Kind {
+	case actions.FirmwareUpdate:
+		after = l("verifikasi versi setelah restart", "verify the version after restart")
+	case actions.FirmwareRefresh:
+		after = l("cache metadata diperbarui", "metadata cache refreshed")
+	case actions.FilesystemRepair:
+		after = l("metadata diperbaiki bila e2fsck menilainya aman; verifikasi ulang", "repair metadata when e2fsck can do so; recheck")
 	case actions.CleanAPT:
 		after = l("cache paket dalam cakupan dihapus permanen", "package cache in scope is permanently deleted")
 	case actions.EnableTrimTimer:
@@ -349,6 +361,9 @@ func resultPage(outcome workflow.Outcome, lang string, intent assistant.Intent) 
 	}
 	page.Evidence = []string{"ID · " + result.Plan.ID, result.FinishedAt.Format("2006-01-02 15:04:05 MST")}
 	page.Choices = []Choice{{Label: l("Periksa ulang", "Scan again"), Kind: "navigate", Value: string(intent)}}
+	if result.Plan.Kind == actions.FirmwareUpdate && result.Started && (result.Status == actions.Partial || result.Status == actions.Unknown) {
+		page.Choices = append([]Choice{{l("Periksa versi setelah restart", "Verify version after restart"), "firmware-verify", result.Plan.Target}}, page.Choices...)
+	}
 	if result.Receipt != "" && outcome.HistoryErr == nil {
 		page.Choices = append(page.Choices, Choice{Label: l("Tinjau pemulihan", "Preview restore"), Kind: "restore", Value: result.Plan.ID})
 	}

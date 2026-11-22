@@ -16,6 +16,7 @@ import (
 	"github.com/christiandoxa/whwmpc/internal/assistant"
 	"github.com/christiandoxa/whwmpc/internal/diagnostics"
 	"github.com/christiandoxa/whwmpc/internal/domain"
+	"github.com/christiandoxa/whwmpc/internal/firmware"
 	"github.com/christiandoxa/whwmpc/internal/hardware"
 )
 
@@ -54,6 +55,7 @@ type ActionSummary struct {
 	PotentialDiscardBytes *uint64        `json:"potential_discard_bytes,omitempty"`
 	RemovedBytes          *uint64        `json:"removed_bytes,omitempty"`
 	FreeSpaceDelta        *int64         `json:"free_space_delta,omitempty"`
+	VerifyAfterRestart    bool           `json:"verify_after_restart,omitempty"`
 	CanRestore            bool           `json:"can_restore"`
 }
 
@@ -91,7 +93,9 @@ func (s Store) RecordAction(result actions.Result) error {
 	var receipt []byte
 	if validPlanID(result.Plan.ID) {
 		entry.PlanID = result.Plan.ID
-		if result.Status == actions.Verified && result.Receipt != "" {
+		summary.VerifyAfterRestart = result.Started && result.Plan.Kind == actions.FirmwareUpdate && (result.Status == actions.Partial || result.Status == actions.Unknown)
+		summary.CanRestore = result.Status == actions.Verified && result.Receipt != ""
+		if summary.CanRestore || summary.VerifyAfterRestart {
 			var err error
 			receipt, err = json.Marshal(result)
 			if err != nil {
@@ -100,7 +104,6 @@ func (s Store) RecordAction(result actions.Result) error {
 			if len(receipt) > 64<<10 {
 				return errors.New("maintenance receipt exceeds size limit")
 			}
-			summary.CanRestore = true
 		}
 	}
 	return s.appendEvent(entry, receipt)
@@ -169,6 +172,45 @@ func (s Store) History() ([]Entry, error) {
 	}
 	defer root.Close()
 	return readHistory(root)
+}
+
+func (s Store) FirmwareHandoff(planID string) (string, error) {
+	if !validPlanID(planID) {
+		return "", errors.New("invalid plan ID")
+	}
+	root, err := privateRoot(s.StateDir, false)
+	if err != nil {
+		return "", err
+	}
+	defer root.Close()
+	entries, historyErr := readHistory(root)
+	for _, entry := range entries {
+		if entry.PlanID != planID || entry.Action == nil || !entry.Action.VerifyAfterRestart {
+			continue
+		}
+		event, err := openEvent(root, entry.dir)
+		if errors.Is(err, fs.ErrNotExist) {
+			continue
+		}
+		if err != nil {
+			return "", err
+		}
+		data, err := readPrivate(event, "receipt.json", 64<<10)
+		event.Close()
+		if err != nil {
+			return "", err
+		}
+		var result actions.Result
+		if err = decodeEvent(data, &result); err != nil || result.Plan.ID != planID || result.Plan.Kind != actions.FirmwareUpdate ||
+			!result.Started || (result.Status != actions.Partial && result.Status != actions.Unknown) {
+			return "", errors.New("invalid firmware handoff")
+		}
+		if _, _, err := firmware.SplitTarget(result.Plan.Target); err != nil {
+			return "", err
+		}
+		return result.Plan.Target, nil
+	}
+	return "", errors.Join(fs.ErrNotExist, historyErr)
 }
 
 func (s Store) RollbackReceipt(planID string) (actions.Result, error) {
@@ -271,6 +313,7 @@ func validEntry(entry Entry) bool {
 		return scanCategory(entry.Category) && entry.Findings != nil && entry.Action == nil && entry.PlanID == ""
 	case "action":
 		return actionCategory(entry.Category) && entry.Action != nil && actionStatus(entry.Action.Status) && entry.Findings == nil &&
+			(!entry.Action.VerifyAfterRestart || (entry.Category == actions.FirmwareUpdate && validPlanID(entry.PlanID))) &&
 			((entry.PlanID == "" && !entry.Action.CanRestore) || validPlanID(entry.PlanID))
 	default:
 		return false
@@ -283,7 +326,7 @@ func scanCategory(category string) bool {
 
 func actionCategory(category string) bool {
 	switch category {
-	case actions.PowerProfile, actions.TrimMount, actions.EnableTrimTimer, actions.CleanAPT, actions.RestorePower, actions.RestoreTrimTimer,
+	case actions.PowerProfile, actions.TrimMount, actions.EnableTrimTimer, actions.CleanAPT, actions.RestorePower, actions.RestoreTrimTimer, actions.FirmwareUpdate, actions.FirmwareRefresh, actions.FilesystemRepair,
 		hardware.PowerLimit, hardware.CoreMax, hardware.VoltageOffset, hardware.RestorePowerLimit, hardware.RestoreCoreMax, hardware.RestoreVoltageOffset:
 		return true
 	}

@@ -114,7 +114,7 @@ func Encode(report Report, format string) ([]byte, error) {
 
 var absolutePath = regexp.MustCompile(`(?i)(?:^|[\s=[:punct:]])(?:[a-z]:[\\/]|/)[^\s<>"',;]+\b`)
 var identified = regexp.MustCompile(`(?i)\b(?:hostname|username|serial(?:_number)?)\s*[:=]\s*[^\s,;]+`)
-var findingID = regexp.MustCompile(`^(?:overview|power|trim|smart|recommend|cleanup|benchmark|gpu)\.[a-z-]{2,30}(?:\.[0-9]{1,5})?$`)
+var findingID = regexp.MustCompile(`^(?:overview|power|trim|smart|recommend|cleanup|benchmark|gpu|firmware|filesystem)\.[a-z-]{2,30}(?:\.[0-9]{1,5})?$`)
 var ordinal = regexp.MustCompile(`^[0-9]{1,20}$`)
 
 func proseRedactor(private map[string]bool) func(string) string {
@@ -152,7 +152,7 @@ func addPrivate(private map[string]bool, values ...string) {
 
 func projectFinding(f diagnostics.Finding, redact func(string) string) diagnostics.Finding {
 	out := diagnostics.Finding{
-		ID: f.ID, Category: allowed(f.Category, "cpu", "memory", "disk", "temperature", "process", "power", "ssd", "trim", "recommendation", "cleanup", "benchmark", "gpu"),
+		ID: f.ID, Category: allowed(f.Category, "cpu", "memory", "disk", "temperature", "process", "power", "ssd", "trim", "recommendation", "cleanup", "benchmark", "gpu", "firmware", "filesystem"),
 		Availability: availability(f.Availability), Severity: f.Severity, At: f.At.UTC(), Source: publicSource(f.Source),
 		Observation: redact(f.Observation), Meaning: redact(f.Meaning), Limits: redact(f.Limits), Recommendation: redact(f.Recommendation),
 	}
@@ -195,7 +195,7 @@ func projectFinding(f diagnostics.Finding, redact func(string) string) diagnosti
 
 func publicSource(value string) string {
 	switch value {
-	case "whwmpc benchmark", "GPU vendor telemetry", "/proc/stat", "/proc/meminfo (MemAvailable, SwapTotal, SwapFree)", "statfs (Bavail) + /proc/self/mountinfo", "Linux hwmon / thermal zones",
+	case "Filesystem checker", "Filesystem inventory", "fwupd inventory", "fwupd verification", "whwmpc benchmark", "GPU vendor telemetry", "/proc/stat", "/proc/meminfo (MemAvailable, SwapTotal, SwapFree)", "statfs (Bavail) + /proc/self/mountinfo", "Linux hwmon / thermal zones",
 		"/proc/[pid]/stat delta + /proc/stat", "Linux power_supply class", "Linux CPUFreq policy sysfs",
 		"Linux power_supply + platform_profile + energy_perf_bias", "D-Bus PowerProfiles API + systemd and /proc manager checks",
 		"Workload preference + overview temperature + power_supply + PowerProfiles API",
@@ -216,6 +216,7 @@ func publicSource(value string) string {
 func publicAction(kind string) string {
 	switch kind {
 	case actions.PowerProfile, actions.TrimMount, actions.EnableTrimTimer, actions.CleanAPT, actions.RestorePower, actions.RestoreTrimTimer,
+		actions.FirmwareUpdate, actions.FirmwareRefresh, actions.FilesystemRepair,
 		hardware.PowerLimit, hardware.CoreMax, hardware.VoltageOffset, hardware.RestorePowerLimit, hardware.RestoreCoreMax, hardware.RestoreVoltageOffset,
 		"rescan", "navigate", "workload":
 		return kind

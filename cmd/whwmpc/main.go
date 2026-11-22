@@ -41,7 +41,7 @@ func run(ctx context.Context, args []string, stdin *os.File, stdout *os.File, st
 	reduced := flags.Bool("reduced-motion", false, "kurangi animasi")
 	showVersion := flags.Bool("version", false, "tampilkan versi")
 	flags.Usage = func() {
-		fmt.Fprintln(stderr, "whwmpc [opsi] [check --json | doctor | clean | power | trim | apply | restore | report | history | gpu | daemon | benchmark | demo animations]")
+		fmt.Fprintln(stderr, "whwmpc [opsi] [check --json | doctor | clean | power | trim | apply | restore | report | history | gpu | firmware | filesystem | daemon | benchmark | demo animations]")
 		flags.PrintDefaults()
 	}
 	if err := flags.Parse(args); err == flag.ErrHelp {
@@ -79,6 +79,9 @@ func run(ctx context.Context, args []string, stdin *os.File, stdout *os.File, st
 	source := inspection.New(options.Demo)
 	store, stateErr := state.Default()
 	maintenance := workflow.NewMaintenance(store, options.Demo)
+	if status, handled := storageActionCommand(ctx, args, maintenance, stdout, stderr); handled {
+		return status
+	}
 	if status, handled := gpuCommand(ctx, args, maintenance, stdout, stderr); handled {
 		return status
 	}

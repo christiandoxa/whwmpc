@@ -22,7 +22,10 @@ type Result struct {
 	Err      error
 }
 
-type Native struct{}
+type Native struct {
+	// Timeout optionally raises the default eight-second command bound.
+	Timeout time.Duration
+}
 
 func (Native) LookPath(name string) (string, error) { return exec.LookPath(name) }
 
@@ -42,8 +45,12 @@ func (b *limitedBuffer) Write(p []byte) (int, error) {
 	return len(p), nil
 }
 
-func (Native) Run(ctx context.Context, file string, args ...string) Result {
-	ctx, cancel := context.WithTimeout(ctx, 8*time.Second)
+func (n Native) Run(ctx context.Context, file string, args ...string) Result {
+	timeout := n.Timeout
+	if timeout <= 0 {
+		timeout = 8 * time.Second
+	}
+	ctx, cancel := context.WithTimeout(ctx, min(timeout, 2*time.Minute))
 	defer cancel()
 	cmd := exec.CommandContext(ctx, file, args...)
 	cmd.WaitDelay = 300 * time.Millisecond

@@ -45,6 +45,10 @@ func Inspector(scanner *inspection.Scanner, store state.Store, maintenance *work
 		allowActions := maintenance.Available() == nil
 		a := diagnostics.Analyzer{Language: req.Language, Now: scanner.Now()}
 		switch req.Intent {
+		case assistant.Firmware:
+			return firmwarePage(ctx, maintenance, req)
+		case assistant.Filesystem:
+			return filesystemPage(ctx, maintenance, req)
 		case assistant.GPU:
 			return gpuPage(ctx, maintenance, req.Language)
 		case assistant.Storage:
@@ -72,6 +76,9 @@ func Inspector(scanner *inspection.Scanner, store state.Store, maintenance *work
 			}
 			return page
 		case assistant.History:
+			if req.Choice.Kind == "firmware-resume" {
+				return firmwarePage(ctx, maintenance, req)
+			}
 			return historyPage(store, maintenance, req.Language)
 		case assistant.Cleanup:
 			return cleanupPage(ctx, maintenance, req.Language)

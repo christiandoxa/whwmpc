@@ -101,6 +101,9 @@ func historyPage(store state.Store, maintenance *workflow.Maintenance, lang stri
 			if a.CancellationRequested {
 				line += " · " + l("penghentian diminta", "cancel requested")
 			}
+			if a.VerifyAfterRestart {
+				page.Choices = append(page.Choices, Choice{l("Periksa firmware setelah restart", "Verify firmware after restart"), "firmware-resume", entry.PlanID})
+			}
 			if a.CanRestore && maintenance.Available() == nil {
 				short := entry.PlanID[:min(8, len(entry.PlanID))]
 				page.Choices = append(page.Choices, Choice{
