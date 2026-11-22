@@ -179,6 +179,21 @@ func TestRebootHandoffRequiresUnambiguousHistory(t *testing.T) {
 	}
 }
 
+func TestRebootHandoffRejectsEmulatedActiveVersion(t *testing.T) {
+	if runtime.GOOS != "linux" {
+		t.Skip("Linux fwupd inventory")
+	}
+	devices := fmt.Sprintf(`{"Devices":[{"DeviceId":%q,"Version":"2.0","Flags":["emulated"]}]}`, testID)
+	history := fmt.Sprintf(`{"Devices":[{"DeviceId":%q,"Version":"1.0","UpdateState":2,"Releases":[{"Version":"2.0"}]}]}`, testID)
+	got := Outcome(context.Background(), runner{responses: map[string]sysrun.Result{
+		"get-devices": result(devices),
+		"get-history": result(history),
+	}}, testID+"@2.0")
+	if got.State != "unknown" || got.Availability != domain.Unknown || got.Installed != "" {
+		t.Fatalf("emulated version accepted as installed: %+v", got)
+	}
+}
+
 type transport func(*http.Request) (*http.Response, error)
 
 func (f transport) RoundTrip(r *http.Request) (*http.Response, error) { return f(r) }

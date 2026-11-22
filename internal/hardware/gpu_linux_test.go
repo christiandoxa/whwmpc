@@ -4,6 +4,7 @@ package hardware
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"os"
 	"path/filepath"
@@ -77,6 +78,45 @@ func TestNVIDIAChangeUsesExactBoundsAndTarget(t *testing.T) {
 	runner.lookErr = os.ErrNotExist
 	if _, status, err := readNVIDIA(ctx, runner, sampleUUID); !errors.Is(err, os.ErrNotExist) || status != domain.DependencyMissing {
 		t.Fatal("missing executable was not distinguished")
+	}
+}
+
+func TestNVIDIAChangeFitsReportedReadbackPrecision(t *testing.T) {
+	var originalJSON string
+	for _, tc := range []struct {
+		reported string
+		reject   string
+		accept   string
+	}{
+		{"160", "169999", "169000"},
+		{"160.0", "169990", "169900"},
+		{"160.00", "169999", "169990"},
+		{"160.000", "", "169999"},
+	} {
+		t.Run(tc.reported, func(t *testing.T) {
+			row := strings.Replace(sampleNVIDIA, ", 160.00,", ", "+tc.reported+",", 1)
+			runner := &gpuRunner{result: sysrun.Result{Output: []byte(row)}}
+			if tc.reject != "" {
+				if _, err := Prepare(t.Context(), runner, PowerLimit, sampleUUID+"="+tc.reject); err == nil ||
+					!strings.Contains(err.Error(), "pembacaan ulang nvidia-smi") {
+					t.Fatalf("unverifiable request accepted: %v", err)
+				}
+			}
+			change, err := Prepare(t.Context(), runner, PowerLimit, sampleUUID+"="+tc.accept)
+			if err != nil || change.Before.InitialTarget() != sampleUUID+"=160000" {
+				t.Fatalf("representable request rejected or original lost: %+v, %v", change, err)
+			}
+			encoded, err := json.Marshal(change.Before)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if originalJSON == "" {
+				originalJSON = string(encoded)
+			}
+			if string(encoded) != originalJSON {
+				t.Fatal("readback formatting changed the serialized restore identity")
+			}
+		})
 	}
 }
 

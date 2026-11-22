@@ -43,3 +43,29 @@ func TestDarwinSensorParsers(t *testing.T) {
 		}
 	}
 }
+
+func TestDarwinPMSetBatteryPhases(t *testing.T) {
+	// pmset prints these phases before the optional time, health, and presence fields.
+	for _, fixture := range []struct {
+		name, source, body, status string
+		percent                    float64
+	}{
+		{"paused on AC", "AC Power", "80%; AC attached; not charging present: true", "Not charging", 80},
+		{"finishing charge", "AC Power", "100%; finishing charge; 0:05 remaining present: true", "Charging", 100},
+		{"charged with health details", "AC Power", "98%; charged (Fair/Good) present: true", "Full", 98},
+		{"discharging with raw connection flag", "Battery Power", "80%; discharging rawExternalConnected: 0 present: true", "Discharging", 80},
+		{"unrecognized phase", "AC Power", "80%; charging paused present: true", "", 80},
+	} {
+		t.Run(fixture.name, func(t *testing.T) {
+			got := darwinPower("Now drawing from '" + fixture.source + "'\n -InternalBattery-0 (id=314)\t" + fixture.body)
+			if got.OnAC == nil || *got.OnAC != (fixture.source == "AC Power") || got.Availability != domain.Available ||
+				got.Percent == nil || *got.Percent != fixture.percent || got.BatteryStatus != fixture.status {
+				t.Fatalf("unexpected power reading %+v", got)
+			}
+		})
+	}
+	got := darwinPower(" -InternalBattery-0 (id=314)\tcharging; (no estimate) present: true")
+	if got.Percent != nil || got.OnAC != nil || got.Availability != domain.Partial || got.BatteryStatus != "Charging" {
+		t.Fatalf("expected independently reported charging status, got %+v", got)
+	}
+}

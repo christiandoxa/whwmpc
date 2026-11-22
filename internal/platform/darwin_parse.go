@@ -75,7 +75,9 @@ func darwinPS(out string, cpus int) []domain.Process {
 	return topNativeProcesses(processes)
 }
 
-var pmsetCharge = regexp.MustCompile(`\s([0-9]{1,3})%;\s*([^;]*)`)
+// pmset prints capacity and charge state independently, before the optional details.
+var pmsetBattery = regexp.MustCompile(`\t[ \t]*(?:([0-9]{1,3})%;[ \t]*)?` +
+	`(?:(AC attached; not charging|finishing charge|not charging|charging|discharging|charged)(?:[ \t]*;|[ \t]+(?:\(|present:|rawExternalConnected:)|$))?`)
 
 func darwinPower(out string) PowerReading {
 	reading := PowerReading{Availability: domain.Unknown}
@@ -90,29 +92,29 @@ func darwinPower(out string) PowerReading {
 		if !strings.HasPrefix(line, "-InternalBattery") {
 			continue
 		}
-		match := pmsetCharge.FindStringSubmatch(line)
+		match := pmsetBattery.FindStringSubmatch(line)
 		if match == nil {
 			continue
 		}
 		if value, err := strconv.ParseFloat(match[1], 64); err == nil && goodPercent(value) {
 			reading.Percent = &value
-			switch strings.TrimSpace(match[2]) {
-			case "charging":
-				reading.BatteryStatus = "Charging"
-			case "discharging":
-				reading.BatteryStatus = "Discharging"
-			case "charged":
-				reading.BatteryStatus = "Full"
-			case "not charging":
-				reading.BatteryStatus = "Not charging"
-			default:
-				reading.BatteryStatus = ""
-			}
+		}
+		switch match[2] {
+		case "charging", "finishing charge":
+			reading.BatteryStatus = "Charging"
+		case "discharging":
+			reading.BatteryStatus = "Discharging"
+		case "charged":
+			reading.BatteryStatus = "Full"
+		case "not charging", "AC attached; not charging":
+			reading.BatteryStatus = "Not charging"
+		default:
+			reading.BatteryStatus = ""
 		}
 	}
 	if reading.OnAC != nil {
 		reading.Availability = domain.Available
-	} else if reading.Percent != nil {
+	} else if reading.Percent != nil || reading.BatteryStatus != "" {
 		reading.Availability = domain.Partial
 	}
 	return reading

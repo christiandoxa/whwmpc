@@ -1,9 +1,9 @@
 {
   "backend_package": "2.0.20-1ubuntu2~24.04.2",
   "executable": {
-    "sha256": "f60ed2b7fab494394fecfd7ead9c4900ab3beb93fd174356d73c3c973ea25f43",
-    "vcs.revision": "11b6252f08bd192f4d0d5ea8eb0e6e0e1b0579b3",
-    "vcs.modified": "false"
+    "sha256": "66fa72155e34991ff34a15558bd430ad1b849a54bf7891430197713fc620acf1",
+    "vcs.revision": "180d30ac0f0187476fb1d479aa7d826d53a70fa4",
+    "vcs.modified": "true"
   },
   "sandbox": "rootless net and mount namespaces; no hardware or host system bus",
   "wrong_confirmation": {
@@ -21,12 +21,39 @@
     "cli_exit": 0,
     "same_daemon_as_update": true,
     "message": "Metadata LVFS resmi tersedia dan baru diperiksa.",
-    "jcat_cache_bytes": 1495
+    "jcat_cache_bytes": 1497
   },
   "initial_refresh_signature_reported_immediately": false,
   "initial_refresh_signature_reported_after_1s": false,
   "cabinet_gets_before_confirmation_and_revalidation_passed": 0,
-  "cabinet_gets_after_confirmation_and_revalidation_passed": 1,
+  "cabinet_gets_after_confirmation_and_revalidation_passed": 2,
+  "negative_checks": {
+    "expired-metadata": {
+      "status": "not_started",
+      "started": false,
+      "message": "pemeriksaan ulang gagal, buat preview baru: metadata LVFS resmi wajib tersedia dan berumur paling lama tujuh hari"
+    },
+    "changed-metadata": {
+      "status": "not_started",
+      "started": false,
+      "message": "target atau kondisi awal berubah, buat preview baru"
+    },
+    "cab-mismatch": {
+      "status": "not_started",
+      "started": false,
+      "message": "SHA-256 atau ukuran CAB hasil unduhan tidak sesuai rencana"
+    }
+  },
+  "current_version_seen_without_new_boot": {
+    "state": "reboot_required",
+    "availability": "partial",
+    "installed": "0.1.51"
+  },
+  "mismatched_current_version_after_history_success": {
+    "state": "unknown",
+    "availability": "partial",
+    "installed": "0.1.50"
+  },
   "apply": {
     "status": "partial",
     "started": true,

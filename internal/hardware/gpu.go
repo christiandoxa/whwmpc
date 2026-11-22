@@ -61,6 +61,8 @@ type Control struct {
 	Min     int64  `json:"min"`
 	Max     int64  `json:"max"`
 	Default *int64 `json:"default,omitempty"`
+
+	readbackStep int64
 }
 
 var pciPattern = regexp.MustCompile(`^(?:0000)?([0-9a-f]{4}:[0-9a-f]{2}:[0-1][0-9a-f]\.[0-7])$`)

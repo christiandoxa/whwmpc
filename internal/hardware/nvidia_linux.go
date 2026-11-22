@@ -92,8 +92,11 @@ func parseNVIDIA(data []byte) ([]Device, error) {
 		current, min, max, reset := wattsToMilli(fields[11]), wattsToMilli(fields[12]), wattsToMilli(fields[13]), wattsToMilli(fields[14])
 		if current != nil && min != nil && max != nil && reset != nil &&
 			*min > 0 && *min < *max && *current >= *min && *current <= *max && *reset >= *min && *reset <= *max {
+			// wattsToMilli has checked that at most three decimal places are reported.
+			_, fraction, _ := strings.Cut(strings.TrimSpace(fields[11]), ".")
+			step := [...]int64{1000, 100, 10, 1}[len(fraction)]
 			gpu.Controls = []Control{{Kind: PowerLimit, Label: "Batas daya GPU", Unit: "mW",
-				Current: *current, Min: *min, Max: *max, Default: reset}}
+				Current: *current, Min: *min, Max: *max, Default: reset, readbackStep: step}}
 			gpu.TuningAvailability = domain.Available
 		} else {
 			gpu.TuningDetail = "Backend tidak melaporkan batas, nilai awal, dan nilai default daya yang dapat divalidasi."

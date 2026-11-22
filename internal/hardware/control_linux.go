@@ -38,6 +38,10 @@ func Prepare(ctx context.Context, runner sysrun.Runner, kind, target string) (Ch
 	if value < control.Min || value > control.Max {
 		return Change{}, fmt.Errorf("nilai %d di luar rentang %d–%d %s", value, control.Min, control.Max, control.Unit)
 	}
+	if control.readbackStep > 0 && value%control.readbackStep != 0 {
+		return Change{}, fmt.Errorf("nilai %d %s memerlukan ketelitian melebihi pembacaan ulang nvidia-smi (%d %s)",
+			value, control.Unit, control.readbackStep, control.Unit)
+	}
 	if mode == "" && before.Mode != "" {
 		mode = "manual"
 	}

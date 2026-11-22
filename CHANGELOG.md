@@ -1,8 +1,11 @@
 # Changelog
 
-## Belum dirilis
+## 0.3.3
 
 - Piko tampil utuh pada margin prompt yang lebar. Input GPU yang tidak valid menampilkan ekspresi error dan memfokuskan pilihan Kembali.
+- Rencana daya NVIDIA mengikuti resolusi pembacaan ulang yang dilaporkan driver.
+- Verifikasi firmware mengabaikan versi aktif yang berasal dari perangkat emulasi fwupd.
+- macOS mempertahankan status pengisian dijeda, pengisian akhir, dan status yang tersedia tanpa persentase baterai.
 
 ## 0.3.2
 

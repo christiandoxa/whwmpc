@@ -9,3 +9,7 @@ apply: verified readback 169000 mW, signed restore receipt present
 one-time claim: replay rejected before attempting another write
 restore when requested power drifts: rejected without a plan
 restore: verified readback 170000 mW, exactly two signed fixture changes
+
+Uji presisi pembacaan pada namespace privat
+Baseline 180d30a menerima dan mengubah fixture ke 169999 mW. CSV membulatkan ke 170.00 W, sehingga hasil lama melaporkan failed dengan changed=false.
+Build perbaikan menolak nilai 169999 mW sebelum penandatanganan dan penulisan. Nilai 169000 mW lulus apply dan verifikasi, lalu kembali ke 170000 mW melalui restore. Bukti restore dari build baseline yang menerapkan 169000 mW juga dapat dipakai dengan build perbaikan.

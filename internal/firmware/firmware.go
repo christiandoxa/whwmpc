@@ -350,7 +350,7 @@ func Outcome(ctx context.Context, run sysrun.Runner, target string) Verification
 	catalog := Collect(ctx, run, false)
 	verification.Availability = catalog.Availability
 	for _, d := range catalog.Devices {
-		if d.ID == id {
+		if d.ID == id && !slices.Contains(d.Flags, "emulated") {
 			verification.Installed = d.Version
 		}
 	}
