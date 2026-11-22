@@ -14,23 +14,28 @@ fixture_home="$fixture/home"
 binary="$fixture_home/whwmpc"
 chmod 0711 "$fixture"
 sudo useradd --create-home --home-dir "$fixture_home" "$account"
+account_uid=$(id -u "$account")
+manager="user@$account_uid.service"
 
 cleanup() {
-    sudo loginctl disable-linger "$account" || true
-    sudo loginctl terminate-user "$account" || true
+    sudo systemctl stop "$manager" "user-runtime-dir@$account_uid.service" || true
     sudo userdel --remove "$account"
     rmdir "$fixture"
 }
 trap cleanup EXIT
 
 sudo install -o "$account" -m 0755 "$source_binary" "$binary"
-uid_dir="/run/user/$(id -u "$account")"
-sudo loginctl enable-linger "$account"
+uid_dir="/run/user/$account_uid"
+sudo systemctl start "$manager"
 for _ in {1..40}; do
     [[ -S "$uid_dir/bus" ]] && break
     sleep 0.25
 done
-test -S "$uid_dir/bus"
+if [[ ! -S "$uid_dir/bus" ]]; then
+    sudo systemctl status --no-pager "$manager" || true
+    printf '%s\n' 'Temporary user manager did not start its session bus.' >&2
+    exit 1
+fi
 
 as_user() {
     sudo -u "$account" env -i HOME="$fixture_home" PATH=/usr/bin:/bin LC_ALL=C \

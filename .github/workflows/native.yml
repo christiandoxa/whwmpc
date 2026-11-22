@@ -12,7 +12,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-15, windows-2025]
+        os: [ubuntu-24.04, macos-15, windows-2025]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 10
     env:
@@ -29,6 +29,10 @@ jobs:
         run: ./whwmpc --version
       - if: runner.os == 'Windows'
         run: ./whwmpc.exe --version
+      - name: Repair a temporary ext4 partition
+        if: runner.os == 'Linux' && runner.environment == 'github-hosted' && github.event_name == 'push'
+        timeout-minutes: 5
+        run: python3 scripts/check-ext4-ci.py ./whwmpc
       - name: Check a temporary APFS image
         if: runner.os == 'macOS' && runner.environment == 'github-hosted'
         timeout-minutes: 5

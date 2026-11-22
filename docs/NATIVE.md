@@ -10,7 +10,7 @@
 
 Metrik lokal tidak mengirim data melalui jaringan. Status alat hilang, izin, data tidak tersedia, dan galat dipertahankan. Laporan menyimpan keluarga sumber dan metrik yang diizinkan, dengan nama proses, label volume, serial, dan model drive disaring.
 
-CI `Native providers` menjalankan tes baca-saja pada macOS 15 arm64 dan Windows Server 2025 amd64, termasuk inventaris volume nyata dan fixture argumen pemeriksaan. Windows arm64 dan macOS amd64 juga dibangun lintas kompilasi. Runner menyediakan mesin virtual. Pengujian laptop fisik dengan baterai, SMART penuh, dan pemeriksaan langsung volume fisik memerlukan perangkat terpisah.
+CI `Native providers` menjalankan tes pada macOS 15 arm64 dan Windows Server 2025 amd64. Inventaris native dan kedua pemeriksa dibuktikan dengan image APFS dan NTFS yang dipasang baca-saja. Checksum image tetap sama. Windows arm64 dan macOS amd64 juga dibangun lintas kompilasi. Validasi baterai, SMART penuh, dan volume fisik memerlukan perangkat terpisah. [Hasil CI native](https://github.com/christiandoxa/whwmpc/actions/runs/45006770449)
 
 Sumber macOS Primer. [Apple top](https://github.com/apple-oss-distributions/top/blob/main/top.1), [Apple virtual memory statistics](https://developer.apple.com/library/archive/documentation/Performance/Conceptual/ManagingMemory/Articles/VMPages.html), [Apple sysctl](https://developer.apple.com/library/archive/documentation/System/Conceptual/ManPages_iPhoneOS/man3/sysctl.3.html), [Disk Utility hardware health](https://support.apple.com/en-nz/guide/mac-help/mchlp2548/27/mac/27).
 
