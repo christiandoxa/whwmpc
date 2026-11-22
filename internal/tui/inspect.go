@@ -4,8 +4,10 @@ import (
 	"context"
 	"fmt"
 	"slices"
+	"strconv"
 	"strings"
 
+	"github.com/christiandoxa/whwmpc/internal/actions"
 	"github.com/christiandoxa/whwmpc/internal/assistant"
 	"github.com/christiandoxa/whwmpc/internal/diagnostics"
 	"github.com/christiandoxa/whwmpc/internal/domain"
@@ -14,10 +16,15 @@ import (
 	"github.com/christiandoxa/whwmpc/internal/state"
 	"github.com/christiandoxa/whwmpc/internal/storage"
 	"github.com/christiandoxa/whwmpc/internal/tui/mascot"
+	"github.com/christiandoxa/whwmpc/internal/workflow"
 )
 
-func Inspector(scanner *inspection.Scanner, store state.Store, demo bool) Inspect {
+func Inspector(scanner *inspection.Scanner, store state.Store, maintenance *workflow.Maintenance) Inspect {
 	return func(ctx context.Context, req Request) Page {
+		if page, handled := previewAction(ctx, maintenance, req); handled {
+			return page
+		}
+		allowActions := maintenance.Available() == nil
 		a := diagnostics.Analyzer{Language: req.Language, Now: scanner.Now()}
 		switch req.Intent {
 		case assistant.Storage:
@@ -25,10 +32,20 @@ func Inspector(scanner *inspection.Scanner, store state.Store, demo bool) Inspec
 			return withFindings(storagePage(snapshot, req.Language), a.SMART(snapshot), req.Language)
 		case assistant.Trim:
 			snapshot := scanner.TRIM(ctx)
-			return withFindings(trimPage(snapshot, req.Language), a.TRIM(snapshot), req.Language)
+			page := withFindings(trimPage(snapshot, req.Language), a.TRIM(snapshot), req.Language)
+			if allowActions {
+				page.Choices = actionChoices(page.Choices, page.Findings, snapshot.Mounts)
+			}
+			return page
 		case assistant.Power:
 			snapshot := scanner.Power(ctx)
-			return withFindings(powerPage(snapshot, req.Language), a.Power(snapshot), req.Language)
+			page := withFindings(powerPage(snapshot, req.Language), a.Power(snapshot), req.Language)
+			if allowActions {
+				page.Choices = actionChoices(page.Choices, page.Findings, nil)
+			}
+			return page
+		case assistant.Cleanup:
+			return cleanupPage(ctx, maintenance, req.Language)
 		case assistant.Slow:
 			return withFindings(overviewPage(req.Overview, req.Language), a.Slow(req.Overview, scanner.Power(ctx)), req.Language)
 		case assistant.Recommend:
@@ -42,10 +59,13 @@ func Inspector(scanner *inspection.Scanner, store state.Store, demo bool) Inspec
 			}
 			page := withFindings(Page{}, a.Recommend(req.Overview, snapshot, workload), req.Language)
 			l := translator(req.Language)
+			if allowActions {
+				page.Choices = actionChoices(page.Choices, page.Findings, nil)
+			}
 			if workload != "" {
 				page.Choices = append(page.Choices, Choice{Label: l("Ubah konteks", "Change context"), Kind: "context"})
 			}
-			if req.Choice.Kind == "workload" && !demo && workload != "" {
+			if req.Choice.Kind == "workload" && !maintenance.Demo && workload != "" {
 				if err := store.SetPreference("workload", string(workload)); err != nil {
 					page.Advice = append(page.Advice, l("Preferensi hanya tersimpan untuk sesi ini.", "Preference is available for this session only."))
 				}
@@ -84,7 +104,7 @@ func withFindings(page Page, findings []diagnostics.Finding, lang string) Page {
 			page.Advice = append(page.Advice, f.Recommendation)
 		}
 		page.Evidence = append(page.Evidence, f.ID+" · "+label, f.Observation, f.Meaning, f.Recommendation,
-			l("Batas", "Limits")+" · "+f.Limits, f.Source+" · "+f.At.Format("2006-01-02 15:04 MST"))
+			l("Batas", "Limits")+" · "+f.Limits, f.Source+" · "+displayTime(f.At, "2006-01-02 15:04 MST"))
 		for _, action := range f.Actions {
 			switch action.Kind {
 			case "navigate", "workload", "rescan":
@@ -294,4 +314,29 @@ func khz(v *uint64) string {
 
 func translator(lang string) func(string, string) string {
 	return func(id, en string) string { return (Words{id, en}).Text(lang) }
+}
+
+func actionChoices(choices []Choice, findings []diagnostics.Finding, mounts []storage.Mount) []Choice {
+	for _, finding := range findings {
+		for _, a := range finding.Actions {
+			switch a.Kind {
+			case actions.PowerProfile:
+				choices = appendChoice(choices, Choice{Label: a.Label, Kind: a.Kind, Value: a.Target})
+			case actions.EnableTrimTimer:
+				choices = appendChoice(choices, Choice{Label: a.Label, Kind: a.Kind})
+			case actions.TrimMount:
+				id, err := strconv.ParseUint(a.Target, 10, 64)
+				if err != nil {
+					continue
+				}
+				for _, mount := range mounts {
+					if mount.ID == id && mount.Point != "" {
+						choices = appendChoice(choices, Choice{Label: a.Label + " · " + domain.SafeText(mount.Point), Kind: a.Kind, Value: mount.Point})
+						break
+					}
+				}
+			}
+		}
+	}
+	return choices
 }

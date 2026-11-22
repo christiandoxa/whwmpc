@@ -8,6 +8,7 @@ import (
 	"io"
 	"os"
 	"os/signal"
+	"syscall"
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/term"
@@ -17,12 +18,13 @@ import (
 	"github.com/christiandoxa/whwmpc/internal/state"
 	"github.com/christiandoxa/whwmpc/internal/tui"
 	"github.com/christiandoxa/whwmpc/internal/tui/motion"
+	"github.com/christiandoxa/whwmpc/internal/workflow"
 )
 
 var version = "dev"
 
 func main() {
-	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
+	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer cancel()
 	os.Exit(run(ctx, os.Args[1:], os.Stdin, os.Stdout, os.Stderr))
 }
@@ -40,7 +42,7 @@ func run(ctx context.Context, args []string, stdin *os.File, stdout *os.File, st
 	reduced := flags.Bool("reduced-motion", false, "kurangi animasi")
 	showVersion := flags.Bool("version", false, "tampilkan versi")
 	flags.Usage = func() {
-		fmt.Fprintln(stderr, "whwmpc [opsi] [check --json | doctor | power | trim | demo animations]")
+		fmt.Fprintln(stderr, "whwmpc [opsi] [check --json | doctor | clean | power | trim | apply | restore | demo animations]")
 		flags.PrintDefaults()
 	}
 	if err := flags.Parse(args); err == flag.ErrHelp {
@@ -76,6 +78,8 @@ func run(ctx context.Context, args []string, stdin *os.File, stdout *os.File, st
 		options.Motion = motion.Reduced
 	}
 	source := inspection.New(options.Demo)
+	store, stateErr := state.Default()
+	maintenance := workflow.NewMaintenance(store, options.Demo)
 	if len(args) == 2 && args[0] == "check" && args[1] == "--json" {
 		data := struct {
 			Demo     bool `json:"demo"`
@@ -88,6 +92,9 @@ func run(ctx context.Context, args []string, stdin *os.File, stdout *os.File, st
 		return 0
 	}
 	if status, handled := readCommand(ctx, args, source, options.Demo, stdout, stderr); handled {
+		return status
+	}
+	if status, handled := actionCommand(ctx, args, maintenance, stdin, stdout, stderr); handled {
 		return status
 	}
 	if len(args) > 0 {
@@ -103,8 +110,11 @@ func run(ctx context.Context, args []string, stdin *os.File, stdout *os.File, st
 		fmt.Fprintf(stdout, "whwmpc · %s %s · %s\n", o.OS, o.Arch, o.Availability)
 		return 0
 	}
-	store, err := state.Default()
-	if err == nil && !options.Demo {
+	if os.Geteuid() == 0 && !options.Demo {
+		fmt.Fprintln(stderr, "Jalankan TUI whwmpc sebagai user biasa.")
+		return 1
+	}
+	if stateErr == nil && !options.Demo {
 		if options.Motion == "" {
 			saved, err := store.Preference("motion")
 			if err != nil {
@@ -119,10 +129,24 @@ func run(ctx context.Context, args []string, stdin *os.File, stdout *os.File, st
 	}
 	scheduler := motion.NewScheduler()
 	options.Scheduler = scheduler
-	p := tea.NewProgram(tui.New(ctx, source, tui.Inspector(source, store, options.Demo), options), tea.WithContext(ctx), tea.WithInput(stdin), tea.WithOutput(stdout))
-	motionCtx, stopMotion := context.WithCancel(ctx)
-	defer stopMotion()
-	go scheduler.Run(motionCtx, func(tick motion.Tick) { p.Send(tick) })
+	options.Authenticate = maintenance.Authenticate
+	var p *tea.Program
+	options.Send = func(msg tea.Msg) { p.Send(msg) }
+	// Keep the event loop available for a verification result after cancellation.
+	uiCtx, stopUI := context.WithCancel(context.WithoutCancel(ctx))
+	defer stopUI()
+	workCtx, stopWork := context.WithCancel(ctx)
+	defer stopWork()
+	p = tea.NewProgram(tui.New(workCtx, source, tui.Inspector(source, store, maintenance), options),
+		tea.WithContext(uiCtx), tea.WithoutSignalHandler(), tea.WithInput(stdin), tea.WithOutput(stdout))
+	go scheduler.Run(uiCtx, func(tick motion.Tick) { p.Send(tick) })
+	go func() {
+		select {
+		case <-ctx.Done():
+			p.Send(tui.ShutdownMsg{})
+		case <-uiCtx.Done():
+		}
+	}()
 	if _, err := p.Run(); err != nil {
 		fmt.Fprintln(stderr, err)
 		return 1

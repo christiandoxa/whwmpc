@@ -24,6 +24,7 @@ const (
 	Trim        Pose = "trim"
 	Broom       Pose = "broom"
 	Preview     Pose = "preview"
+	Confirm     Pose = "confirmation"
 	Cleaning    Pose = "cleaning"
 	Applying    Pose = "applying"
 	Success     Pose = "success"
@@ -41,7 +42,7 @@ const (
 )
 
 var Gallery = []Pose{Greeting, Idle, Blink, LookLeft, LookRight, Listening, Thinking, Scanning, SSD, CPU, Battery, Charging, Trim,
-	Broom, Preview, Cleaning, Applying, Success, Performance, Balanced, Saver, Warning, Critical, Unknown, Error, Cancelled, Restore, Printing, Farewell}
+	Broom, Preview, Confirm, Cleaning, Applying, Success, Performance, Balanced, Saver, Warning, Critical, Unknown, Error, Cancelled, Restore, Printing, Farewell}
 
 const Width, Height = 16, 6
 
@@ -100,6 +101,7 @@ var poses = map[Pose][]frame{
 		{"  o    o", "   _    ", "--        ", "", "[=]"},
 		{" o    o ", "   _    ", "--        ", "", "[=]"},
 	},
+	Confirm: {{" o    o ", "   _    ", "--        ", "", "[=]"}},
 	Cleaning: {
 		{"  o    o", "   .    ", "--        ", "        . /==", "/"},
 		{"  o    o", "   v    ", "--        ", "        .  /==", "/"},

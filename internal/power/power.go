@@ -75,7 +75,8 @@ const (
 	profileDaemon = "power-profiles-daemon"
 	currentAPI    = "org.freedesktop.UPower.PowerProfiles"
 	legacyAPI     = "net.hadess.PowerProfiles"
-	busAddress    = "--address=unix:path=/run/dbus/system_bus_socket"
+	busPath       = "/run/dbus/system_bus_socket"
+	busAddress    = "--address=unix:path=" + busPath
 	propertiesAPI = "org.freedesktop.DBus.Properties"
 )
 
@@ -89,9 +90,10 @@ func ValidProfile(name string) bool {
 }
 
 func (p Profiles) CanChange() bool {
+	guid, _ := profileEndpoint(p.Target)
 	return p.Status == domain.Available && p.ManagerStatus == domain.Available &&
 		p.Backend == profileDaemon && p.Holds != nil && *p.Holds == 0 && len(p.Conflicts) == 0 &&
-		profileObject(p.API) != "" && profileOwner(p.Target) != "" && ValidProfile(p.Active) &&
+		profileObject(p.API) != "" && guid != "" && ValidProfile(p.Active) &&
 		slices.Contains(p.Available, p.Active)
 }
 
@@ -103,29 +105,39 @@ func ProfileCommand(p Profiles, desired string) ([]string, error) {
 	if desired == "performance" && p.Inhibited != "" {
 		return nil, errors.New("the daemon inhibits the performance profile")
 	}
-	return []string{busAddress, "--auto-start=no", "--allow-interactive-authorization=no",
-		"call", profileOwner(p.Target), profileObject(p.API), propertiesAPI,
+	guid, owner := profileEndpoint(p.Target)
+	return []string{busAddress + ",guid=" + guid, "--auto-start=no", "--allow-interactive-authorization=no",
+		"call", owner, profileObject(p.API), propertiesAPI,
 		"Set", "ssv", p.API, "ActiveProfile", "s", desired}, nil
 }
 
-func profileOwner(target string) string {
-	busID, owner, ok := strings.Cut(target, "/")
-	if !ok || len(busID) != 32 || !strings.HasPrefix(owner, ":") || len(owner) > 64 {
-		return ""
+func profileEndpoint(target string) (guid, owner string) {
+	busID, endpoint, _ := strings.Cut(target, "/")
+	guid, owner, _ = strings.Cut(endpoint, "/")
+	if !validBusID(busID) || !validBusID(guid) || !validOwner(owner) {
+		return "", ""
 	}
-	if strings.ContainsFunc(busID, func(r rune) bool { return !strings.ContainsRune("0123456789abcdef", r) }) {
-		return ""
+	return guid, owner
+}
+
+func validBusID(id string) bool {
+	return len(id) == 32 && id != strings.Repeat("0", 32) && strings.Trim(id, "0123456789abcdef") == ""
+}
+
+func validOwner(owner string) bool {
+	if !strings.HasPrefix(owner, ":") || len(owner) > 64 {
+		return false
 	}
 	fields := strings.Split(owner[1:], ".")
 	if len(fields) != 2 {
-		return ""
+		return false
 	}
 	for _, field := range fields {
 		if field == "" || strings.ContainsFunc(field, func(r rune) bool { return r < '0' || r > '9' }) {
-			return ""
+			return false
 		}
 	}
-	return owner
+	return true
 }
 
 func profileObject(api string) string {

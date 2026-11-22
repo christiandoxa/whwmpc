@@ -11,6 +11,7 @@ import (
 	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
 
+	"github.com/christiandoxa/whwmpc/internal/actions"
 	"github.com/christiandoxa/whwmpc/internal/assistant"
 	"github.com/christiandoxa/whwmpc/internal/diagnostics"
 	"github.com/christiandoxa/whwmpc/internal/domain"
@@ -25,6 +26,8 @@ type Options struct {
 	Motion               motion.Mode
 	Scheduler            *motion.Scheduler
 	SaveMotion           func(motion.Mode) error
+	Authenticate         Authenticator
+	Send                 func(tea.Msg)
 	Workload             assistant.Workload
 }
 
@@ -39,12 +42,16 @@ type Page struct {
 	Pose             mascot.Pose
 	Findings         []diagnostics.Finding
 	Priority         string
+	Plan             *actions.Plan
+	Confirm          bool
 	Found, Meaning   []string
 	Advice, Evidence []string
 	Choices          []Choice
 }
 
 type Request struct {
+	Plan     *actions.Plan
+	Progress func(actions.Stage)
 	Intent   assistant.Intent
 	Choice   Choice
 	Overview domain.Overview
@@ -98,6 +105,13 @@ type Model struct {
 	motionSaving  bool
 	motionPending motion.Mode
 	critical      bool
+	job           uint64
+	cancelJob     context.CancelFunc
+	workName      string
+	runningAction bool
+	actionPose    mascot.Pose
+	cancelling    bool
+	quitPending   bool
 }
 
 func New(ctx context.Context, source platform.Provider, inspect Inspect, opts Options) Model {
@@ -137,7 +151,10 @@ func New(ctx context.Context, source platform.Provider, inspect Inspect, opts Op
 }
 
 type overviewMsg struct{ data domain.Overview }
-type replyMsg struct{ page Page }
+type replyMsg struct {
+	job  uint64
+	page Page
+}
 type refreshMsg struct{}
 type motionSavedMsg struct {
 	mode motion.Mode
@@ -176,17 +193,35 @@ func (m *Model) setFocus(f focus) tea.Cmd {
 }
 
 func (m *Model) start(intent assistant.Intent, choice Choice) tea.Cmd {
+	if choice.Kind == "apply" || choice.Kind == "confirm-plan" {
+		if w, h := m.bounds(); w < 60 || h < 18 {
+			m.toast = m.tr(Words{"Perbesar terminal untuk meninjau rencana.", "Enlarge the terminal to review the plan."})
+			return nil
+		}
+	}
 	if strings.HasPrefix(choice.Kind, "gallery-") && m.options.Gallery {
 		m.galleryChoice(choice)
+		return nil
+	}
+	if choice.Kind == "cancel-plan" && m.page.Plan != nil {
+		m.cancelPreview()
+		return nil
+	}
+	if choice.Kind == "confirm-plan" && m.page.Plan != nil && choice.Value == m.page.Plan.ID && !m.options.Demo {
+		m.confirmPage()
 		return nil
 	}
 	if choice.Kind == "motion" {
 		return m.setMotion(motion.Mode(choice.Value))
 	}
 	if m.busy {
-		if choice.Kind == "" {
+		if choice.Kind == "" && !m.runningAction {
 			m.queued = intent
 		}
+		return nil
+	}
+	plan := m.page.Plan
+	if choice.Kind == "apply" && (plan == nil || !m.page.Confirm || choice.Value != plan.ID || m.options.Demo) {
 		return nil
 	}
 	m.active, m.scroll, m.choice, m.detail = intent, 0, 0, false
@@ -212,18 +247,14 @@ func (m *Model) start(intent assistant.Intent, choice Choice) tea.Cmd {
 		m.showReply()
 		return nil
 	}
-	m.busy = true
-	m.activity = poseFor(intent)
-	m.show(m.activity, "", true)
-	m.page = Page{}
 	if choice.Kind == "workload" {
 		workload := assistant.Workload(choice.Value)
 		if slices.Contains(assistant.Workloads, workload) {
 			m.options.Workload = workload
 		}
 	}
-	request := Request{Intent: intent, Choice: choice, Overview: m.overview, Language: m.options.Language, Workload: m.options.Workload}
-	return func() tea.Msg { return replyMsg{m.inspect(m.ctx, request)} }
+	request := Request{Intent: intent, Choice: choice, Overview: m.overview, Language: m.options.Language, Workload: m.options.Workload, Plan: plan}
+	return m.launch(request, aimFor(intent, choice, plan))
 }
 
 func (m *Model) updateOverview(data domain.Overview) tea.Cmd {
@@ -267,14 +298,52 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.input.SetWidth(max(1, w-13))
 	case overviewMsg:
 		cmd = m.updateOverview(msg.data)
+	case authMsg:
+		if msg.job == m.job && m.busy {
+			if msg.err != nil || msg.ctx.Err() != nil {
+				page := cancellationPage(m.options.Language, m.active)
+				if msg.err != nil && msg.ctx.Err() == nil {
+					page = unavailableAction(msg.err, m.options.Language)
+				}
+				cmd = func() tea.Msg { return replyMsg{msg.job, page} }
+			} else {
+				m.workName = ""
+				cmd = m.doRequest(msg.ctx, msg.job, msg.req)
+			}
+		}
+	case stageMsg:
+		m.updateStage(msg)
+	case ShutdownMsg:
+		if m.cancelCurrent() {
+			m.quitPending = true
+		} else {
+			cmd = m.quit()
+		}
 	case replyMsg:
-		m.page, m.busy = msg.page, false
+		if msg.job != m.job || !m.busy {
+			return m, nil
+		}
+		if m.cancelJob != nil {
+			m.cancelJob()
+			m.cancelJob = nil
+		}
+		if m.cancelling && !m.runningAction {
+			msg.page = cancellationPage(m.options.Language, m.active)
+		}
+		m.page, m.busy, m.runningAction, m.cancelling, m.workName = msg.page, false, false, false, ""
+		if m.page.Plan != nil {
+			m.setFocus(pageFocus)
+			m.choice, m.scroll = 0, 0
+		}
 		if m.active == assistant.Storage && msg.page.Availability == domain.Available {
 			m.critical = msg.page.Pose == mascot.Critical
 		} else if msg.page.Pose == mascot.Critical {
 			m.critical = true
 		}
 		m.showReply()
+		if m.quitPending {
+			return m, m.quit()
+		}
 		if m.queued != "" {
 			intent := m.queued
 			m.queued = ""
@@ -315,12 +384,23 @@ func (m *Model) key(msg tea.KeyPressMsg) tea.Cmd {
 	m.toast = ""
 	switch msg.String() {
 	case "ctrl+c":
+		if m.cancelCurrent() {
+			m.quitPending = true
+			return nil
+		}
 		return m.quit()
 	case "tab":
 		return m.setFocus((m.focus + 1) % 3)
 	case "shift+tab":
 		return m.setFocus((m.focus + 2) % 3)
 	case "esc":
+		if m.cancelCurrent() {
+			return nil
+		}
+		if m.page.Plan != nil {
+			m.cancelPreview()
+			return nil
+		}
 		m.help, m.detail = false, false
 		if m.options.Gallery {
 			m.galleryPage()
@@ -340,6 +420,10 @@ func (m *Model) key(msg tea.KeyPressMsg) tea.Cmd {
 	}
 	switch msg.String() {
 	case "q":
+		if m.cancelCurrent() {
+			m.quitPending = true
+			return nil
+		}
 		return m.quit()
 	case "?":
 		m.help, m.scroll = !m.help, 0
@@ -393,7 +477,9 @@ func (m *Model) key(msg tea.KeyPressMsg) tea.Cmd {
 				step = -1
 			}
 			m.choice = (m.choice + len(m.page.Choices) + step) % len(m.page.Choices)
-			m.accent(true, false)
+			if m.page.Plan == nil {
+				m.accent(true, false)
+			}
 		}
 	case "enter":
 		if m.options.Gallery && m.focus == menuFocus {
@@ -407,7 +493,7 @@ func (m *Model) key(msg tea.KeyPressMsg) tea.Cmd {
 			m.question = ""
 			return m.start(assistant.Menu[m.selected], Choice{})
 		}
-		if m.focus == pageFocus && len(m.page.Choices) > 0 {
+		if m.focus == pageFocus && !m.detail && len(m.page.Choices) > 0 {
 			choice := m.page.Choices[m.choice]
 			if choice.Kind == "navigate" {
 				return m.start(assistant.Intent(choice.Value), Choice{})

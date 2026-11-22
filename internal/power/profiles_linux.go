@@ -3,14 +3,20 @@
 package power
 
 import (
+	"bufio"
 	"context"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"io"
 	"io/fs"
+	"net"
+	"os"
 	"path"
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/christiandoxa/whwmpc/internal/domain"
 	"github.com/christiandoxa/whwmpc/internal/sysrun"
@@ -35,6 +41,12 @@ func decodeCall(raw []byte, kind string, out any) bool {
 }
 
 func InspectProfiles(ctx context.Context, fsys fs.FS, runner sysrun.Runner) Profiles {
+	return inspectProfiles(ctx, fsys, runner, func(ctx context.Context) (string, error) {
+		return readBusGUID(ctx, busPath)
+	})
+}
+
+func inspectProfiles(ctx context.Context, fsys fs.FS, runner sysrun.Runner, authenticate func(context.Context) (string, error)) Profiles {
 	managers := inspectManagers(ctx, fsys, runner)
 	p := Profiles{Status: domain.Unknown, ManagerStatus: managers.status, Managers: managers.names}
 	if len(p.Managers) > 1 {
@@ -50,8 +62,15 @@ func InspectProfiles(ctx context.Context, fsys fs.FS, runner sysrun.Runner) Prof
 		p.Detail = "busctl is required to inspect the system power-profile API."
 		return p
 	}
+	address := busAddress
+	guid, authErr := authenticate(ctx)
+	if authErr != nil || !validBusID(guid) {
+		guid = ""
+	} else {
+		address += ",guid=" + guid
+	}
 	call := func(destination, object, iface, method string, args ...string) sysrun.Result {
-		cmd := []string{busAddress, "--auto-start=no", "--allow-interactive-authorization=no", "--json=short",
+		cmd := []string{address, "--auto-start=no", "--allow-interactive-authorization=no", "--json=short",
 			"call", destination, object, iface, method}
 		return runner.Run(ctx, busctl, append(cmd, args...)...)
 	}
@@ -60,23 +79,23 @@ func InspectProfiles(ctx context.Context, fsys fs.FS, runner sysrun.Runner) Prof
 	}
 	id := busCall("GetId")
 	var busID string
-	if !okResult(id) || !decodeCall(id.Output, "s", &busID) || profileOwner(busID+"/:1.1") == "" {
+	if !okResult(id) || !decodeCall(id.Output, "s", &busID) || !validBusID(busID) {
 		p.Status = callStatus(id)
 		p.Detail = "System D-Bus identity could not be read."
 		return p
 	}
+	var owner string
 	for _, api := range []string{currentAPI, legacyAPI} {
 		res := busCall("GetNameOwner", "s", api)
 		if res.Err == nil && res.ExitCode != 0 && nameMissing(res.Stderr) {
 			continue
 		}
-		var owner string
-		if !okResult(res) || !decodeCall(res.Output, "s", &owner) || profileOwner(busID+"/"+owner) == "" {
+		if !okResult(res) || !decodeCall(res.Output, "s", &owner) || !validOwner(owner) {
 			p.Status = callStatus(res)
 			p.Detail = "The owner of the system power-profile API could not be verified."
 			return p
 		}
-		p.Target, p.API = busID+"/"+owner, api
+		p.Target, p.API = busID+"/"+guid+"/"+owner, api
 		break
 	}
 	if p.API == "" {
@@ -88,7 +107,6 @@ func InspectProfiles(ctx context.Context, fsys fs.FS, runner sysrun.Runner) Prof
 		}
 		return p
 	}
-	owner := profileOwner(p.Target)
 	data := call(owner, profileObject(p.API), propertiesAPI, "GetAll", "s", p.API)
 	if !okResult(data) {
 		p.Status = callStatus(data)
@@ -113,6 +131,8 @@ func InspectProfiles(ctx context.Context, fsys fs.FS, runner sysrun.Runner) Prof
 		p.Detail = "Use the active manager's controls. Changes require a verified power-profiles-daemon service."
 	case p.ManagerStatus != domain.Available:
 		p.Detail = "Competing power managers could not be ruled out."
+	case guid == "":
+		p.Detail = "The system bus authentication identity could not be verified for profile changes."
 	case p.Holds == nil:
 		p.Detail = "The service did not report its active profile holds."
 	case *p.Holds > 0:
@@ -123,6 +143,38 @@ func InspectProfiles(ctx context.Context, fsys fs.FS, runner sysrun.Runner) Prof
 		p.Detail = "The daemon reports a placeholder driver. Hardware effects are unverified."
 	}
 	return p
+}
+
+func readBusGUID(ctx context.Context, socket string) (string, error) {
+	ctx, cancel := context.WithTimeout(ctx, 700*time.Millisecond)
+	defer cancel()
+	conn, err := (&net.Dialer{}).DialContext(ctx, "unix", socket)
+	if err != nil {
+		return "", err
+	}
+	defer conn.Close()
+	deadline, _ := ctx.Deadline()
+	if err := conn.SetDeadline(deadline); err != nil {
+		return "", err
+	}
+	stop := context.AfterFunc(ctx, func() { _ = conn.Close() })
+	defer stop()
+
+	uid := hex.EncodeToString([]byte(strconv.Itoa(os.Geteuid())))
+	if _, err := io.WriteString(conn, "\x00AUTH EXTERNAL "+uid+"\r\n"); err != nil {
+		return "", err
+	}
+	reply, err := bufio.NewReaderSize(conn, 64).ReadSlice('\n')
+	if err != nil {
+		return "", err
+	}
+	line := string(reply)
+	guid := strings.ToLower(strings.TrimSuffix(strings.TrimPrefix(line, "OK "), "\r\n"))
+	if !strings.HasPrefix(line, "OK ") || !strings.HasSuffix(line, "\r\n") || !validBusID(guid) {
+		return "", errors.New("system bus did not authenticate the connection")
+	}
+	// Authentication ends here. Only busctl sends requests to the verified peer.
+	return guid, nil
 }
 
 func readProfiles(raw []byte, p *Profiles) bool {

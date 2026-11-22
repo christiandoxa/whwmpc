@@ -70,7 +70,7 @@ func readPrivate(root *os.Root, name string, limit int64) ([]byte, error) {
 	if !before.Mode().IsRegular() || !private(before) {
 		return nil, errors.New("app data file must be private and owned by the user")
 	}
-	file, err := root.Open(name)
+	file, err := root.OpenFile(name, openReadFlags, 0)
 	if err != nil {
 		return nil, err
 	}

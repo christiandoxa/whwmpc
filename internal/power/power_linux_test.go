@@ -3,15 +3,23 @@
 package power
 
 import (
+	"bufio"
 	"context"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"io/fs"
+	"net"
+	"os"
+	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 	"testing/fstest"
+	"time"
 
 	"github.com/christiandoxa/whwmpc/internal/domain"
 	"github.com/christiandoxa/whwmpc/internal/sysrun"
@@ -115,7 +123,10 @@ func TestCPUFreqAndSupplies(t *testing.T) {
 }
 
 const testBusID = "00112233445566778899aabbccddeeff"
+const testAuthGUID = "ffeeddccbbaa99887766554433221100"
 const testOwner = ":1.12"
+
+func fixtureGUID(context.Context) (string, error) { return testAuthGUID, nil }
 
 const profileResponse = `{"type":"a{sv}","data":[{
 	"ActiveProfile":{"type":"s","data":"balanced"},
@@ -145,8 +156,12 @@ func knownManagerUnits(ppdPID int, active ...string) string {
 	return out.String()
 }
 
-func testProfileRunner(t *testing.T, systemd, daemonData, api string, ownerPID int) fixtureRunner {
+func testProfileRunner(t *testing.T, systemd, daemonData, api, guid string, ownerPID int) fixtureRunner {
 	t.Helper()
+	address := busAddress
+	if guid != "" {
+		address += ",guid=" + guid
+	}
 	return fixtureRunner{tools: []string{"busctl", "systemctl", "powerprofilesctl"}, run: func(file string, args ...string) sysrun.Result {
 		if file == "/usr/bin/systemctl" {
 			if len(args) != len(managerUnits)+4 || args[0] != "show" {
@@ -155,7 +170,7 @@ func testProfileRunner(t *testing.T, systemd, daemonData, api string, ownerPID i
 			return sysrun.Result{Output: []byte(systemd)}
 		}
 		if file != "/usr/bin/busctl" || len(args) < 9 ||
-			!slices.Equal(args[:5], []string{busAddress, "--auto-start=no", "--allow-interactive-authorization=no", "--json=short", "call"}) {
+			!slices.Equal(args[:5], []string{address, "--auto-start=no", "--allow-interactive-authorization=no", "--json=short", "call"}) {
 			t.Fatalf("unapproved probe: %s %v", file, args)
 		}
 		var reply string
@@ -185,13 +200,14 @@ func TestInspectAndBuildProfileOperation(t *testing.T) {
 	for _, api := range []string{currentAPI, legacyAPI} {
 		t.Run(api, func(t *testing.T) {
 			sys := files(map[string]string{"proc/1/comm": "systemd\n", "proc/25/comm": "power-profiles-\n"})
-			p := InspectProfiles(context.Background(), sys, testProfileRunner(t, knownManagerUnits(25), profileResponse, api, 25))
-			if !p.CanChange() || p.Active != "balanced" || p.Target != testBusID+"/"+testOwner ||
+			runner := testProfileRunner(t, knownManagerUnits(25), profileResponse, api, testAuthGUID, 25)
+			p := inspectProfiles(t.Context(), sys, runner, fixtureGUID)
+			if !p.CanChange() || p.Active != "balanced" || p.Target != testBusID+"/"+testAuthGUID+"/"+testOwner ||
 				p.Degraded != "lap-detected" || !slices.Equal(p.Drivers["performance"], []string{"amd_pstate", "platform_profile"}) {
 				t.Fatalf("unexpected backend: %+v", p)
 			}
 			args, err := ProfileCommand(p, "power-saver")
-			want := []string{busAddress, "--auto-start=no", "--allow-interactive-authorization=no", "call", testOwner,
+			want := []string{busAddress + ",guid=" + testAuthGUID, "--auto-start=no", "--allow-interactive-authorization=no", "call", testOwner,
 				profileObject(api), propertiesAPI, "Set", "ssv", api, "ActiveProfile", "s", "power-saver"}
 			if err != nil || !slices.Equal(args, want) {
 				t.Fatalf("unexpected mutation arguments: %v, %v", args, err)
@@ -203,7 +219,7 @@ func TestInspectAndBuildProfileOperation(t *testing.T) {
 			if _, err := ProfileCommand(p, "performance"); err == nil {
 				t.Fatal("accepted the inhibited performance profile")
 			}
-			p.Target = testBusID + "/--address=unix:path=/tmp/bus"
+			p.Target = testBusID + "/" + testAuthGUID + "/--address=unix:path=/tmp/bus"
 			if _, err := ProfileCommand(p, "balanced"); err == nil {
 				t.Fatal("accepted an injected bus destination")
 			}
@@ -236,7 +252,8 @@ func TestProfileGuards(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			sys := files(tt.opts)
 			sys["proc/1/comm"] = &fstest.MapFile{Data: []byte("systemd\n")}
-			p := InspectProfiles(context.Background(), sys, testProfileRunner(t, tt.systemd, tt.data, currentAPI, tt.pid))
+			runner := testProfileRunner(t, tt.systemd, tt.data, currentAPI, testAuthGUID, tt.pid)
+			p := inspectProfiles(t.Context(), sys, runner, fixtureGUID)
 			if p.Status != tt.wantStatus || p.CanChange() || (tt.conflict != "" && !slices.Contains(p.Conflicts, tt.conflict)) {
 				t.Fatalf("profiles = %+v", p)
 			}
@@ -254,7 +271,7 @@ func TestProfileGuards(t *testing.T) {
 func TestMissingOrRestrictedBackend(t *testing.T) {
 	ctx := context.Background()
 	sys := files(map[string]string{"proc/1/comm": "init\n", "proc/24/comm": "tuned\n"})
-	p := InspectProfiles(ctx, sys, testProfileRunner(t, "", "", "", 0))
+	p := inspectProfiles(ctx, sys, testProfileRunner(t, "", "", "", testAuthGUID, 0), fixtureGUID)
 	if p.Status != domain.Unsupported || p.ManagerStatus != domain.Partial || !slices.Equal(p.Managers, []string{"TuneD"}) {
 		t.Fatalf("non-systemd manager not recognized: %+v", p)
 	}
@@ -262,10 +279,66 @@ func TestMissingOrRestrictedBackend(t *testing.T) {
 	if p.Status != domain.DependencyMissing {
 		t.Fatalf("missing busctl = %+v", p)
 	}
-	p = InspectProfiles(ctx, sys, fixtureRunner{tools: []string{"busctl"}, run: func(string, ...string) sysrun.Result {
+	p = inspectProfiles(ctx, sys, fixtureRunner{tools: []string{"busctl"}, run: func(string, ...string) sysrun.Result {
 		return sysrun.Result{Err: errors.Join(fs.ErrPermission, errors.New("bus unavailable"))}
-	}})
+	}}, fixtureGUID)
 	if p.Status != domain.PermissionRequired {
 		t.Fatalf("restricted bus = %+v", p)
+	}
+}
+
+func TestUnpinnedProfilesAreReadOnly(t *testing.T) {
+	sys := files(map[string]string{"proc/1/comm": "systemd\n"})
+	runner := testProfileRunner(t, knownManagerUnits(25), profileResponse, currentAPI, "", 25)
+	p := inspectProfiles(t.Context(), sys, runner, func(context.Context) (string, error) {
+		return "", errors.New("authentication unavailable")
+	})
+	if p.Status != domain.Available || p.Active != "balanced" || p.CanChange() {
+		t.Fatalf("unexpected unpinned profiles: %+v", p)
+	}
+	if _, err := ProfileCommand(p, "performance"); err == nil {
+		t.Fatal("an unpinned profile accepted a change")
+	}
+}
+
+func TestReadBusGUID(t *testing.T) {
+	socket := filepath.Join(t.TempDir(), "bus")
+	listener, err := net.Listen("unix", socket)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer listener.Close()
+	served := make(chan error, 1)
+	go func() {
+		conn, err := listener.Accept()
+		if err != nil {
+			served <- err
+			return
+		}
+		defer conn.Close()
+		_ = conn.SetDeadline(time.Now().Add(2 * time.Second))
+		reader := bufio.NewReader(conn)
+		hello, err := reader.ReadString('\n')
+		want := "\x00AUTH EXTERNAL " + hex.EncodeToString([]byte(strconv.Itoa(os.Geteuid()))) + "\r\n"
+		if err != nil || hello != want {
+			served <- fmt.Errorf("authentication request = %q, %v", hello, err)
+			return
+		}
+		if _, err = io.WriteString(conn, "OK "+testAuthGUID+"\r\n"); err != nil {
+			served <- err
+			return
+		}
+		if _, err = reader.ReadByte(); err != io.EOF {
+			served <- fmt.Errorf("client did not disconnect after authentication: %v", err)
+			return
+		}
+		served <- nil
+	}()
+	got, err := readBusGUID(t.Context(), socket)
+	if err != nil || got != testAuthGUID {
+		t.Fatalf("guid = %q, %v", got, err)
+	}
+	if err := <-served; err != nil {
+		t.Fatal(err)
 	}
 }

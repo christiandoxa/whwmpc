@@ -46,7 +46,7 @@ var demoFlow = []galleryStep{
 	{mascot.Scanning, "Pemeriksaan · inventaris cache paket contoh", "Scan · fixture package cache inventory"},
 	{mascot.Broom, "Temuan · cache APT contoh berukuran 376 MiB", "Finding · sample APT cache contains 376 MiB"},
 	{mascot.Preview, "Preview · seluruh cache paket contoh; penghapusan permanen", "Preview · entire fixture package cache; permanent deletion"},
-	{mascot.Preview, "Konfirmasi DEMO · pilih Terapkan demo untuk melanjutkan", "DEMO confirmation · select Apply demo to continue"},
+	{mascot.Confirm, "Konfirmasi DEMO · pilih Terapkan demo untuk melanjutkan", "DEMO confirmation · select Apply demo to continue"},
 	{mascot.Cleaning, "Menjalankan DEMO · backend fixture sedang menyapu", "Running DEMO · fixture backend is cleaning"},
 	{mascot.Applying, "Verifikasi DEMO · cek kembali inventaris fixture", "DEMO verification · recheck the fixture inventory"},
 	{mascot.Success, "Terbukti · cache contoh kosong setelah operasi demo", "Verified · demo cache is empty after the fixture operation"},

@@ -36,3 +36,11 @@
 - Preferensi penggunaan bisa dipilih dengan keyboard atau input bebas, dipakai ulang, dan diubah di Rekomendasi. Demo memakai timestamp fixture dan preferensi sesi.
 - Gate lokal mencakup gofmt, vet, test, race, build, serta fixture sehat, kritis, konflik, baterai/AC, unknown dan stale.
 - Berikutnya preview tindakan, revalidasi, eksekusi dengan autentikasi OS, dan hasil terverifikasi.
+
+## 5 · Tindakan dengan preview dan verifikasi
+
+- Preview dan konfirmasi terpisah di TUI serta rencana-file/ID di CLI. HMAC, expiry, revalidasi target/argv, gate lintas proses, sudo melalui terminal, dan pemeriksaan hasil setelah interupsi.
+- Profil PPD melalui GUID autentikasi terpin, TRIM manual melalui descriptor BusyBox, timer systemd vendor, dan cache APT melalui mekanisme native. Pemulihan profil/timer berangkat dari bukti perubahan terverifikasi.
+- Piko memakai aktivitas aktual untuk revalidasi, eksekusi, verifikasi, pembatalan, dan hasil. Konfirmasi diblokir jika terminal terlalu kecil untuk menampilkan rencana.
+- Fixture mencakup penggantian target, expiry, replay, sudo/permission, cancel/partial, dan restore. Preview baca-saja pada Linux amd64 untuk APT, profil daya, dan TRIM manual. Mutasi perangkat nyata tidak dijalankan.
+- Berikutnya riwayat dan laporan untuk pengguna, distribusi, serta bukti visual final.

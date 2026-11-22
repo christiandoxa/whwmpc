@@ -49,7 +49,7 @@ func powerFixture() power.Snapshot {
 		Profiles: power.Profiles{
 			Status: domain.Available, ManagerStatus: domain.Available, Holds: new(0),
 			Backend: "power-profiles-daemon", Active: "balanced",
-			Target: "0123456789abcdef0123456789abcdef/:1.42", API: "org.freedesktop.UPower.PowerProfiles",
+			Target: "0123456789abcdef0123456789abcdef/abcdef0123456789abcdef0123456789/:1.42", API: "org.freedesktop.UPower.PowerProfiles",
 			Available: []string{"power-saver", "balanced", "performance"}, Managers: []string{"power-profiles-daemon"},
 		},
 	}

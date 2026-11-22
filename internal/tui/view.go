@@ -387,7 +387,11 @@ func (m Model) sessionLines(w int) []string {
 			add("")
 		}
 		if m.busy && m.page.Availability == "" {
-			add(m.palette.secondary.Render(displayStage(m.activity, m.options.Language)))
+			stage := m.workName
+			if stage == "" {
+				stage = displayStage(m.activity, m.options.Language)
+			}
+			add(m.palette.secondary.Render(stage))
 		}
 		if m.page.Priority != "" {
 			add(m.palette.alert.Render(domain.SafeText(m.page.Priority)))
