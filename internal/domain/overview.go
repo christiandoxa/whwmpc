@@ -8,8 +8,13 @@ import (
 	"github.com/charmbracelet/x/ansi"
 )
 
+type PercentScope string
+
+const PrimaryProcessorGroup PercentScope = "primary_processor_group"
+
 type Percent struct {
 	Availability Availability `json:"availability"`
+	Scope        PercentScope `json:"scope,omitempty"`
 	Samples      []float64    `json:"samples,omitempty"`
 	StartedAt    time.Time    `json:"started_at,omitzero"`
 	CapturedAt   time.Time    `json:"captured_at,omitzero"`

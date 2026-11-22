@@ -25,6 +25,17 @@ func step(m Model, msg tea.Msg) Model {
 	return updated.(Model)
 }
 
+func TestOverviewShowsProcessorGroupScope(t *testing.T) {
+	o := platform.Demo{}.Overview(t.Context())
+	o.OS, o.Distro, o.LogicalCPUs = "windows", "Windows", 128
+	o.CPU.Scope, o.CPU.Availability = domain.PrimaryProcessorGroup, domain.Partial
+	page := overviewPage(o, "en")
+	if !slices.Contains(page.Found, "Primary group CPU 24% · 8 samples") ||
+		!strings.Contains(strings.Join(page.Evidence, "\n"), "host CPU 14.0%") {
+		t.Fatalf("details conflate the CPU metrics: %+v", page)
+	}
+}
+
 func TestHomeAndQuestionReturn(t *testing.T) {
 	m := New(context.Background(), platform.Demo{}, nil, Options{Demo: true, Motion: motion.Off})
 	v := m.View().Content

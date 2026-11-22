@@ -40,3 +40,17 @@ func TestWindowsTelemetryUnits(t *testing.T) {
 		t.Fatalf("windows process units or PID reuse incorrect: %+v", pr)
 	}
 }
+
+func TestWindowsProcessorGroupTelemetry(t *testing.T) {
+	if sampleAvailability(0, true) != domain.Unknown ||
+		sampleAvailability(3, true) != domain.Partial ||
+		sampleAvailability(3, false) != domain.Available {
+		t.Fatal("sample completeness must include processor scope")
+	}
+	before := map[uint32]windowsProc{1: {created: 10, name: "one"}}
+	after := map[uint32]windowsProc{1: {created: 10, name: "one", total: 640_000_000}}
+	processes := windowsProcesses(before, after, time.Second, 128)
+	if len(processes) != 1 || processes[0].CPU != 50 {
+		t.Fatalf("process share must use the capacity of all 128 processors: %+v", processes)
+	}
+}

@@ -128,3 +128,23 @@ func TestNativeMarkdownUsesReportedPowerAndStorageEvidence(t *testing.T) {
 		}
 	}
 }
+
+func TestProcessorGroupScopeInExports(t *testing.T) {
+	o := domain.Overview{OS: "windows", LogicalCPUs: 128,
+		CPU: domain.Percent{Availability: domain.Partial, Scope: domain.PrimaryProcessorGroup, Samples: []float64{98}}}
+	projected := Build(Input{Overview: &o})
+	for format, want := range map[string]string{
+		"json":     `"scope": "primary_processor_group"`,
+		"markdown": "Sampel CPU grup prosesor primer** · 98.0%",
+	} {
+		data, err := Encode(projected, format)
+		if err != nil || !strings.Contains(string(data), want) {
+			t.Fatalf("%s lost the scope of the CPU sample: %s (%v)", format, data, err)
+		}
+	}
+	o.CPU.Scope = ""
+	data, err := Encode(Build(Input{Overview: &o}), "json")
+	if err != nil || strings.Contains(string(data), `"scope":`) {
+		t.Fatalf("whole-host CPU sample must preserve the previous format: %s (%v)", data, err)
+	}
+}

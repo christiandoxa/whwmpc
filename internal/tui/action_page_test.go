@@ -11,6 +11,7 @@ import (
 	"github.com/christiandoxa/whwmpc/internal/actions"
 	"github.com/christiandoxa/whwmpc/internal/assistant"
 	"github.com/christiandoxa/whwmpc/internal/domain"
+	"github.com/christiandoxa/whwmpc/internal/firmware"
 	"github.com/christiandoxa/whwmpc/internal/platform"
 	"github.com/christiandoxa/whwmpc/internal/tui/mascot"
 	"github.com/christiandoxa/whwmpc/internal/workflow"
@@ -91,6 +92,29 @@ func TestPikoCelebratesOnlyVerifiedProfileAndPreservesCriticalNotice(t *testing.
 	m.showReply()
 	if !strings.Contains(m.View().Content, "CRITICAL") {
 		t.Fatal("verification hid an unrelated critical finding")
+	}
+}
+
+func TestFirmwareHandoffOnlyCelebratesVerifiedOutcome(t *testing.T) {
+	for _, test := range []struct {
+		state        string
+		availability domain.Availability
+		label        string
+		pose         mascot.Pose
+	}{
+		{"reboot_required", domain.Partial, "Firmware awaiting restart", mascot.Warning},
+		{"failed", domain.Error, "Firmware update failed", mascot.Error},
+		{"unknown", domain.PermissionRequired, "Permission required", mascot.Unknown},
+		{"verified", domain.Available, "Firmware verified", mascot.Success},
+	} {
+		t.Run(test.state, func(t *testing.T) {
+			v := firmware.Verification{State: test.state, Availability: test.availability, Installed: "0.1.51"}
+			page := firmwareVerificationPage(v, "en")
+			if got := replyPose(page); got != test.pose || !strings.Contains(strings.Join(page.Found, " "), test.label) ||
+				page.Found[len(page.Found)-1] != "Active version · 0.1.51" {
+				t.Fatalf("firmware resume: got pose %s, copy %v", got, page.Found)
+			}
+		})
 	}
 }
 

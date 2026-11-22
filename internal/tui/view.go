@@ -359,9 +359,16 @@ func overviewPage(o domain.Overview, lang string) Page {
 	if o.Environment != "" && o.Environment != "undetermined" {
 		context += " / " + strings.ReplaceAll(o.Environment, "_", " ")
 	}
-	page.Found = []string{fmt.Sprintf("%s · %d %s", context, o.LogicalCPUs, l("CPU logis", "logical CPUs"))}
+	if o.LogicalCPUs > 0 {
+		context += fmt.Sprintf(" · %d %s", o.LogicalCPUs, l("CPU logis", "logical CPUs"))
+	}
+	page.Found = []string{context}
 	if cpu, valid := o.CPU.Latest(); valid {
-		page.Found = append(page.Found, fmt.Sprintf("CPU %.0f%% · %d %s", cpu, len(o.CPU.Samples), l("sampel", "samples")))
+		label := "CPU"
+		if o.CPU.Scope == domain.PrimaryProcessorGroup {
+			label = l("CPU grup primer", "Primary group CPU")
+		}
+		page.Found = append(page.Found, fmt.Sprintf("%s %.0f%% · %d %s", label, cpu, len(o.CPU.Samples), l("sampel", "samples")))
 	}
 	page.Meaning = []string{l("Ini cuplikan singkat. Beban bisa berubah saat tugas berjalan.", "This is a short sample. Load may change as tasks run.")}
 	page.Advice = []string{l("Pilih diagnosis lambat, SSD, TRIM, atau daya untuk pemeriksaan lebih dekat.", "Choose a slowdown, SSD, TRIM or power check for more detail.")}
@@ -381,8 +388,12 @@ func overviewPage(o domain.Overview, lang string) Page {
 	for _, disk := range o.Disks {
 		page.Evidence = append(page.Evidence, fmt.Sprintf("%s · %s · %s", disk.Mount, disk.FSType, percent(disk.UsedPercent, disk.Availability == domain.Available)))
 	}
+	processCPU := "CPU"
+	if o.CPU.Scope == domain.PrimaryProcessorGroup {
+		processCPU = l("CPU host", "host CPU")
+	}
 	for _, process := range o.Processes {
-		page.Evidence = append(page.Evidence, fmt.Sprintf("%s · CPU %.1f%% · RSS %s", process.Name, process.CPU, bytesText(process.RSS)))
+		page.Evidence = append(page.Evidence, fmt.Sprintf("%s · %s %.1f%% · RSS %s", process.Name, processCPU, process.CPU, bytesText(process.RSS)))
 	}
 	return page
 }

@@ -1,5 +1,11 @@
 # Changelog
 
+## Belum dirilis
+
+- Detail GPU membedakan daya papan, daya SoC, serta batas daya NVIDIA yang diminta dan ditegakkan.
+- Verifikasi firmware dari Riwayat menampilkan status restart, gagal, atau terverifikasi beserta versi aktif yang teramati.
+- Windows melabeli sampel CPU satu grup sebagai parsial pada host dengan lebih dari 64 prosesor logis. Diagnosis menggunakan cakupan yang sesuai.
+
 ## 0.3.1
 
 - Piko menampilkan aksesori pada layout ringkas. Lirikan, highlight fokus, reveal panel, dan anggukan pertanyaan kembali terlihat. Galeri lebar menampilkan pose karakter 16×6.

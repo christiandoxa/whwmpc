@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"time"
 	"unsafe"
@@ -30,6 +31,7 @@ func (Native) Overview(ctx context.Context) domain.Overview {
 	o := baseOverview(start, domain.Unknown)
 	version := windows.RtlGetVersion()
 	o.DistroID = "windows"
+	o.LogicalCPUs = int(windows.GetActiveProcessorCount(windows.ALL_PROCESSOR_GROUPS))
 	o.Kernel = fmt.Sprintf("%d.%d.%d", version.MajorVersion, version.MinorVersion, version.BuildNumber)
 	o.Distro = "Windows " + o.Kernel
 	if cpu, err := registry.OpenKey(registry.LOCAL_MACHINE, `HARDWARE\DESCRIPTION\System\CentralProcessor\0`, registry.QUERY_VALUE); err == nil {
@@ -50,6 +52,12 @@ func (Native) Overview(ctx context.Context) domain.Overview {
 	o.CPU.StartedAt = time.Now().UTC()
 	o.Memory.Use.StartedAt = o.CPU.StartedAt
 	firstProc := windowsProcessSnapshot(ctx)
+	if o.LogicalCPUs > 64 {
+		// GetSystemTimes reports the calling thread's primary group on these hosts.
+		o.CPU.Scope = domain.PrimaryProcessorGroup
+		runtime.LockOSThread()
+		defer runtime.UnlockOSThread()
+	}
 	before, beforeOK := systemTicks()
 	lastProc := firstProc
 	lastProcAt := time.Now()
@@ -63,7 +71,7 @@ loop:
 		case <-timer.C:
 		}
 		after, ok := systemTicks()
-		if busy, valid := windowsBusy(before, after); beforeOK && ok && valid {
+		if busy, valid := windowsBusy(before, after); o.LogicalCPUs > 0 && beforeOK && ok && valid {
 			o.CPU.Samples = append(o.CPU.Samples, busy)
 		}
 		before, beforeOK = after, ok
@@ -76,12 +84,8 @@ loop:
 			o.Memory.Availability = status
 		}
 	}
-	o.CPU.Availability = sampleAvailability(len(o.CPU.Samples))
-	// GetSystemTimes covers the current processor group on machines with more than 64 logical CPUs.
-	if o.LogicalCPUs > 64 && o.CPU.Availability == domain.Available {
-		o.CPU.Availability = domain.Partial
-	}
-	o.Memory.Use.Availability = sampleAvailability(len(o.Memory.Use.Samples))
+	o.CPU.Availability = sampleAvailability(len(o.CPU.Samples), o.CPU.Scope != "")
+	o.Memory.Use.Availability = sampleAvailability(len(o.Memory.Use.Samples), false)
 	if len(o.Memory.Use.Samples) == 0 {
 		o.Memory.Use.Availability = o.Memory.Availability
 	}
@@ -119,11 +123,11 @@ func windowsBusy(before, after tickCounts) (float64, bool) {
 	return 100 * float64(total-idle) / float64(total), true
 }
 
-func sampleAvailability(samples int) domain.Availability {
-	switch samples {
-	case 0:
+func sampleAvailability(samples int, limited bool) domain.Availability {
+	switch {
+	case samples == 0:
 		return domain.Unknown
-	case 1, 2:
+	case samples < 3 || limited:
 		return domain.Partial
 	default:
 		return domain.Available

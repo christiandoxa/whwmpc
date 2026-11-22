@@ -29,9 +29,17 @@ func markdown(report Report) string {
 		fmt.Fprintf(&out, "\n## Ringkasan\n\nCakupan %s · Sampel %s\n\n", md(string(o.Availability)), stamp(o.CapturedAt))
 		bullet(&out, "Sistem", nonempty(o.OS, o.Distro, o.Kernel, o.Arch, o.Environment))
 		bullet(&out, "Uptime", optional(o.UptimeSeconds, "%.0f detik"))
-		bullet(&out, "CPU", fmt.Sprintf("%d CPU logis · %s", o.LogicalCPUs, o.CPU.Availability))
+		cpuStatus := string(o.CPU.Availability)
+		if o.LogicalCPUs > 0 {
+			cpuStatus = fmt.Sprintf("%d CPU logis · %s", o.LogicalCPUs, cpuStatus)
+		}
+		bullet(&out, "CPU", cpuStatus)
 		if latest, ok := o.CPU.Latest(); ok {
-			bullet(&out, "Sampel CPU terakhir", fmt.Sprintf("%.1f%%", latest))
+			label := "Sampel CPU terakhir"
+			if o.CPU.Scope == domain.PrimaryProcessorGroup {
+				label = "Sampel CPU grup prosesor primer"
+			}
+			bullet(&out, label, fmt.Sprintf("%.1f%%", latest))
 		}
 		memory := string(o.Memory.Availability)
 		if o.Memory.Availability == domain.Available || o.Memory.Availability == domain.Partial {

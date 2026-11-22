@@ -12,6 +12,7 @@ import (
 	"github.com/christiandoxa/whwmpc/internal/firmware"
 	"github.com/christiandoxa/whwmpc/internal/report"
 	"github.com/christiandoxa/whwmpc/internal/sysrun"
+	"github.com/christiandoxa/whwmpc/internal/tui/mascot"
 	"github.com/christiandoxa/whwmpc/internal/workflow"
 )
 
@@ -29,10 +30,7 @@ func firmwarePage(ctx context.Context, m *workflow.Maintenance, req Request) Pag
 				return unavailableAction(err, req.Language)
 			}
 		}
-		v := firmware.Outcome(ctx, sysrun.Native{}, target)
-		p := Page{Availability: v.Availability, Found: []string{l("Verifikasi firmware", "Firmware verification"), v.Detail()}}
-		p.Snapshot = maintenanceSnapshot(v.Availability, "firmware", "fwupd verification", v.Detail())
-		return p
+		return firmwareVerificationPage(firmware.Outcome(ctx, sysrun.Native{}, target), req.Language)
 	}
 	updates := req.Choice.Kind == "firmware-cache"
 	snap := firmware.Collect(ctx, sysrun.Native{}, updates)
@@ -61,6 +59,27 @@ func firmwarePage(ctx context.Context, m *workflow.Maintenance, req Request) Pag
 	if !updates {
 		page.Choices = append([]Choice{{l("Cari kandidat di katalog lokal", "Check cached updates"), "firmware-cache", ""}}, page.Choices...)
 	}
+	return page
+}
+
+func firmwareVerificationPage(v firmware.Verification, lang string) Page {
+	l := translator(lang)
+	page := Page{Availability: v.Availability}
+	switch {
+	case v.State == "verified" && v.Availability == domain.Available:
+		page.Found = []string{l("Firmware terverifikasi", "Firmware verified")}
+		page.Pose = mascot.Success
+	case v.State == "reboot_required":
+		page.Found = []string{l("Firmware menunggu restart", "Firmware awaiting restart")}
+	case v.State == "failed":
+		page.Found = []string{l("Pembaruan firmware gagal", "Firmware update failed")}
+	default:
+		page.Found = []string{l("Hasil firmware belum terverifikasi", "Firmware outcome unverified"), statusNames[v.Availability].Text(lang)}
+	}
+	if v.Installed != "" {
+		page.Found = append(page.Found, l("Versi aktif", "Active version")+" · "+v.Installed)
+	}
+	page.Snapshot = maintenanceSnapshot(v.Availability, "firmware", "fwupd verification", v.Detail())
 	return page
 }
 

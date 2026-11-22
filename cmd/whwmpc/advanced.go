@@ -48,8 +48,15 @@ func gpuCommand(ctx context.Context, args []string, m *workflow.Maintenance, std
 		fmt.Fprintln(stdout, snap.Availability, domain.SafeText(snap.Detail))
 		for _, device := range snap.Devices {
 			fmt.Fprintf(stdout, "%s · %s · %s %s · %s\n", device.PCI, domain.SafeText(device.Model), device.Driver, device.Version, device.Availability)
+			if enforced := device.Metrics.EnforcedMilliW; enforced != nil {
+				fmt.Fprintf(stdout, "  Batas daya yang ditegakkan %d mW\n", *enforced)
+			}
 			for _, control := range device.Controls {
-				fmt.Fprintf(stdout, "  %s · saat ini %d · batas %d–%d %s\n", control.Kind, control.Current, control.Min, control.Max, control.Unit)
+				current := "saat ini"
+				if control.Kind == hardware.PowerLimit {
+					current = "diminta"
+				}
+				fmt.Fprintf(stdout, "  %s · %s %d %s · batas %d–%d %s\n", control.Kind, current, control.Current, control.Unit, control.Min, control.Max, control.Unit)
 			}
 		}
 		return 0, true

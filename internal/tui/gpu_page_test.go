@@ -2,6 +2,7 @@ package tui
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
@@ -32,5 +33,19 @@ func TestGPUNumericEntryCreatesOnlyPreviewRequest(t *testing.T) {
 	m = step(m, cmd())
 	if m.page.Found[0] != "fixture preview" {
 		t.Fatal(m.page.Found)
+	}
+}
+
+func TestGPUEvidenceKeepsPowerScopesAndLimitsDistinct(t *testing.T) {
+	snapshot := hardware.Snapshot{Devices: []hardware.Device{
+		{PCI: "0000:01:00.0", Metrics: hardware.Metrics{PowerScope: "board", PowerMilliW: new(int64(15000)), EnforcedMilliW: new(int64(160000))},
+			Controls: []hardware.Control{{Kind: hardware.PowerLimit, Current: 170000, Min: 100000, Max: 170000, Unit: "mW"}}},
+		{PCI: "0000:08:00.0", Metrics: hardware.Metrics{PowerScope: "soc", PowerMilliW: new(int64(5000))}},
+	}}
+	evidence := strings.Join(gpuInventoryPage(snapshot, false, "en").Evidence, "\n")
+	for _, want := range []string{"GPU board power 15000 mW", "Enforced power limit 160000 mW", "requested 170000 mW", "SoC power 5000 mW"} {
+		if !strings.Contains(evidence, want) {
+			t.Errorf("GPU evidence missing %q:\n%s", want, evidence)
+		}
 	}
 }

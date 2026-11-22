@@ -67,6 +67,9 @@ func numeric(value *float64, low, high float64) *float64 {
 
 func percent(value domain.Percent) domain.Percent {
 	out := domain.Percent{Availability: availability(value.Availability), StartedAt: value.StartedAt.UTC(), CapturedAt: value.CapturedAt.UTC()}
+	if value.Scope == domain.PrimaryProcessorGroup {
+		out.Scope = value.Scope
+	}
 	for _, sample := range value.Samples {
 		if sample >= 0 && sample <= 100 {
 			out.Samples = append(out.Samples, sample)

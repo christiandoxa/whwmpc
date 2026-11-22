@@ -106,6 +106,34 @@ func TestOverviewCorrelatesPressureAcrossSamples(t *testing.T) {
 	}
 }
 
+func TestWindowsProcessorGroupSamplesDoNotCorrelateHostPressure(t *testing.T) {
+	o := overviewFixture()
+	o.OS, o.LogicalCPUs = "windows", 128
+	o.CPU.Scope, o.CPU.Availability = domain.PrimaryProcessorGroup, domain.Partial
+	o.CPU.Samples = []float64{97, 98, 99}
+	o.Processes[0].CPU = 50
+	p := power.Snapshot{OS: "windows", At: fixtureTime, PowerStatus: domain.Available, PowerSource: "ac"}
+	a := Analyzer{Now: fixtureTime, Language: "en"}
+	findings := a.Slow(o, p)
+	cpu, process := byID(t, findings, "overview.cpu"), byID(t, findings, "overview.process")
+	if cpu.Availability != domain.Partial || cpu.Severity != Info ||
+		!strings.Contains(cpu.Observation, "Primary processor group CPU 97–99%") {
+		t.Fatalf("group measurement must remain visible without a host pressure warning: %+v", cpu)
+	}
+	if process.Severity != Info || !strings.Contains(process.Observation, "50% of host CPU") ||
+		!strings.Contains(process.Limits, "primary processor group") {
+		t.Fatalf("process share correlated with a different CPU scope: %+v", process)
+	}
+	o.LogicalCPUs = 64
+	o.CPU.Scope, o.CPU.Availability = "", domain.Available
+	findings = a.Slow(o, p)
+	for _, id := range []string{"overview.cpu", "overview.process"} {
+		if f := byID(t, findings, id); f.Severity != Warning {
+			t.Fatalf("whole-host Windows samples lost the usual correlation: %+v", f)
+		}
+	}
+}
+
 func TestOverviewRetainsUnknownPartialAndStale(t *testing.T) {
 	a := Analyzer{Now: fixtureTime.Add(time.Second), Language: "id"}
 	o := overviewFixture()

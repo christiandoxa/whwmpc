@@ -65,6 +65,12 @@ func (a Analyzer) cpu(o domain.Overview) Finding {
 	f.Limits = a.text("Jendela ini singkat. Beban satu inti dapat tersembunyi di angka gabungan.", "This is a short window. An aggregate can hide load on a single core.")
 	f.Recommendation = a.text("Ambil sampel saat gejala berlangsung untuk membandingkan beban.", "Repeat the scan while the slowdown is occurring.")
 	f.Actions = []Action{a.rescan()}
+	if p.Scope == domain.PrimaryProcessorGroup {
+		f.Observation = a.textf("CPU grup prosesor primer %.0f–%.0f%% pada %d sampel.", "Primary processor group CPU %.0f–%.0f%% over %d samples.", low, high, len(p.Samples))
+		f.Meaning = a.text("Sampel mengukur beban grup prosesor primer thread pemindai.", "The sample measures load in the scanning thread's primary processor group.")
+		f.Limits = a.text("Penilaian beban CPU host memerlukan pengukuran semua grup prosesor.", "Host CPU load requires measurements across all processor groups.")
+		return f
+	}
 	if underLoad(p.Samples, cpuWarning) {
 		f.Severity = Warning
 		f.Meaning = a.text("CPU sibuk sepanjang jendela sampel. Beban ini dapat menunda pekerjaan lain.", "CPU stayed busy throughout the sample window. This can delay other work.")
@@ -216,6 +222,10 @@ func (a Analyzer) process(o domain.Overview) Finding {
 	f.Recommendation = a.text("Tinjau detail proses saat gejala terjadi.", "Check process details while the slowdown occurs.")
 	if o.OS == "darwin" {
 		f.Limits = a.text("Persentase ps adalah rata-rata yang meluruh dan berbeda dari interval top.", "The ps percentage is a decaying average and differs from the top interval.")
+		return f
+	}
+	if o.CPU.Scope == domain.PrimaryProcessorGroup {
+		f.Limits += a.text(" Persentase proses memakai kapasitas CPU host. Sampel penggunaan CPU terbatas pada grup prosesor primer.", " Process percentages use host CPU capacity. CPU load samples cover the primary processor group.")
 		return f
 	}
 	if percent >= dominantProcessCPU && usable(a.status(o.CPU.Availability, o.CPU.CapturedAt, overviewAge)) &&
