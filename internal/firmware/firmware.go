@@ -59,14 +59,16 @@ type Release struct {
 }
 
 type Remote struct {
-	ID              string `json:"Id"`
-	Kind            string
-	Enabled         bool
-	MetadataURI     string `json:"MetadataUri"`
-	SignatureURI    string `json:"MetadataUriSig"`
-	FirmwareBaseURI string `json:"FirmwareBaseUri"`
-	ChecksumSig     string
-	Mtime           int64
+	ID               string `json:"Id"`
+	Kind             string
+	Enabled          bool
+	MetadataURI      string `json:"MetadataUri"`
+	SignatureURI     string `json:"MetadataUriSig"`
+	FirmwareBaseURI  string `json:"FirmwareBaseUri"`
+	ChecksumSig      string
+	Mtime            int64
+	FilenameCache    string `json:"-"`
+	FilenameCacheSig string `json:"-"`
 }
 
 type Verification struct {
@@ -298,12 +300,18 @@ func BackendVersion(ctx context.Context, run sysrun.Runner) (string, error) {
 
 func OfficialRemote(ctx context.Context, run sysrun.Runner, refresh bool) (Remote, error) {
 	r := query(ctx, run, Args("get-remotes"))
-	var doc struct{ Remotes []Remote }
+	var doc struct {
+		Remotes []struct {
+			Remote
+			FilenameCache, FilenameCacheSig string
+		}
+	}
 	if availability(r) != domain.Available || json.Unmarshal(r.Output, &doc) != nil {
 		return Remote{}, errors.New("konfigurasi remote fwupd belum terverifikasi")
 	}
 	var result Remote
-	for _, remote := range doc.Remotes {
+	for _, item := range doc.Remotes {
+		remote := item.Remote
 		if !remote.Enabled || remote.Kind != "download" {
 			continue
 		}
@@ -316,6 +324,7 @@ func OfficialRemote(ctx context.Context, run sysrun.Runner, refresh bool) (Remot
 		if result.ID != "" {
 			return Remote{}, errors.New("remote LVFS ditemukan lebih dari satu kali")
 		}
+		remote.FilenameCache, remote.FilenameCacheSig = item.FilenameCache, item.FilenameCacheSig
 		result = remote
 	}
 	if result.ID == "" || !officialURI(result.MetadataURI, false) ||

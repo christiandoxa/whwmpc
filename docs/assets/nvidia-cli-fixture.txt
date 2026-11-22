@@ -1,0 +1,11 @@
+Clean source commit: c79c5c92b9ab3414c4b7249eb3accd5a2066d6c5
+Backend: synthetic nvidia-smi and sudo inside the sandbox
+
+isolated setup: distinct user, network, mount, and PID namespaces; no network route; PID-only procfs and temporary root
+inventory: requested 170000 mW, enforced 160000 mW, control range 100000–170000 mW
+stale plan: not_started, fake sudo and driver setter untouched
+fixture sudo denial: not_started, no driver setter invocation
+apply: verified readback 169000 mW, signed restore receipt present
+one-time claim: replay rejected before attempting another write
+restore when requested power drifts: rejected without a plan
+restore: verified readback 170000 mW, exactly two signed fixture changes

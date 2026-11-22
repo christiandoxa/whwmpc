@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -227,5 +228,21 @@ func TestOfficialRemoteMustRemainFresh(t *testing.T) {
 	remote := Remote{Mtime: now.Add(-5 * time.Hour).Unix(), ChecksumSig: testDigest}
 	if !remote.Fresh(now) || remote.Fresh(now.Add(8*24*time.Hour)) || remote.Fresh(now.Add(-6*time.Hour)) {
 		t.Fatal("metadata freshness misclassified")
+	}
+}
+
+func TestOfficialRemoteReadsCachePathsWithoutChangingSignedRemoteIdentity(t *testing.T) {
+	const cached = "/var/lib/fwupd/metadata/lvfs/firmware.xml.zst"
+	const uri = "https://cdn.fwupd.org/downloads/firmware.xml.zst"
+	r, err := OfficialRemote(context.Background(), runner{responses: map[string]sysrun.Result{
+		"get-remotes": result(fmt.Sprintf(`{"Remotes":[{"Id":"lvfs","Enabled":true,"Kind":"download","MetadataUri":%q,"MetadataUriSig":%q,"FirmwareBaseUri":"https://fwupd.org/downloads","Mtime":1700000000,"FilenameCache":%q,"FilenameCacheSig":%q}]}`,
+			uri, uri+".jcat", cached, cached+".jcat")),
+	}}, false)
+	if err != nil || r.FilenameCache != cached || r.FilenameCacheSig != cached+".jcat" {
+		t.Fatalf("remote did not expose its cache paths: %+v %v", r, err)
+	}
+	encoded, err := json.Marshal(r)
+	if err != nil || bytes.Contains(encoded, []byte(cached)) {
+		t.Fatalf("cache paths changed remote identity: %s %v", encoded, err)
 	}
 }

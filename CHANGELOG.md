@@ -2,6 +2,7 @@
 
 ## Belum dirilis
 
+- Refresh awal LVFS memverifikasi cache JCat pada fwupd 2.0.x ketika checksum belum muncul di respons daemon. Alur bertanda tangan lulus dari cache kosong hingga verifikasi capsule setelah simulasi boot.
 - Pemeriksaan daya dan TRIM macOS/Windows menampilkan sumber serta status native di CLI, TUI, dan laporan. Bacaan baterai tanpa sumber daya tetap parsial. Laporan Windows mencantumkan kesehatan drive dan counter reliabilitas yang tersedia.
 
 ## 0.3.0

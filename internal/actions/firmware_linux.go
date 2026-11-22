@@ -2,8 +2,11 @@ package actions
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -11,9 +14,65 @@ import (
 	"time"
 
 	"github.com/christiandoxa/whwmpc/internal/firmware"
+	"golang.org/x/sys/unix"
 )
 
 const cabinetOperand = "{cabinet-LVFS-terverifikasi}"
+
+func (p linuxPlatform) firmwareRemote(ctx context.Context, refresh bool) (firmware.Remote, error) {
+	remote, err := firmware.OfficialRemote(ctx, p.runner, refresh)
+	if err == nil && remote.ChecksumSig == "" {
+		// fwupd 2.0.x can report the new metadata mtime before reloading the signature checksum.
+		remote.ChecksumSig = firmwareCacheDigest(remote)
+	}
+	return remote, err
+}
+
+func firmwareCacheDigest(remote firmware.Remote) string {
+	metadata := filepath.Join("/var/lib/fwupd/metadata/lvfs", filepath.Base(remote.MetadataURI))
+	signature := metadata + ".jcat"
+	if remote.FilenameCache != metadata || remote.FilenameCacheSig != signature {
+		return ""
+	}
+	metadataInfo, err := protectedPath(metadata, 0, false)
+	if err != nil {
+		return ""
+	}
+	signatureInfo, err := protectedPath(signature, 0, false)
+	if err != nil {
+		return ""
+	}
+	return readFirmwareCacheDigest(metadata, signature, remote.Mtime, metadataInfo, signatureInfo)
+}
+
+func readFirmwareCacheDigest(metadata, signature string, mtime int64, metadataInfo, signatureInfo os.FileInfo) string {
+	const maxSignatureBytes = 1 << 20 // FU_ENGINE_MAX_SIGNATURE_SIZE in fwupd.
+	signatureMtime := signatureInfo.ModTime().Unix()
+	if !metadataInfo.Mode().IsRegular() || !signatureInfo.Mode().IsRegular() || metadataInfo.ModTime().Unix() != mtime ||
+		signatureMtime < mtime || signatureMtime > time.Now().Unix() || signatureInfo.Size() <= 0 || signatureInfo.Size() > maxSignatureBytes {
+		return ""
+	}
+	file, err := os.OpenFile(signature, os.O_RDONLY|unix.O_NOFOLLOW|unix.O_NONBLOCK, 0)
+	if err != nil {
+		return ""
+	}
+	defer file.Close()
+	opened, err := file.Stat()
+	if err != nil || identity(opened) != identity(signatureInfo) {
+		return ""
+	}
+	sum := sha256.New()
+	size, err := io.Copy(sum, io.LimitReader(file, maxSignatureBytes+1))
+	if err != nil || size != signatureInfo.Size() {
+		return ""
+	}
+	currentMetadata, metadataErr := os.Lstat(metadata)
+	currentSignature, signatureErr := os.Lstat(signature)
+	if metadataErr != nil || signatureErr != nil || identity(currentMetadata) != identity(metadataInfo) || identity(currentSignature) != identity(signatureInfo) {
+		return ""
+	}
+	return hex.EncodeToString(sum.Sum(nil))
+}
 
 func busProperty(ctx context.Context, host linuxPlatform, service, path, key string) (string, error) {
 	cmd, err := host.runner.LookPath("busctl")
@@ -66,7 +125,7 @@ func (p linuxPlatform) firmwareState(ctx context.Context, target string) (firmwa
 	if err != nil || !strings.HasPrefix(version, "2.0.") {
 		return firmware.Device{}, firmware.Release{}, firmware.Remote{}, version, errors.New("pembaruan capsule memerlukan fwupd 2.0.x")
 	}
-	remote, err := firmware.OfficialRemote(ctx, p.runner, false)
+	remote, err := p.firmwareRemote(ctx, false)
 	if err != nil || !remote.Fresh(time.Now()) {
 		return firmware.Device{}, firmware.Release{}, remote, version, errors.New("metadata LVFS resmi wajib tersedia dan berumur paling lama tujuh hari")
 	}
@@ -162,7 +221,7 @@ func (p linuxPlatform) firmwareRefresh(ctx context.Context, target string) (prep
 	if target != "" && target != firmware.LVFS {
 		return prepared{}, errors.New("pilih LVFS stabil untuk refresh")
 	}
-	remote, err := firmware.OfficialRemote(ctx, p.runner, true)
+	remote, err := p.firmwareRemote(ctx, true)
 	if err != nil {
 		return prepared{}, err
 	}
@@ -183,7 +242,7 @@ func (p linuxPlatform) firmwareRefresh(ctx context.Context, target string) (prep
 		},
 		run: func(ctx context.Context) attempt { return inv.run(ctx, 3*time.Minute) },
 		verify: func(ctx context.Context, step attempt) Result {
-			after, err := firmware.OfficialRemote(ctx, p.runner, true)
+			after, err := p.firmwareRemote(ctx, true)
 			if err != nil || !after.Fresh(time.Now()) {
 				return Result{Status: Unknown, Message: withStepError("Metadata LVFS resmi belum terverifikasi", step)}
 			}

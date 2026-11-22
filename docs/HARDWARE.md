@@ -16,6 +16,8 @@ AMD OverDrive memerlukan kedua atribut driver yang dapat ditulis oleh pemilik. B
 
 Aksi memakai konfirmasi, klaim satu kali, dan autentikasi OS yang sama dengan tindakan lain. Restore memerlukan hasil apply yang sudah terverifikasi, perangkat yang sama, dan kesamaan state saat ini dengan identitas hasil sebelumnya. Restore mengembalikan nilai awal dan mode DPM yang disimpan. Jika kondisi berubah atau operasi terhenti tanpa kepastian, baca ulang konfigurasi sebelum memilih rencana lain.
 
+Uji end-to-end CLI NVIDIA dari `c79c5c9` menjalankan preview, apply, pembacaan balik, dan restore pada backend fixture dan sudo sintetis dalam user namespace privat. Rencana usang, penolakan autentikasi, replay, dan perubahan daya eksternal ditolak sebelum penulisan. Batas yang diminta kembali ke 170 W setelah apply ke 169 W, dengan batas yang ditegakkan fixture terbaca terpisah. [Hasil uji CLI](assets/nvidia-cli-fixture.txt)
+
 ```sh
 go test -race ./internal/hardware ./internal/actions
 ```

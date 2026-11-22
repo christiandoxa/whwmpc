@@ -1,0 +1,48 @@
+{
+  "backend_package": "2.0.20-1ubuntu2~24.04.2",
+  "executable": {
+    "sha256": "36bea0bf16ab689238a3066debc0fabcaf56378c55c1e1e76918f8d043314b32",
+    "vcs.revision": "c79c5c92b9ab3414c4b7249eb3accd5a2066d6c5",
+    "vcs.modified": "true"
+  },
+  "sandbox": "rootless net and mount namespaces; no hardware or host system bus",
+  "wrong_confirmation": {
+    "status": "not_started",
+    "started": false
+  },
+  "power_changed": {
+    "status": "not_started",
+    "started": false
+  },
+  "metadata_refresh": {
+    "status": "verified",
+    "started": true,
+    "changed": true,
+    "cli_exit": 0,
+    "same_daemon_as_update": true,
+    "message": "Metadata LVFS resmi tersedia dan baru diperiksa.",
+    "jcat_cache_bytes": 1494
+  },
+  "initial_refresh_signature_reported_immediately": false,
+  "initial_refresh_signature_reported_after_1s": false,
+  "cabinet_gets_before_confirmation_and_revalidation_passed": 0,
+  "cabinet_gets_after_confirmation_and_revalidation_passed": 1,
+  "apply": {
+    "status": "partial",
+    "started": true,
+    "authorization": "polkit",
+    "capsule_bytes_in_temporary_esp": 4112
+  },
+  "resume_before_simulated_boot": {
+    "state": "reboot_required",
+    "installed": "0.1.50",
+    "fwupd_state": 4
+  },
+  "resume_after_simulated_boot": {
+    "state": "verified",
+    "installed": "0.1.51",
+    "fwupd_state": 2,
+    "capsule_cleaned_up": true
+  },
+  "limits": "Synthetic LVFS origin, private test certificates, simulated AC and boot, no actual firmware or physical reboot."
+}
