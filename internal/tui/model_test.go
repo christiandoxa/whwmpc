@@ -12,6 +12,7 @@ import (
 
 	"github.com/christiandoxa/whwmpc/internal/assistant"
 	"github.com/christiandoxa/whwmpc/internal/diagnostics"
+	"github.com/christiandoxa/whwmpc/internal/domain"
 	"github.com/christiandoxa/whwmpc/internal/platform"
 	"github.com/christiandoxa/whwmpc/internal/tui/mascot"
 	"github.com/christiandoxa/whwmpc/internal/tui/motion"
@@ -80,12 +81,12 @@ func TestMotionUsesLatestGeneration(t *testing.T) {
 	m = step(m, keyPress("j"))
 	fake = fake.Add(motion.FrameInterval)
 	m = step(m, motion.Tick{Generation: old, At: fake})
-	if m.visual.pose != mascot.Greeting || m.visual.frame != 0 {
+	if m.visual.pose != mascot.LookRight || m.visual.frame != 0 || !strings.Contains(m.View().Content, "» ") {
 		t.Fatalf("obsolete tick advanced %+v", m.visual)
 	}
 	fake = fake.Add(time.Second)
 	m = step(m, motion.Tick{Generation: m.visual.generation, At: fake})
-	if m.visual.pose != mascot.Idle || m.visual.wakeAt.IsZero() {
+	if m.visual.pose != mascot.Idle || m.visual.wakeAt.IsZero() || strings.Contains(m.View().Content, "» ") {
 		t.Fatalf("look did not settle: %+v", m.visual)
 	}
 	m.show(mascot.Scanning, "", true)
@@ -101,6 +102,64 @@ func TestMotionUsesLatestGeneration(t *testing.T) {
 	m = step(m, motion.Tick{Generation: m.visual.generation, At: fake.Add(time.Second)})
 	if m.visual.frame != frame {
 		t.Fatal("off mode advanced animation")
+	}
+}
+
+func TestQuestionAcknowledgementStartsWorkAndYieldsToLatestState(t *testing.T) {
+	m := New(context.Background(), platform.Demo{}, func(context.Context, Request) Page {
+		return Page{Availability: domain.Available, Found: []string{"Hasil SSD"}}
+	}, Options{Demo: true})
+	at := platform.DemoTime
+	m.now = func() time.Time { return at }
+	m = step(m, keyPress("/"))
+	generation := m.visual.generation
+	for _, r := range "cek SSD" {
+		m = step(m, keyPress(string(r)))
+	}
+	if m.visual.pose != mascot.Listening || m.visual.generation != generation || m.input.Value() != "cek SSD" {
+		t.Fatal("typing replaced the listening pose or dropped input")
+	}
+	next, run := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	m = next.(Model)
+	if run == nil || !m.busy || m.visual.pose != mascot.Nod || !strings.Contains(m.View().Content, "Pertanyaan · cek SSD") {
+		t.Fatal("submission delayed work or omitted the question and nod")
+	}
+	generation = m.visual.generation
+	at = at.Add(3 * motion.FrameInterval)
+	m = step(m, motion.Tick{Generation: generation, At: at})
+	if m.visual.pose != mascot.SSD || !m.busy || !strings.Contains(m.View().Content, "J[=]") {
+		t.Fatal("live inspection lost its compact accessory after the nod")
+	}
+	m = step(m, run())
+	if m.busy || m.visual.pose != mascot.Idle || !strings.Contains(m.View().Content, "Hasil SSD") {
+		t.Fatal("backend result did not replace the scanning pose")
+	}
+}
+
+func TestGalleryFullArtAndPanelAccentFitWithoutShifting(t *testing.T) {
+	m := New(context.Background(), platform.Demo{}, nil, Options{Demo: true, Gallery: true, ASCII: true})
+	at := time.Now()
+	m.now = func() time.Time { return at }
+	m = step(m, tea.WindowSizeMsg{Width: 120, Height: 36})
+	m.accent(false, true)
+	full := strings.Split(m.View().Content, "\n")
+	if !strings.Contains(full[1], "---") || !strings.Contains(m.View().Content, ".--------.") {
+		t.Fatal("wide gallery did not show the panel accent and full artwork")
+	}
+	at = at.Add(motion.PanelDuration / 2)
+	m = step(m, motion.Tick{Generation: m.visual.generation, At: at})
+	if middle := strings.Split(m.View().Content, "\n")[1]; !strings.Contains(middle, "-----") || strings.Contains(middle, "------") {
+		t.Fatal("panel accent did not expand in its reserved row")
+	}
+	at = at.Add(motion.PanelDuration)
+	m = step(m, motion.Tick{Generation: m.visual.generation, At: at})
+	settled := strings.Split(m.View().Content, "\n")
+	if len(full) != len(settled) || strings.Contains(settled[1], "---") || full[2] != settled[2] {
+		t.Fatal("panel reveal stayed active or shifted content")
+	}
+	m = step(m, keyPress("n"))
+	if strings.Contains(m.View().Content, ".--------.") {
+		t.Fatal("narrow gallery consumed space with the full artwork")
 	}
 }
 

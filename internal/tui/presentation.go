@@ -45,7 +45,9 @@ func (m *Model) accent(focus, panel bool) {
 		if focus {
 			m.visual.focusUntil = at.Add(motion.FocusDuration)
 		}
-		if panel {
+		if m.screen == reviewPlan {
+			m.visual.focusUntil, m.visual.panelUntil = time.Time{}, time.Time{}
+		} else if panel {
 			m.visual.panelUntil = at.Add(motion.PanelDuration)
 		}
 	}
@@ -81,6 +83,8 @@ func (m *Model) scheduleMotion(at time.Time) {
 			}
 			take(p.wakeAt)
 			take(p.focusUntil)
+			take(p.panelUntil.Add(-2 * motion.PanelDuration / 3))
+			take(p.panelUntil.Add(-motion.PanelDuration / 3))
 			take(p.panelUntil)
 		}
 	}

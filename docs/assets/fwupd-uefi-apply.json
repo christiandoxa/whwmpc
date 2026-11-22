@@ -1,9 +1,9 @@
 {
   "backend_package": "2.0.20-1ubuntu2~24.04.2",
   "executable": {
-    "sha256": "36bea0bf16ab689238a3066debc0fabcaf56378c55c1e1e76918f8d043314b32",
-    "vcs.revision": "c79c5c92b9ab3414c4b7249eb3accd5a2066d6c5",
-    "vcs.modified": "true"
+    "sha256": "f60ed2b7fab494394fecfd7ead9c4900ab3beb93fd174356d73c3c973ea25f43",
+    "vcs.revision": "11b6252f08bd192f4d0d5ea8eb0e6e0e1b0579b3",
+    "vcs.modified": "false"
   },
   "sandbox": "rootless net and mount namespaces; no hardware or host system bus",
   "wrong_confirmation": {
@@ -21,7 +21,7 @@
     "cli_exit": 0,
     "same_daemon_as_update": true,
     "message": "Metadata LVFS resmi tersedia dan baru diperiksa.",
-    "jcat_cache_bytes": 1494
+    "jcat_cache_bytes": 1495
   },
   "initial_refresh_signature_reported_immediately": false,
   "initial_refresh_signature_reported_after_1s": false,

@@ -15,6 +15,7 @@ const (
 	LookLeft    Pose = "look-left"
 	LookRight   Pose = "look-right"
 	Listening   Pose = "listening"
+	Nod         Pose = "nod"
 	Thinking    Pose = "thinking"
 	Scanning    Pose = "scanning"
 	SSD         Pose = "ssd"
@@ -41,10 +42,10 @@ const (
 	Farewell    Pose = "farewell"
 )
 
-var Gallery = []Pose{Greeting, Idle, Blink, LookLeft, LookRight, Listening, Thinking, Scanning, SSD, CPU, Battery, Charging, Trim,
+var Gallery = []Pose{Greeting, Idle, Blink, LookLeft, LookRight, Listening, Nod, Thinking, Scanning, SSD, CPU, Battery, Charging, Trim,
 	Broom, Preview, Confirm, Cleaning, Applying, Success, Performance, Balanced, Saver, Warning, Critical, Unknown, Error, Cancelled, Restore, Printing, Farewell}
 
-const Width, Height = 16, 6
+const Width, Height, CompactWidth = 16, 6, 10
 
 type frame struct{ eyes, mouth, arm, floor, hint string }
 
@@ -59,9 +60,14 @@ var poses = map[Pose][]frame{
 	},
 	Idle:      {{" o    o ", "   u    ", "--        ", "", ""}},
 	Blink:     {{" -    - ", "   u    ", "--        ", "", ""}, {" o    o ", "   u    ", "--        ", "", ""}},
-	LookLeft:  {{"o    o  ", "   u    ", "--        ", "", ""}},
-	LookRight: {{"  o    o", "   u    ", "--        ", "", ""}},
+	LookLeft:  {{"o    o  ", "   <    ", "--        ", "", ""}},
+	LookRight: {{"  o    o", "   >    ", "--        ", "", ""}},
 	Listening: {{"  o    o", "    ?   ", "--        ", "", "."}},
+	Nod: {
+		{" o    o ", "   .    ", "--        ", "", ""},
+		{" -    - ", "   _    ", "--        ", "", ""},
+		{" ^    ^ ", "   u    ", "--        ", "", ""},
+	},
 	Thinking: {
 		{" o    o ", "    .   ", "--        ", "", ""},
 		{"  o    .", "    o   ", "--        ", "", "."},
@@ -75,10 +81,10 @@ var poses = map[Pose][]frame{
 		{"  o   O ", "   .    ", "--        ", "", " O-"},
 	},
 	SSD: {
-		{"  o    o", "   .    ", "--        ", "    _[==]_", "J."},
-		{" o    o ", "   .    ", "--        ", "    _[==]_", "J:"},
-		{"  o    o", "   .    ", "--        ", "    _[==]_", "J."},
-		{"  o    o", "   v    ", "--        ", "    _[==]_", "J "},
+		{"  o    o", "   .    ", "--        ", "    _[==]_", "J[=]"},
+		{" o    o ", "   .    ", "--        ", "    _[==]_", "J[-]"},
+		{"  o    o", "   .    ", "--        ", "    _[==]_", "J[=]"},
+		{"  o    o", "   v    ", "--        ", "    _[==]_", "J[=]"},
 	},
 	CPU: {
 		{" o    o ", "   .    ", "--        ", "", "(+)"},
@@ -103,11 +109,11 @@ var poses = map[Pose][]frame{
 	},
 	Confirm: {{" o    o ", "   _    ", "--        ", "", "[=]"}},
 	Cleaning: {
-		{"  o    o", "   .    ", "--        ", "        . /==", "/"},
-		{"  o    o", "   v    ", "--        ", "        .  /==", "/"},
-		{" o    o ", "   .    ", "--        ", "          . /==", "/"},
-		{"  o    o", "   v    ", "--        ", "           . /==", "/"},
-		{" o    o ", "   .    ", "--        ", "           /==", "/"},
+		{"  o    o", "   .    ", "--        ", "        . /==", "/.  "},
+		{"  o    o", "   v    ", "--        ", "        .  /==", " /. "},
+		{" o    o ", "   .    ", "--        ", "          . /==", " ./."},
+		{"  o    o", "   v    ", "--        ", "           . /==", "  ./"},
+		{" o    o ", "   .    ", "--        ", "           /==", "   /"},
 	},
 	Applying: {
 		{"  o    o", "   .    ", "--        ", "", "{+}"},
@@ -123,10 +129,10 @@ var poses = map[Pose][]frame{
 		{" ^    ^ ", "   u    ", "-^        ", "", "v "},
 	},
 	Performance: {
-		{" ^    ^ ", "   u    ", "--        ", "       .>^", ""},
-		{" ^    ^ ", "   u    ", "--        ", "        .>^", "*"},
-		{" ^    ^ ", "   U    ", "-^        ", "          .>^", "*"},
-		{" ^    ^ ", "   U    ", "-^        ", "            .>^", "v"},
+		{" ^    ^ ", "   u    ", "--        ", "       .>^", ">^  "},
+		{" ^    ^ ", "   u    ", "--        ", "        .>^", " >^ "},
+		{" ^    ^ ", "   U    ", "-^        ", "          .>^", "  >^"},
+		{" ^    ^ ", "   U    ", "-^        ", "            .>^", "*  v"},
 		{" ^    ^ ", "   u    ", "-^        ", "", "v"},
 	},
 	Balanced: {{" ^    ^ ", "   u    ", "-^        ", "", "v"}},
@@ -151,9 +157,9 @@ var poses = map[Pose][]frame{
 		{" o    o ", "   .    ", "--        ", "", " <"},
 	},
 	Printing: {
-		{" o    o ", "   u    ", "--        ", "     [---]", ""},
-		{" ^    ^ ", "   u    ", "--        ", "     [===]", "."},
-		{" ^    ^ ", "   v    ", "-^        ", "     [===]", "."},
+		{" o    o ", "   u    ", "--        ", "     [---]", "[-]"},
+		{" ^    ^ ", "   u    ", "--        ", "     [===]", "[=]"},
+		{" ^    ^ ", "   v    ", "-^        ", "     [===]", "[==]"},
 		{" ^    ^ ", "   u    ", "-^        ", "     [___]", "v"},
 	},
 	Farewell: {
@@ -183,7 +189,7 @@ func Render(p Pose, index int, ascii bool) []string {
 		tl, tr, bl, br, line, side = "╭", "╮", "╰", "╯", "─", "│"
 		f.eyes, f.mouth, f.hint, f.floor = unicode.Replace(f.eyes), unicode.Replace(f.mouth), unicode.Replace(f.hint), unicode.Replace(f.floor)
 	}
-	hint := strings.TrimSpace(f.hint)
+	hint := strings.TrimRight(f.hint, " ")
 	arm := f.arm[:2]
 	return []string{
 		pad("  "+hint, Width),
@@ -209,6 +215,18 @@ func Face(p Pose, index int, ascii bool) string {
 		return "[" + unicode.Replace(eyes[0]+mouth+eyes[1]) + "]"
 	}
 	return "[" + eyes[0] + mouth + eyes[1] + "]"
+}
+
+func Compact(p Pose, index int, ascii bool) string {
+	f := art(p, index)
+	hint := f.hint
+	if (p == Greeting || p == Farewell) && !strings.HasPrefix(f.arm, "--") {
+		hint = f.arm[:2]
+	}
+	if !ascii {
+		hint = unicode.Replace(hint)
+	}
+	return Face(p, index, ascii) + " " + pad(hint, 4)
 }
 
 func pad(s string, width int) string {

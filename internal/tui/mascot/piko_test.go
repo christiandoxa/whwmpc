@@ -10,6 +10,9 @@ func TestFramesHaveStableTerminalCells(t *testing.T) {
 	for _, pose := range Gallery {
 		for i := range Frames(pose) {
 			for _, ascii := range []bool{true, false} {
+				if width := ansi.StringWidth(Compact(pose, i, ascii)); width != CompactWidth {
+					t.Errorf("compact %s/%d: width = %d", pose, i, width)
+				}
 				lines := Render(pose, i, ascii)
 				if len(lines) != Height {
 					t.Fatalf("%s/%d: height = %d", pose, i, len(lines))

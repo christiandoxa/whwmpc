@@ -11,13 +11,14 @@ Satu timer dengan deadline yang dapat diganti memberi pesan Bubble Tea bertanda 
 | Detail | Durasi |
 | --- | --- |
 | Highlight fokus | 130 ms |
-| Reveal panel | 190 ms |
+| Reveal panel | 190 ms, aksen melebar dalam tiga langkah pada baris tetap |
 | Animasi sel Piko | 110 ms per frame, sekitar 9 fps |
+| Anggukan pertanyaan | 330 ms, dapat digantikan oleh hasil atau status baru |
 | Gestur singkat | Umumnya 3–6 frame |
 | Kedipan idle | Setelah 9 detik idle, satu kedipan |
 | Frame kerja berulang | Selama status kerja masih aktif dan tampilan terlihat |
 
-Semua layout memakai wajah mini Piko dekat label tugas. Pada terminal yang terlalu kecil, label Piko dan petunjuk resize tetap tersedia. Angka metrik dan teks hasil tampil utuh ketika data tiba.
+Alur kerja memakai wajah mini dengan aksesori di area tetap 10 sel dekat label tugas. Layout yang sempit memakai wajah lima sel. Galeri pada terminal lebar menampilkan gambar 16×6. Pada terminal yang terlalu kecil petunjuk resize tetap tersedia. Angka metrik dan teks hasil tampil utuh ketika data tiba.
 
 Tambahkan pose di `internal/tui/mascot/piko.go` dengan deskripsi mata, mulut, lengan, lantai, dan aksesori. Daftarkan di galeri agar tes memeriksa lebar sel ASCII dan Unicode. Hubungkan pose dengan aktivitas atau hasil yang benar di `internal/tui/presentation.go`. Gunakan status terverifikasi untuk gestur berhasil.
 
@@ -26,7 +27,7 @@ Tambahkan pose di `internal/tui/mascot/piko.go` dengan deskripsi mata, mulut, le
 | Interaksi | Feedback |
 | --- | --- |
 | Startup dan keluar | Layar Piko menyala, mata terbuka, lalu melambai. Judul dan menu aktif sejak frame pertama. Keluar segera memulihkan terminal. |
-| Menu, fokus, input, dan kirim | Aksen pilihan dan lirikan mengikuti seleksi. Input memakai pose mendengarkan tanpa mengulang animasi per huruf. Pertanyaan masuk ke halaman pemeriksaan atau klarifikasi. |
+| Menu, fokus, input, dan kirim | Penanda pilihan dan lirikan mengikuti seleksi terbaru. Input memakai pose mendengarkan tanpa mengulang animasi per huruf. Pertanyaan yang dikirim langsung muncul pada pemeriksaan atau klarifikasi sambil Piko mengangguk sekali. |
 | Detail bukti, bantuan, dan resize | Aksen panel singkat dengan dimensi yang sama. Resize menghitung ulang layout dan menghentikan frame saat area terlalu kecil. |
 | Overview dan pemindaian ulang | Kaca pembesar dan indikator indeterminate. Label menyatakan pemeriksaan atau sumber bacaan. Progres bertahap berasal dari collector. |
 | SSD, CPU, baterai, dan TRIM | Stetoskop dan drive, kipas CPU, baterai dengan pose pengisian berdasarkan status AC dan Charging, serta checklist blok untuk audit baca-saja. |
@@ -39,3 +40,5 @@ Tambahkan pose di `internal/tui/mascot/piko.go` dengan deskripsi mata, mulut, le
 | Tugas lanjutan | Inventaris GPU, firmware, filesystem, dan timer memakai pose pemeriksaan. Review konfigurasi memakai clipboard. Pengujian kinerja menampilkan label beban yang berjalan. Firmware menunggu verifikasi setelah restart sebelum menampilkan sukses. |
 
 Galeri memuat skenario normal, peringatan, kritis, unknown, pembatalan, dan hasil parsial. Transisi skenario mengikuti Enter untuk memudahkan review setiap keadaan. Jalur aksi nyata mengikuti pesan backend tanpa durasi tunggu buatan.
+
+Rekaman berasal dari executable yang berjalan dalam PTY. Versi ringkas memakai `--ascii --motion off`. [Demo 120×36](assets/piko-demo.gif) · [Asciicast 120×36](assets/piko-demo.cast) · [Asciicast 80×24](assets/piko-compact.cast)

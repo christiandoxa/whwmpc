@@ -22,7 +22,7 @@ func (m *Model) galleryPage() {
 		Availability: domain.Available,
 		Found: []string{m.tr(Words{"Galeri Piko · DEMO", "Piko gallery · DEMO"}),
 			m.tr(Words{"Pilih ekspresi, atau jalankan satu skenario langkah demi langkah.", "Pick an expression or step through a scenario."})},
-		Meaning: []string{m.tr(Words{"←/→ pilih · Enter tampilkan · m mode · n ukuran ringkas", "←/→ select · Enter show · m motion · n narrow"})},
+		Meaning: []string{m.tr(Words{"↑/↓ pilih · Enter tampilkan · m mode · n ukuran ringkas", "↑/↓ select · Enter show · m motion · n narrow"})},
 		Advice:  []string{m.tr(Words{"Semua hasil dari fixture. Akses perangkat dan aksi sistem terkunci.", "Results use fixtures. Hardware access and system actions are locked."})},
 	}
 	for _, label := range scenarioNames {
@@ -42,7 +42,7 @@ type galleryStep struct {
 }
 
 var demoFlow = []galleryStep{
-	{mascot.Thinking, "Pertanyaan · Apa yang aman dibersihkan?", "Question · What is safe to clean?"},
+	{mascot.Nod, "Pertanyaan · Apa yang aman dibersihkan?", "Question · What is safe to clean?"},
 	{mascot.Scanning, "Pemeriksaan · inventaris cache paket contoh", "Scan · fixture package cache inventory"},
 	{mascot.Broom, "Temuan · cache APT contoh berukuran 376 MiB", "Finding · sample APT cache contains 376 MiB"},
 	{mascot.Preview, "Preview · seluruh cache paket contoh; penghapusan permanen", "Preview · entire fixture package cache; permanent deletion"},

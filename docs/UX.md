@@ -18,6 +18,7 @@ Satu layar review menampilkan target, kondisi sebelum dan sesudah, dampak, risik
 
 - Beranda [sebelum 80×24](assets/ux/before-80.png) dari build `ac30936`, [sesudah 80×24](assets/ux/after-80.png), dan [sesudah 120×36](assets/ux/after-120.png).
 - Rekaman asciicast dari build revamp dalam mode demo untuk [cek kondisi](assets/ux/condition.cast), [PC terasa lambat](assets/ux/slow.cast), dan [cleanup sampai kembali dari review](assets/ux/cleanup.cast).
+- Rekaman galeri terbaru memperagakan pertanyaan, pemeriksaan, preview, konfirmasi, eksekusi, dan verifikasi fixture. [GIF 120×36](assets/piko-demo.gif) · [Asciicast 120×36](assets/piko-demo.cast) · [Asciicast ASCII 80×24](assets/piko-compact.cast)
 
 Review menggunakan skenario tugas dan PTY. Tidak ada peserta studi pengguna dan tidak ada mutasi perangkat dalam skenario.
 

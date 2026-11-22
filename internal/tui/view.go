@@ -111,6 +111,12 @@ func (m Model) body(w int) []string {
 	}
 	title := func(s string) { text(s, m.palette.accent); lines = append(lines, "") }
 	normal := func(s string) { text(s, m.palette.text) }
+	echoQuestion := func() {
+		if m.question != "" {
+			label := l("Pertanyaan", "Question") + " · " + m.question
+			text(ansi.Truncate(label, w, "…"), m.palette.muted)
+		}
+	}
 	switch m.screen {
 	case home:
 		title(l("Mau dibantu apa?", "What can I help with?"))
@@ -145,6 +151,9 @@ func (m Model) body(w int) []string {
 			label = m.spinner.View() + " " + label
 		}
 		title(label)
+		if m.screen == scanning {
+			echoQuestion()
+		}
 	case help:
 		title(l("Bantuan keyboard", "Keyboard help"))
 		for _, line := range []string{l("↑ / ↓  Pilih atau gulir", "↑ / ↓  Select or scroll"), l("Enter  Buka pilihan", "Enter  Open selection"), l("Esc  Kembali atau minta penghentian", "Esc  Back or request cancellation"), l("/  Buka halaman pertanyaan", "/  Open question entry")} {
@@ -176,6 +185,7 @@ func (m Model) body(w int) []string {
 			for _, line := range s.Highlights {
 				normal("· " + line)
 			}
+			echoQuestion()
 			return lines
 		}
 		if len(m.page.Found) > 0 {
@@ -188,6 +198,15 @@ func (m Model) body(w int) []string {
 			for _, s := range group {
 				normal(s)
 			}
+		}
+		if m.screen == results || m.screen == taskQuestion {
+			echoQuestion()
+		}
+	}
+	if m.screen == gallery && !m.narrow && w >= 64 && m.height >= 28 {
+		lines = append(lines, "")
+		for _, row := range mascot.Render(m.visual.pose, m.visual.frame, m.options.ASCII) {
+			lines = append(lines, m.palette.muted.Render(row))
 		}
 	}
 	return lines
@@ -218,7 +237,25 @@ func (m Model) View() tea.View {
 		label += "  /  " + context
 	}
 	face := mascot.Face(m.visual.pose, m.visual.frame, m.options.ASCII)
-	rows := []string{m.palette.secondary.Render(label) + "   " + m.palette.muted.Render(face+" Piko"), ""}
+	if m.canAnimate() && ansi.StringWidth(label)+mascot.CompactWidth+8 <= w {
+		face = mascot.Compact(m.visual.pose, m.visual.frame, m.options.ASCII)
+	}
+	separator := ""
+	if left := m.visual.panelUntil.Sub(m.now()); left > 0 && m.canAnimate() && m.screen != reviewPlan {
+		width := 3
+		switch {
+		case left <= motion.PanelDuration/3:
+			width = 6
+		case left <= 2*motion.PanelDuration/3:
+			width = 5
+		}
+		mark := "─"
+		if m.options.ASCII {
+			mark = "-"
+		}
+		separator = m.palette.frame.Render(strings.Repeat(mark, width))
+	}
+	rows := []string{m.palette.secondary.Render(label) + "   " + m.palette.muted.Render(face+" Piko"), separator}
 	body := m.body(w)
 	choices := m.choices()
 
@@ -239,6 +276,12 @@ func (m Model) View() tea.View {
 				mark, style = "› ", m.palette.selected
 				if m.options.ASCII {
 					mark = "> "
+				}
+				if m.canAnimate() && m.screen != reviewPlan && !m.visual.focusUntil.IsZero() {
+					mark = "» "
+					if m.options.ASCII {
+						mark = "+ "
+					}
 				}
 			}
 			label := c.Label

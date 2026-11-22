@@ -96,6 +96,7 @@ type screenState struct {
 	exportType     string
 	pendingOutput  string
 	parameter      Choice
+	question       string
 }
 
 type Model struct {
@@ -148,6 +149,7 @@ func New(ctx context.Context, source platform.Provider, inspect Inspect, opts Op
 		m.screen = gallery
 		m.galleryPage()
 	}
+	m.accent(false, true)
 	return m
 }
 
@@ -189,10 +191,11 @@ func (m *Model) returnTo() tea.Cmd {
 	} else {
 		m.homePage()
 	}
-	m.showReply()
 	if m.typing() {
+		m.show(mascot.Listening, "", false)
 		return m.input.Focus()
 	}
+	m.showReply()
 	return nil
 }
 
@@ -419,7 +422,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.screen = outcome
 		}
 		m.updateCritical()
-		m.showReply()
+		if m.visual.pose == mascot.Nod && replyPose(m.page) == mascot.Idle {
+			m.visual.rest = mascot.Idle
+			m.accent(false, true)
+		} else {
+			m.showReply()
+		}
 		if m.quitPending {
 			cmd = m.quit()
 		}
@@ -437,7 +445,15 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.toast = m.tr(Words{"Preferensi disimpan", "Preference saved"})
 		}
 	case tea.KeyPressMsg:
+		previous := m.screen
 		cmd = m.key(msg)
+		if m.screen != previous && m.screen != reviewPlan {
+			m.visual.focusUntil = time.Time{}
+			if m.screen == fileInput {
+				m.show(mascot.Listening, "", false)
+			}
+			m.accent(false, true)
+		}
 	default:
 		if m.typing() {
 			m.input, cmd = m.input.Update(msg)
@@ -539,8 +555,19 @@ func (m *Model) key(msg tea.KeyPressMsg) tea.Cmd {
 		if m.screen == detail || m.screen == help || key == "pgup" || key == "pgdown" || len(m.choices()) == 0 {
 			m.scroll = max(0, min(m.scroll+step, m.maxScroll()))
 		} else {
+			previous := m.choice
 			m.choice = max(0, min(m.choice+step, len(m.choices())-1))
-			if m.screen != reviewPlan {
+			if m.choice != previous && m.screen != reviewPlan {
+				if !m.options.Gallery {
+					switch m.visual.pose {
+					case mascot.Greeting, mascot.Idle, mascot.Blink, mascot.LookLeft, mascot.LookRight:
+						pose := mascot.LookRight
+						if step < 0 {
+							pose = mascot.LookLeft
+						}
+						m.show(pose, mascot.Idle, false)
+					}
+				}
 				m.accent(true, false)
 			}
 		}
@@ -592,7 +619,13 @@ func (m *Model) submit() tea.Cmd {
 	if len(intents) == 1 {
 		if intent := intents[0]; intent != "" {
 			m.returnTo()
-			return m.start(intent, Choice{})
+			cmd := m.start(intent, Choice{})
+			m.question = domain.SafeText(value)
+			if m.busy && m.options.Motion == motion.Full && m.canAnimate() {
+				m.show(mascot.Nod, m.activity, false)
+				m.spinFor(m.activity)
+			}
+			return cmd
 		}
 	}
 	m.screen = taskQuestion
@@ -602,8 +635,14 @@ func (m *Model) submit() tea.Cmd {
 		intents = assistant.Menu
 	}
 	m.page = Page{Availability: domain.Unknown, Found: []string{message}}
+	m.question = domain.SafeText(value)
 	for _, id := range intents {
 		m.page.Choices = append(m.page.Choices, Choice{m.tr(menuNames[id]), "navigate", string(id)})
+	}
+	if m.options.Motion == motion.Full && m.canAnimate() {
+		m.show(mascot.Nod, mascot.Thinking, false)
+	} else {
+		m.show(mascot.Thinking, "", false)
 	}
 	return nil
 }

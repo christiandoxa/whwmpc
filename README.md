@@ -4,7 +4,7 @@
 
 ![Beranda demo whwmpc pada terminal 120×36](docs/assets/ux/after-120.png)
 
-[Sebelum](docs/assets/ux/before-80.png) · [Sesudah](docs/assets/ux/after-80.png) · [Alur dan rekaman PTY](docs/UX.md)
+[Sebelum](docs/assets/ux/before-80.png) · [Sesudah](docs/assets/ux/after-80.png) · [Demo Piko](docs/assets/piko-demo.gif) · [Alur dan rekaman PTY](docs/UX.md)
 
 ## Mulai
 
