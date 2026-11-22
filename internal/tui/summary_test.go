@@ -258,6 +258,23 @@ func TestTRIMWarningOpensOnlyTheRelatedPlan(t *testing.T) {
 	}
 }
 
+func TestAdvancedPrimaryOptionsFollowTheirEvidence(t *testing.T) {
+	p := Page{Availability: domain.Available, Choices: []Choice{
+		{"Tune GPU", "gpu-value", "fixture"}, {"Preview performance", actions.PowerProfile, "performance"},
+		{"Preview balanced", actions.PowerProfile, "balanced"},
+	}}
+	if got := summarize(p, assistant.GPU, "en"); got.Primary.Kind != "finish" {
+		t.Fatalf("a GPU control became the primary choice without a finding: %+v", got.Primary)
+	}
+	p.Findings = []diagnostics.Finding{{ID: "recommend.profile", Category: "recommendation", Severity: diagnostics.Info,
+		Availability: domain.Available, Recommendation: "Use balanced for the selected workload.",
+		Actions: []diagnostics.Action{{Kind: actions.PowerProfile, Target: "balanced", Label: "Preview balanced"}},
+	}}
+	if got := summarize(p, assistant.Recommend, "en"); got.NextFinding != "recommend.profile" || got.Primary.Value != "balanced" {
+		t.Fatalf("wrong next action for the selected workload: %+v", got)
+	}
+}
+
 func TestQuickScanThenDetailsKeepsResultAndSelection(t *testing.T) {
 	ctx := context.Background()
 	scanner := inspection.New(true)

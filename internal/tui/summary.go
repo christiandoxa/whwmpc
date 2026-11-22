@@ -245,9 +245,19 @@ func summarize(page Page, intent assistant.Intent, lang string) ResultSummary {
 		if intent == assistant.Slow && (page.Snapshot == nil || page.Snapshot.ObservedFor == 0) {
 			summary.Primary = observeChoice(lang)
 		}
-	default:
+	case assistant.Recommend:
+		for _, f := range findings {
+			if f.Category == "recommendation" {
+				summary.NextFinding, summary.Advice = f.ID, findingAdvice(f)
+				if linked := findingChoices(page, f); len(linked) == 1 {
+					summary.Primary = linked[0]
+				}
+				break
+			}
+		}
+	case assistant.Firmware:
 		for _, c := range page.Choices {
-			if c.Kind != "save-scan" && c.Kind != "rescan" {
+			if c.Kind == "firmware-cache" {
 				summary.Primary = c
 				break
 			}
