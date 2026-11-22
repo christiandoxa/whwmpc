@@ -210,7 +210,7 @@ func acceptWindowsPipe(ctx context.Context, pipe, process windows.Handle) error 
 }
 
 func helperPipe(args []string) (Scope, io.ReadWriteCloser, error) {
-	if len(args) != 3 || !allowed(Scope(args[0]), SMART) || len(args[1]) != 32 {
+	if len(args) != 3 || !Scope(args[0]).valid() || len(args[1]) != 32 {
 		return "", nil, ErrProtocol
 	}
 	if _, err := hex.DecodeString(args[1]); err != nil {

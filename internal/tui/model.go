@@ -100,6 +100,8 @@ type screenState struct {
 	pendingOutput  string
 	parameter      Choice
 	question       string
+	access         *readAccess
+	readErr        error
 }
 
 type Model struct {
@@ -118,7 +120,7 @@ type Model struct {
 	visual                                       presentation
 	activity, actionPose                         mascot.Pose
 	overview                                     domain.Overview
-	readStart                                    uint64
+	accessChosen                                 bool
 	lastChecked                                  time.Time
 	lastCoverage                                 string
 	toast                                        string
@@ -152,8 +154,6 @@ func New(ctx context.Context, source platform.Provider, inspect Inspect, opts Op
 	if opts.Gallery {
 		m.screen = gallery
 		m.galleryPage()
-	} else if opts.Privilege != nil {
-		m.privilegeChoices()
 	}
 	m.accent(false, true)
 	return m
@@ -177,7 +177,7 @@ func (m *Model) homePage() {
 		{m.tr(menuNames[assistant.Overview]), "navigate", string(assistant.Overview)},
 		{m.tr(menuNames[assistant.Slow]), "navigate", string(assistant.Slow)},
 		{m.tr(menuNames[assistant.Cleanup]), "navigate", string(assistant.Cleanup)},
-		{m.tr(Words{"Lainnya…", "More…"}), "more", ""},
+		{m.tr(Words{"Pemeriksaan lain", "Other checks"}), "more", ""},
 	}}}
 }
 
@@ -228,15 +228,17 @@ func (m *Model) start(intent assistant.Intent, choice Choice) tea.Cmd {
 	switch choice.Kind {
 	case "check-level":
 		m.remember()
-		m.privilegeChoices()
+		m.privilegeChoices(readAccess{purpose: changeReads, scope: privread.All})
 		return nil
 	case "ordinary":
+		if m.access == nil {
+			return nil
+		}
 		m.options.Privilege.Disable()
-		m.privilegeHome()
-		return nil
+		return m.finishReadAuthorization(nil)
 	case "deep-scope":
 		m.remember()
-		m.privilegeScope()
+		m.privilegeChoices(readAccess{purpose: changeReads, scope: readScope(m.active)})
 		return nil
 	case "deep-authorize":
 		return m.authorizeReads()
@@ -336,12 +338,13 @@ func (m *Model) start(intent assistant.Intent, choice Choice) tea.Cmd {
 		intent = assistant.Intent(choice.Value)
 		choice = Choice{}
 	}
+	question := m.question
 	if choice.Kind != "rescan" && choice.Kind != "apply" && choice.Kind != "workload" {
 		m.remember()
 	}
 	req := Request{Intent: intent, Choice: choice, Output: m.pendingOutput, Overview: m.overview, Plan: plan, Findings: m.page.Findings,
 		Language: m.options.Language, Workload: m.options.Workload}
-	m.screenState = screenState{screen: results, active: intent}
+	m.screenState = screenState{screen: results, active: intent, question: question}
 	if choice.Kind == "" && intent == assistant.Settings {
 		m.settingsPage()
 		return nil
@@ -380,16 +383,18 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case overviewMsg:
 		m.overview = msg.data
 	case privilegeMsg:
-		if m.job == msg.job && m.busy {
+		if m.job == msg.job && m.busy && m.access != nil {
+			if m.cancelling && msg.err == nil {
+				m.options.Privilege.Disable()
+				msg.err = privread.ErrCancelled
+			}
 			m.cancelJob()
 			m.cancelJob = nil
 			m.busy, m.cancelling, m.workName = false, false, ""
-			m.privilegeHome()
-			if msg.err != nil && !m.options.Privilege.State().Requested {
-				m.toast = privilegeReason(privread.State{Err: msg.err}, m.options.Language)
-			}
 			if m.quitPending {
 				cmd = m.quit()
+			} else {
+				cmd = m.finishReadAuthorization(msg.err)
 			}
 		}
 	case authMsg:
@@ -573,7 +578,7 @@ func (m *Model) key(msg tea.KeyPressMsg) tea.Cmd {
 		m.screen = help
 		m.scroll = 0
 	case "/":
-		if m.screen != reviewPlan && !m.options.Gallery {
+		if m.screen != reviewPlan && m.access == nil && !m.options.Gallery {
 			return m.ask()
 		}
 	case "n":

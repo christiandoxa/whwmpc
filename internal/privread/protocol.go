@@ -136,7 +136,7 @@ func serve(ctx context.Context, pipe io.ReadWriter, scope Scope, operations []Op
 		for expected := uint64(1); ; expected++ {
 			var req request
 			err := readFrame(in, &req)
-			if err == nil && (req.ID != expected || !allowed(scope, req.Op) || !slices.Contains(operations, req.Op)) {
+			if err == nil && (req.ID != expected || !scope.Allows(req.Op) || !slices.Contains(operations, req.Op)) {
 				err = ErrProtocol
 			}
 			if err != nil {

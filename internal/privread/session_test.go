@@ -56,6 +56,23 @@ func TestDemoDoesNotStartHelper(t *testing.T) {
 	}
 }
 
+func TestSingleOperationScope(t *testing.T) {
+	s := New(fakeBackend(func(_ context.Context, op Operation) any {
+		if op != SMART {
+			t.Errorf("unauthorized operation reached helper: %s", op)
+		}
+		return storage.SMARTAudit{CapturedAt: time.Now(), Availability: domain.Available}
+	}), false)
+	defer s.Disable()
+	if err := s.Enable(t.Context(), Scope(SMART), nil, nil); err != nil {
+		t.Fatal(err)
+	}
+	if s.Read(t.Context(), TRIM, new(TrimReading)) || !s.Read(t.Context(), SMART, new(storage.SMARTAudit)) ||
+		!Observe.Allows(Power) || Observe.Allows(SMART) || Scope("trim,smart").valid() {
+		t.Fatal("task scope was not enforced")
+	}
+}
+
 func TestScopedReadsPartialDataAndExpiry(t *testing.T) {
 	entered, stopped := make(chan struct{}), make(chan struct{})
 	s := New(fakeBackend(func(ctx context.Context, op Operation) any {

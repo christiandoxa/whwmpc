@@ -78,7 +78,7 @@ func TestViewFitsTerminal(t *testing.T) {
 				t.Fatalf("too wide: %q", line)
 			}
 		}
-		if !strings.Contains(m.View().Content, "Lainnya") {
+		if !strings.Contains(m.View().Content, "Pemeriksaan lain") {
 			t.Fatal("Home lost secondary path")
 		}
 	}

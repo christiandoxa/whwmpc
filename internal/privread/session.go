@@ -27,9 +27,12 @@ const (
 type Scope string
 
 const (
-	All   Scope = "all"
-	Check Scope = "check"
+	All     Scope = "all"
+	Check   Scope = "check"
+	Observe Scope = "observe"
 )
+
+var operations = []Operation{SMART, TRIM, Power, Temperature, GPU, Firmware, Filesystem}
 
 const Lifetime = 10 * time.Minute
 
@@ -88,7 +91,7 @@ func (s *Session) Capability() error {
 }
 
 func (s *Session) Enable(ctx context.Context, scope Scope, terminal *os.File, stderr io.Writer) error {
-	if scope != All && scope != Check {
+	if !scope.valid() {
 		return ErrProtocol
 	}
 	ctx, cancel := context.WithTimeout(ctx, 90*time.Second)
@@ -176,7 +179,7 @@ func (s *Session) Read(ctx context.Context, op Operation, out any) bool {
 	s.mu.Lock()
 	c := s.client
 	s.mu.Unlock()
-	if c == nil || !allowed(c.scope, op) || !slices.Contains(s.backend.Operations, op) {
+	if c == nil || !c.scope.Allows(op) || !slices.Contains(s.backend.Operations, op) {
 		return false
 	}
 	err := c.read(ctx, op, out)
@@ -224,16 +227,12 @@ func disabled(err error) State {
 	return State{Requested: true, Availability: status, Err: err}
 }
 
-func allowed(scope Scope, op Operation) bool {
-	if scope != All && scope != Check {
-		return false
-	}
-	switch op {
-	case SMART, TRIM, Power, Temperature:
-		return true
-	case GPU, Firmware, Filesystem:
-		return scope == All
-	default:
-		return false
-	}
+func (s Scope) valid() bool {
+	return s == All || s == Check || s == Observe || slices.Contains(operations, Operation(s))
+}
+
+func (s Scope) Allows(op Operation) bool {
+	return slices.Contains(operations, op) && (s == All || s == Scope(op) ||
+		s == Check && (op == SMART || op == TRIM || op == Power || op == Temperature) ||
+		s == Observe && (op == Power || op == Temperature))
 }

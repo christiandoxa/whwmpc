@@ -54,6 +54,10 @@ type stageMsg struct {
 type ShutdownMsg struct{}
 
 func (m *Model) launch(req Request, pose mascot.Pose) tea.Cmd {
+	if m.options.Privilege != nil && !m.accessChosen && startsInspection(req) {
+		m.privilegeChoices(readAccess{purpose: firstReads, scope: readScope(req.Intent), request: req})
+		return nil
+	}
 	m.busy, m.cancelling, m.workName = true, false, ""
 	m.activity = pose
 	switch req.Choice.Kind {
@@ -79,9 +83,6 @@ func (m *Model) launch(req Request, pose mascot.Pose) tea.Cmd {
 	}
 	m.job++
 	job := m.job
-	if m.options.Privilege != nil {
-		m.readStart = m.options.Privilege.State().Reads
-	}
 	ctx, cancel := context.WithCancel(m.ctx)
 	m.cancelJob = cancel
 	m.show(m.activity, "", req.Choice.Kind != "apply")

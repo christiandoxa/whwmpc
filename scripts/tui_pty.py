@@ -126,27 +126,25 @@ def press(terminal, key):
 
 
 def choose_level(terminal, deep):
-    terminal.expect("Pemeriksaan biasa")
+    terminal.expect("Mulai tanpa administrator")
     if deep:
+        terminal.expect("SMART")
         press(terminal, b"\x1b[A")
-        press(terminal, b"\r")
-        terminal.expect("Izinkan pemeriksaan mendalam?")
-        terminal.expect("SSD / SMART")
-        press(terminal, b"\x1b[B")
+    offset = len(terminal.output)
     press(terminal, b"\r")
-    terminal.expect("Mau dibantu apa?")
-    terminal.expect("Mendalam" if deep else "Biasa")
+    terminal.expect("Mendalam" if deep else "Biasa", offset)
     if deep and (terminal.output.count(ENTER_ALT) < 2 or LEAVE_ALT not in terminal.output):
         raise RuntimeError("authorization did not release and restore the alternate screen")
+    return offset
 
 
-def task_flow(terminal, flow, resize=False):
+def task_flow(terminal, flow, resize=False, deep=False):
     terminal.expect("Mau dibantu apa?")
     index = ("condition", "slow", "cleanup").index(flow)
     for _ in range(index):
         press(terminal, b"\x1b[B")
-    offset = len(terminal.output)
     press(terminal, b"\r")
+    offset = choose_level(terminal, deep and flow != "cleanup")
     if flow == "cleanup":
         terminal.expect("file teramati", offset)
         offset = len(terminal.output)
@@ -228,12 +226,8 @@ def main():
         )
         try:
             terminal.expect("DEMO")
-            if not args.gallery:
-                choose_level(terminal, args.deep)
             if args.flow:
-                task_flow(terminal, args.flow, resize=args.record is None)
-                if args.deep and args.flow == "condition":
-                    terminal.expect("Pemeriksaan mendalam selesai")
+                task_flow(terminal, args.flow, resize=args.record is None, deep=args.deep)
                 if args.record is not None:
                     terminal.hold(1)
                     recording = terminal.events[:]

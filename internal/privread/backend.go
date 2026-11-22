@@ -35,7 +35,7 @@ func RunHelper(args []string) int {
 		return 1
 	}
 	scope, pipe, err := helperPipe(args)
-	if err != nil || !allowed(scope, SMART) {
+	if err != nil || !scope.valid() {
 		return 1
 	}
 	defer pipe.Close()

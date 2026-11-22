@@ -16,7 +16,7 @@ import (
 	"github.com/christiandoxa/whwmpc/internal/workflow"
 )
 
-func TestInspectionLevelDefaultsToOrdinaryAndChangesSafely(t *testing.T) {
+func TestFirstGoalStartsWithOrdinaryCheck(t *testing.T) {
 	access := privread.New(privread.Backend{Start: func(context.Context, privread.Scope, *os.File, io.Writer) (io.ReadWriteCloser, error) {
 		t.Fatal("the demo tried to authorize a native process")
 		return nil, nil
@@ -30,40 +30,77 @@ func TestInspectionLevelDefaultsToOrdinaryAndChangesSafely(t *testing.T) {
 		}
 		return Page{Availability: domain.Available}
 	}, Options{Demo: true, Language: "en", Motion: "off", Privilege: access})
-	keys := func(code rune) { m = step(m, tea.KeyPressMsg{Code: code}) }
+	if m.screen != home || m.choice != 0 || !strings.Contains(m.View().Content, "Understand your PC") {
+		t.Fatal("startup did not show the primary goal and purpose")
+	}
+	m = step(m, tea.KeyPressMsg{Code: tea.KeyEnter})
 	if m.choice != 1 || m.choices()[1].Kind != "ordinary" {
 		t.Fatal("ordinary reads were not the default")
 	}
-	keys(tea.KeyEnter)
-	if m.screen != home || access.State().Requested || calls != 0 {
-		t.Fatal("ordinary startup did more than show the home screen")
-	}
-	m.start(assistant.Settings, Choice{Kind: "check-level"})
-	keys(tea.KeyUp)
-	keys(tea.KeyEnter)
-	if !strings.Contains(m.View().Content, "SMART") || access.State().Requested || m.choice != 0 {
-		t.Fatal("read scope and confirmation were bypassed")
-	}
-	keys(tea.KeyDown)
-	next, grant := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
-	m = next.(Model)
-	if grant == nil || !m.busy || access.State().Active {
-		t.Fatal("confirmation did not hand off to foreground authorization")
-	}
-	exec := foregroundReads{ctx: t.Context(), access: access, stdin: os.Stdin}
-	m = step(m, privilegeMsg{m.job, exec.Run()})
-	if m.screen != home || !access.State().Active || calls != 0 {
-		t.Fatal("grant triggered extra work or did not reach home")
-	}
 	next, scan := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
-	m = step(next.(Model), scan())
-	if m.screen != results || calls != 1 || !strings.Contains(m.View().Content, "Deep inspection complete") {
-		t.Fatal("the selected task did not use the deep demo mode")
+	m = next.(Model)
+	if m.screen != scanning || scan == nil || access.State().Requested {
+		t.Fatal("ordinary access did not begin the task")
 	}
-	m.start(assistant.Settings, Choice{Kind: "check-level"})
-	keys(tea.KeyEnter)
-	if access.State().Requested || m.screen != home || len(m.back) != 0 {
-		t.Fatal("ordinary selection retained the scope or the deep result stack")
+	m = step(m, scan())
+	if m.screen != results || m.active != assistant.Overview || calls != 1 || len(m.back) != 1 {
+		t.Fatal("goal was not checked in two confirmations")
+	}
+	m = step(m, tea.KeyPressMsg{Code: tea.KeyEsc})
+	if m.screen != home || calls != 1 {
+		t.Fatal("back did not return to goals")
+	}
+}
+
+func TestInitialGrantContinuesSelectedCheck(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		err  error
+		info string
+	}{
+		{"granted", nil, "No warnings in this sample"},
+		{"denied", privread.ErrDenied, "Read access was not granted"},
+		{"cancelled", privread.ErrCancelled, "Authorization cancelled"},
+		{"timeout", context.DeadlineExceeded, "Authorization timed out"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			access := privread.New(privread.Backend{Operations: []privread.Operation{privread.SMART},
+				Start: func(_ context.Context, scope privread.Scope, _ *os.File, _ io.Writer) (io.ReadWriteCloser, error) {
+					if scope != privread.Check {
+						t.Fatalf("unexpected scope %q", scope)
+					}
+					return nil, tc.err
+				}}, tc.err == nil)
+			defer access.Disable()
+			calls := 0
+			m := New(t.Context(), platform.Demo{}, func(_ context.Context, req Request) Page {
+				calls++
+				if req.Intent != assistant.Overview || access.State().Active != (tc.err == nil) {
+					t.Fatal("check ran with the wrong task or access")
+				}
+				return Page{Availability: domain.Available}
+			}, Options{Demo: true, Language: "en", Motion: "off", Privilege: access})
+			m = step(m, tea.KeyPressMsg{Code: tea.KeyEnter})
+			if !strings.Contains(m.View().Content, "SMART") || access.State().Requested {
+				t.Fatal("scope must be visible before consent")
+			}
+			m = step(m, tea.KeyPressMsg{Code: tea.KeyUp})
+			next, grant := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+			m = next.(Model)
+			if grant == nil || !m.busy || calls != 0 {
+				t.Fatal("grant did not open foreground auth before scanning")
+			}
+			exec := foregroundReads{ctx: t.Context(), access: access, stdin: os.Stdin, scope: m.access.scope}
+			next, scan := m.Update(privilegeMsg{m.job, exec.Run()})
+			m = next.(Model)
+			if scan == nil || m.screen != scanning || m.access != nil {
+				t.Fatal("auth result did not resume the original request")
+			}
+			m = step(m, scan())
+			if m.screen != results || calls != 1 || !strings.Contains(m.View().Content, tc.info) {
+				t.Fatalf("check did not retain the result and access status: %s", m.View().Content)
+			}
+		})
 	}
 }
 

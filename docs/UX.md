@@ -1,8 +1,8 @@
 # Alur TUI
 
-Saat startup interaktif, Piko menawarkan **Pemeriksaan mendalam** serta **Pemeriksaan biasa** sebagai pilihan awal. Memilih Mendalam membuka cakupan baca dan konfirmasi sebelum autentikasi OS. Sesudah itu tugas dipilih dari beranda. Judul menunjukkan mode sesi, hasil menghitung pemeriksaan yang perlu izin, dan **Coba izin baca lagi** tersedia bila sesi gagal. Tingkat pemeriksaan dapat diganti di Pengaturan. [Cakupan dan autentikasi](PRIVILEGE.md)
+Saat startup interaktif, Piko menampilkan manfaat aplikasi dan pilihan tujuan. Setelah memilih tujuan pertama, layar akses menampilkan cakupan baca dan menyorot **Mulai tanpa administrator**. Saat tersedia, pilihan administrator membuka autentikasi OS. Persetujuan, penolakan, dan pembatalan autentikasi meneruskan tugas yang sama dengan akses yang tersedia. Judul menunjukkan mode sesi, dan hasil menghitung pemeriksaan yang perlu izin. [Cakupan dan autentikasi](PRIVILEGE.md)
 
-Beranda menanyakan **Mau dibantu apa?** dan memilih **Cek kondisi PC** sebagai posisi awal. Cek kondisi memeriksa CPU/memori, ruang simpan, daya, SSD, dan perawatan storage. Pemeriksaan read-only berlangsung tanpa otentikasi. **PC terasa lambat** langsung mengukur sampel karena gejala awal belum mengubah pengukuran yang didukung. **Bersihkan ruang** membuka inventaris sebelum membuat rencana. Kemampuan lanjutan ada di **Lainnya…**.
+Beranda menyorot **Cek kondisi PC**. Cek kondisi memeriksa CPU/memori, ruang simpan, daya, SSD, dan perawatan storage. **Cari penyebab PC lambat** mengukur kondisi sistem yang sedang berjalan. **Bersihkan ruang** membuka inventaris sebelum membuat rencana. Kemampuan lanjutan ada di **Pemeriksaan lain**.
 
 Gunakan ↑/↓ untuk daftar, Enter untuk membuka pilihan, dan Esc untuk kembali. Pertanyaan bebas ada di halaman tersendiri melalui `/`. Kolom utama memakai maksimum 76 sel. Pada 120×36 Piko memakai margin kanan. Pada 80×24 wajah dan aksesori Piko berada di dekat judul. Ukuran minimum 48×18. Di bawah batas itu, layar meminta terminal diperbesar dan Esc serta `q` tetap berfungsi.
 

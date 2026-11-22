@@ -28,51 +28,104 @@ var readScopes = map[privread.Operation]Words{
 	privread.Filesystem:  {"Inventaris filesystem", "Filesystem inventory"},
 }
 
-func (m *Model) privilegeChoices() {
-	l := translator(m.options.Language)
-	m.screenState = screenState{screen: taskQuestion, choice: 1, page: Page{
-		Found: []string{l("Piko · Mau aku periksa komputermu lebih mendalam?", "Piko · Would you like me to check your PC more closely?")},
-		Meaning: []string{l("Mode mendalam dapat membaca lebih banyak informasi hardware.", "Deep inspection can read more hardware information."),
-			l("Perubahan konfigurasi tetap memerlukan persetujuanmu.", "Configuration changes still require your approval.")},
-		Choices: []Choice{
-			{l("Pemeriksaan mendalam · perlu izin administrator", "Deep inspection · administrator permission"), "deep-scope", ""},
-			{l("Pemeriksaan biasa · tanpa izin administrator", "Ordinary inspection · standard access"), "ordinary", ""},
-		},
-	}}
+type accessPurpose uint8
+
+const (
+	firstReads accessPurpose = iota
+	changeReads
+)
+
+type readAccess struct {
+	purpose accessPurpose
+	scope   privread.Scope
+	request Request
 }
 
-func (m *Model) privilegeScope() {
+func readScope(intent assistant.Intent) privread.Scope {
+	switch intent {
+	case assistant.Overview, assistant.Report:
+		return privread.Check
+	case assistant.Slow:
+		return privread.Observe
+	case assistant.Storage:
+		return privread.Scope(privread.SMART)
+	case assistant.Trim:
+		return privread.Scope(privread.TRIM)
+	case assistant.Power, assistant.Recommend:
+		return privread.Scope(privread.Power)
+	case assistant.GPU:
+		return privread.Scope(privread.GPU)
+	case assistant.Firmware:
+		return privread.Scope(privread.Firmware)
+	case assistant.Filesystem:
+		return privread.Scope(privread.Filesystem)
+	default:
+		return ""
+	}
+}
+
+func startsInspection(req Request) bool {
+	switch req.Choice.Kind {
+	case "export":
+		return req.Snapshot == nil
+	case "", "rescan", "workload":
+		if req.Intent == assistant.Recommend {
+			return req.Workload != ""
+		}
+		return readScope(req.Intent) != "" || req.Intent == assistant.Cleanup || req.Intent == assistant.Daemon
+	default:
+		return false
+	}
+}
+
+func (m *Model) privilegeChoices(flow readAccess) {
 	l := translator(m.options.Language)
-	access := m.options.Privilege
-	m.screenState = screenState{screen: taskQuestion, page: Page{
-		Found: []string{l("Izinkan pemeriksaan mendalam?", "Allow deep inspection?")},
-		Choices: []Choice{
-			{l("Kembali", "Back"), "back", ""},
-			{l("Izinkan akses baca", "Authorize read access"), "deep-authorize", ""},
-		},
-	}}
-	if err := access.Capability(); err != nil {
-		m.page.Meaning = []string{l("Autentikasi administrator tidak tersedia.", "Administrator authorization is unavailable."), domain.SafeText(err.Error())}
-		m.page.Choices[1] = Choice{l("Lanjut dengan pemeriksaan biasa", "Continue with ordinary inspection"), "ordinary", ""}
-		m.show(mascot.Unknown, "", false)
-		return
+	title := l("Pilih akses baca", "Choose read access")
+	ordinary, admin := l("Gunakan akses biasa", "Use ordinary access"), l("Gunakan izin administrator", "Use administrator access")
+	var description []string
+	if flow.purpose == firstReads {
+		m.active = flow.request.Intent
+		title = m.tr(menuNames[m.active])
+		ordinary, admin = l("Mulai tanpa administrator", "Start without administrator"), l("Mulai dengan izin administrator", "Start with administrator access")
+		switch m.active {
+		case assistant.Overview:
+			description = append(description, l("Lihat kondisi komponen dan saran perawatan.", "See component condition and maintenance priorities."),
+				l("Cakupan CPU, memori, disk, SSD, TRIM, dan daya.", "Checks CPU, memory, disk, SSD, TRIM, and power."))
+		case assistant.Slow:
+			description = append(description, l("Amati CPU, memori, proses, dan daya.", "Observe CPU, memory, processes, and power."))
+		case assistant.Cleanup:
+			description = append(description, l("Lihat cache dan perkiraan ruang yang bisa dibersihkan.", "See cache contents and estimated space to reclaim."))
+		}
 	}
 	var labels []string
-	for _, op := range access.Operations() {
-		labels = append(labels, m.tr(readScopes[op]))
+	for _, op := range m.options.Privilege.Operations() {
+		if flow.scope.Allows(op) {
+			labels = append(labels, m.tr(readScopes[op]))
+		}
 	}
-	for len(labels) > 0 {
-		n := min(len(labels), 2)
-		m.page.Meaning = append(m.page.Meaning, strings.Join(labels[:n], " · "))
-		labels = labels[n:]
+	choices := []Choice{{ordinary, "ordinary", ""}}
+	switch {
+	case len(labels) == 0:
+		description = append(description, l("Tugas ini memakai akses biasa.", "This task uses ordinary access."))
+	case m.options.Privilege.Capability() != nil:
+		description = append(description, l("Izin administrator tidak tersedia di sini.", "Administrator access is unavailable here."))
+	default:
+		description = append(description, l("Akses admin baca hingga 10 menit", "Administrator reads for up to 10 minutes")+" · "+strings.Join(labels, ", "))
+		choices = append([]Choice{{admin, "deep-authorize", ""}}, choices...)
+		if flow.purpose == firstReads {
+			description = append(description, l("Izin batal/ditolak → lanjut dengan akses biasa.", "Denied or cancelled? Continue with ordinary access."))
+		}
 	}
-	m.page.Advice = []string{l("Akses baca berlaku hingga 10 menit dalam sesi ini.", "Read access lasts up to 10 minutes in this session.")}
+	m.screen, m.access, m.choice, m.scroll = taskQuestion, &flow, len(choices)-1, 0
+	m.page = Page{Found: []string{title}, Meaning: description, Choices: choices,
+		Advice: []string{l("Perubahan sistem ditinjau terpisah.", "System changes have a separate review.")}}
 	m.show(mascot.Confirm, "", false)
 }
 
 type foregroundReads struct {
 	ctx    context.Context
 	access *privread.Session
+	scope  privread.Scope
 	stdin  *os.File
 	stderr io.Writer
 }
@@ -81,7 +134,7 @@ func (a *foregroundReads) Run() error {
 	if a.stdin == nil {
 		return privread.ErrUnavailable
 	}
-	return a.access.Enable(a.ctx, privread.All, a.stdin, a.stderr)
+	return a.access.Enable(a.ctx, a.scope, a.stdin, a.stderr)
 }
 func (a *foregroundReads) SetStdin(in io.Reader)      { a.stdin, _ = in.(*os.File) }
 func (a *foregroundReads) SetStdout(io.Writer)        {}
@@ -93,24 +146,36 @@ type privilegeMsg struct {
 }
 
 func (m *Model) authorizeReads() tea.Cmd {
+	if m.access == nil || m.access.scope == "" {
+		return nil
+	}
 	ctx, cancel := context.WithCancel(m.ctx)
 	m.job++
 	job := m.job
 	m.busy, m.cancelJob = true, cancel
-	m.screenState = screenState{screen: scanning}
+	m.screen = scanning
 	m.workName = m.tr(Words{"Menunggu izin administrator", "Waiting for administrator permission"})
 	m.show(mascot.Confirm, "", false)
-	return tea.Exec(&foregroundReads{ctx: ctx, access: m.options.Privilege}, func(err error) tea.Msg { return privilegeMsg{job, err} })
+	return tea.Exec(&foregroundReads{ctx: ctx, access: m.options.Privilege, scope: m.access.scope}, func(err error) tea.Msg { return privilegeMsg{job, err} })
 }
 
-func (m *Model) privilegeHome() {
-	m.back = nil
-	m.overview = domain.Overview{}
-	m.homePage()
-	m.showReply()
-	if st := m.options.Privilege.State(); st.Requested && !st.Active {
-		m.show(mascot.Unknown, "", false)
+func (m *Model) finishReadAuthorization(err error) tea.Cmd {
+	flow := m.access
+	if flow == nil {
+		return nil
 	}
+	m.access = nil
+	m.accessChosen = true
+	if flow.purpose == firstReads {
+		m.readErr = err
+		req := flow.request
+		return m.launch(req, aimFor(req.Intent, req.Choice, req.Plan))
+	}
+	cmd := m.returnTo()
+	if err != nil {
+		m.toast = privilegeReason(privread.State{Err: err}, m.options.Language)
+	}
+	return cmd
 }
 
 func privilegeReason(s privread.State, lang string) string {
@@ -124,6 +189,8 @@ func privilegeReason(s privread.State, lang string) string {
 		return l("Autentikasi tidak tersedia", "Authorization unavailable")
 	case errors.Is(s.Err, privread.ErrProtocol):
 		return l("Komunikasi dengan helper gagal", "Read helper communication failed")
+	case errors.Is(s.Err, context.DeadlineExceeded):
+		return l("Waktu autentikasi habis", "Authorization timed out")
 	default:
 		return l("Izin baca belum diberikan", "Read access was not granted")
 	}
@@ -141,6 +208,9 @@ func (m *Model) summarizeReads(s *ResultSummary) {
 	}
 	l := translator(m.options.Language)
 	st := m.options.Privilege.State()
+	if m.readErr != nil && !st.Requested {
+		st = privread.State{Requested: true, Availability: domain.PermissionRequired, Err: m.readErr}
+	}
 	if n := permissionChecks(m.page, m.active); n != 0 {
 		s.Coverage += fmt.Sprintf(l(" · %d perlu izin", " · %d need permission"), n)
 	}
@@ -148,11 +218,6 @@ func (m *Model) summarizeReads(s *ResultSummary) {
 		s.Statuses = append(s.Statuses, resultStatus{Label: l("Akses baca", "Read access"), Value: privilegeReason(st, m.options.Language), Availability: st.Availability})
 		s.RetryRead = true
 		m.page.Choices = appendChoice(m.page.Choices, m.retryReadChoice())
-	}
-	if st.Active && m.active == assistant.Overview && (st.Reads > m.readStart || m.options.Demo) {
-		if s.Headline == l("Tidak ada peringatan pada sampel ini", "No warnings in this sample") {
-			s.Headline = l("Pemeriksaan mendalam selesai", "Deep inspection complete")
-		}
 	}
 }
 

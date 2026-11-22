@@ -126,6 +126,7 @@ func (m Model) body(w int) []string {
 	switch m.screen {
 	case home:
 		title(l("Mau dibantu apa?", "What can I help with?"))
+		normal(l("Pahami kondisi PC, cari tanda masalah, dan tinjau perawatan.", "Understand your PC, look for signs of problems, and review maintenance."))
 		if m.lastChecked.IsZero() {
 			text(l("Belum diperiksa", "No checks yet"), m.palette.muted)
 		} else {
@@ -258,7 +259,7 @@ func (m Model) View() tea.View {
 	if context != "" {
 		label += "  /  " + context
 	}
-	if m.options.Privilege != nil && !m.options.Gallery {
+	if m.options.Privilege != nil && !m.options.Gallery && (m.accessChosen || m.options.Privilege.State().Requested) {
 		if m.options.Privilege.State().Active {
 			label += "  /  " + m.tr(Words{"Mendalam", "Deep"})
 		} else {
@@ -323,8 +324,8 @@ func (m Model) View() tea.View {
 			}
 			label := c.Label
 			if m.screen == home && h >= 20 && i < 3 {
-				desc := []Words{{"Ringkasan kondisi dan saran", "Condition and next steps"},
-					{"Cari tanda penyebabnya", "Look for likely causes"}, {"Tinjau yang bisa dibersihkan", "Review what can be cleaned"}}
+				desc := []Words{{"Kondisi komponen dan hal yang perlu ditangani", "Components and what needs attention"},
+					{"Amati saat kelambatan terjadi", "Observe while the slowdown happens"}, {"Tinjau ruang yang bisa dibersihkan", "Review space you can reclaim"}}
 				label += "  ·  " + m.tr(desc[i])
 			}
 			if m.screen == reviewPlan && c.Kind == "apply" {
@@ -341,7 +342,11 @@ func (m Model) View() tea.View {
 	footer := m.tr(Words{"↑↓ Pilih  ·  Enter Buka  ·  Esc Kembali  ·  ? Bantuan", "↑↓ Select  ·  Enter Open  ·  Esc Back  ·  ? Help"})
 	switch m.screen {
 	case home:
-		footer = m.tr(Words{"↑↓ Pilih  ·  Enter Buka  ·  / Tanya  ·  ? Bantuan", "↑↓ Select  ·  Enter Open  ·  / Ask  ·  ? Help"})
+		footer = m.tr(Words{"↑↓ Pilih  ·  Enter Pilih tujuan  ·  / Tanya  ·  q Keluar", "↑↓ Select  ·  Enter Choose a goal  ·  / Ask  ·  q Quit"})
+	case taskQuestion:
+		if m.access != nil && m.access.purpose == firstReads {
+			footer = m.tr(Words{"↑↓ Pilih akses  ·  Enter Mulai  ·  Esc Kembali", "↑↓ Select access  ·  Enter Start  ·  Esc Back"})
+		}
 	case reviewPlan:
 		switch {
 		case m.options.Demo:

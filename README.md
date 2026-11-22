@@ -1,6 +1,6 @@
 # What Happens With My PC
 
-`whwmpc` adalah asisten terminal lokal untuk memahami kondisi PC. Tanyakan kenapa PC terasa lambat, audit SSD dan TRIM, lihat kebijakan CPU dan daya, atau tinjau pembersihan cache. Piko menemani pemeriksaan di terminal. Semua diagnosis inti berjalan offline.
+`whwmpc` membantu memahami kondisi PC, mencari tanda penyebab masalah, dan meninjau perawatan yang sesuai sebelum menerapkannya. Piko menemani pemeriksaan di terminal. Semua diagnosis inti berjalan offline.
 
 ![Beranda demo whwmpc pada terminal 120×36](docs/assets/ux/after-120.png)
 
@@ -58,9 +58,9 @@ Untuk instalasi dari arsip di Linux, macOS, atau Windows, pilih paket yang cocok
 
 ### Navigasi
 
-Sejak `v0.4.0`, Enter di layar startup memilih **Pemeriksaan biasa**. Pilih **Pemeriksaan mendalam** untuk melihat cakupan baca tambahan dan meminta izin lewat prompt sistem operasi. Ganti mode dari **Lainnya… → Pengaturan → Tingkat pemeriksaan**. [Cakupan Linux, macOS, dan Windows](docs/PRIVILEGE.md)
+Pada build `main`, pilih tujuan lebih dulu. Layar akses muncul sebelum pemeriksaan pertama dengan **Mulai tanpa administrator** sebagai pilihan awal. Pilihan administrator memakai prompt sistem operasi dan melanjutkan tujuan yang sudah dipilih. Ganti tingkat akses dari Pengaturan. [Cakupan Linux, macOS, dan Windows](docs/PRIVILEGE.md)
 
-Beranda menyediakan **Cek kondisi PC**, **PC terasa lambat**, dan **Bersihkan ruang**. Tekan Enter pada pilihan pertama untuk memulai pemeriksaan. Gunakan **Lainnya…** untuk SSD, TRIM, daya, riwayat, laporan, pengaturan, dan pertanyaan bebas. **Tugas lanjutan** membuka GPU, firmware, filesystem, benchmark, dan status observasi terjadwal.
+Beranda menyediakan **Cek kondisi PC**, **Cari penyebab PC lambat**, dan **Bersihkan ruang**. Gunakan **Pemeriksaan lain** untuk SSD, TRIM, daya, riwayat, laporan, pengaturan, dan pertanyaan bebas. **Tugas lanjutan** membuka GPU, firmware, filesystem, benchmark, dan status observasi terjadwal.
 
 | Tombol | Fungsi |
 | --- | --- |

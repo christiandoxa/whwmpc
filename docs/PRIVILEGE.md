@@ -1,6 +1,6 @@
 # Pemeriksaan mendalam
 
-Mulai `whwmpc` dari terminal sebagai pengguna biasa. Tekan Enter untuk **Pemeriksaan biasa**, atau pilih **Pemeriksaan mendalam** dan tinjau cakupan sebelum memilih **Izinkan akses baca**. Cakupan bergantung pada OS dan backend. Piko menampilkan mode aktif di judul. Gunakan **Lainnya → Pengaturan → Tingkat pemeriksaan** untuk mengganti mode. Hasil menampilkan alasan jika izin gagal atau kedaluwarsa dan menyediakan pilihan untuk mencoba lagi.
+Mulai `whwmpc` dari terminal sebagai pengguna biasa dan pilih tujuan. Sebelum tugas pertama, **Mulai tanpa administrator** menjadi pilihan awal. Pilihan administrator menampilkan cakupan yang dapat dibaca oleh backend untuk tujuan itu. Setelah autentikasi, tugas langsung berjalan dengan akses yang tersedia. Piko menampilkan mode aktif di judul. Gunakan **Pemeriksaan lain → Pengaturan → Tingkat pemeriksaan** untuk mengganti mode.
 
 | Platform | Autentikasi | Cakupan baca tambahan |
 | --- | --- | --- |
