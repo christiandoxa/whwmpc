@@ -1,5 +1,9 @@
 # Changelog
 
+## Belum dirilis
+
+- Piko tampil utuh pada margin prompt yang lebar. Input GPU yang tidak valid menampilkan ekspresi error dan memfokuskan pilihan Kembali.
+
 ## 0.3.2
 
 - Riwayat menutup pilihan pemulihan setelah hasilnya terverifikasi. Rencana pemulihan yang sudah ditandatangani diperiksa kembali saat eksekusi.

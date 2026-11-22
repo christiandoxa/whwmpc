@@ -7,8 +7,10 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/christiandoxa/whwmpc/internal/assistant"
+	"github.com/christiandoxa/whwmpc/internal/domain"
 	"github.com/christiandoxa/whwmpc/internal/hardware"
 	"github.com/christiandoxa/whwmpc/internal/platform"
+	"github.com/christiandoxa/whwmpc/internal/tui/mascot"
 )
 
 func TestGPUNumericEntryCreatesOnlyPreviewRequest(t *testing.T) {
@@ -47,5 +49,26 @@ func TestGPUEvidenceKeepsPowerScopesAndLimitsDistinct(t *testing.T) {
 		if !strings.Contains(evidence, want) {
 			t.Errorf("GPU evidence missing %q:\n%s", want, evidence)
 		}
+	}
+}
+
+func TestInvalidGPUValueShowsErrorAndFocusesBack(t *testing.T) {
+	m := New(t.Context(), platform.Demo{}, nil, Options{Language: "en"})
+	m.active, m.screen, m.choice = assistant.GPU, results, 1
+	m.page = Page{Choices: []Choice{
+		{Label: "Another GPU control"},
+		{"100000–170000 mW", "gpu-value", hardware.PowerLimit + " GPU-example"},
+	}}
+	m = step(m, tea.KeyPressMsg{Code: tea.KeyEnter})
+	m.input.SetValue("150W")
+	next, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	m = next.(Model)
+	if cmd != nil || m.busy || m.page.Availability != domain.Error || m.visual.pose != mascot.Error || m.choice != 0 ||
+		!strings.Contains(m.View().Content, "Invalid integer value.") {
+		t.Fatal("invalid GPU input skipped the error pose or left Back unfocused")
+	}
+	m = step(m, tea.KeyPressMsg{Code: tea.KeyEnter})
+	if m.choice != 1 || m.choices()[m.choice].Kind != "gpu-value" {
+		t.Fatal("Back did not restore the selected GPU control")
 	}
 }

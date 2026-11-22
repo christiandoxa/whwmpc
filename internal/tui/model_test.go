@@ -81,6 +81,32 @@ func TestViewFitsTerminal(t *testing.T) {
 	}
 }
 
+func TestWidePromptKeepsPikoInTheRightMargin(t *testing.T) {
+	m := New(t.Context(), platform.Demo{}, nil, Options{Demo: true, ASCII: true})
+	m = step(m, tea.WindowSizeMsg{Width: 120, Height: 36})
+	m.show(mascot.Idle, "", false)
+	before := strings.Split(m.View().Content, "\n")
+	w, _ := m.bounds()
+	mascotColumn := (m.width-w)/2 + w + 2
+	if got := ansi.Strip(ansi.Cut(before[1], mascotColumn, mascotColumn+mascot.Width)); got != mascot.Render(mascot.Idle, 0, true)[1] {
+		t.Fatalf("wide prompt mascot row = %q", got)
+	}
+	m.show(mascot.Cleaning, "", false)
+	after := strings.Split(m.View().Content, "\n")
+	if len(before) != len(after) || after[0] == before[0] {
+		t.Fatal("Piko's pose did not change within a stable layout")
+	}
+	for i, row := range before {
+		if ansi.Cut(row, 0, mascotColumn) != ansi.Cut(after[i], 0, mascotColumn) {
+			t.Fatalf("Piko's pose moved prompt row %d", i)
+		}
+	}
+	m = step(m, tea.WindowSizeMsg{Width: 80, Height: 24})
+	if v := ansi.Strip(m.View().Content); strings.Contains(v, ".--------.") || !strings.Contains(v, "/.   Piko") {
+		t.Fatal("compact prompt lost the broom accessory or showed the wide artwork")
+	}
+}
+
 func TestMotionUsesLatestGeneration(t *testing.T) {
 	ctx := context.Background()
 	m := New(ctx, platform.Demo{}, nil, Options{Demo: true})

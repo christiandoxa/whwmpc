@@ -18,7 +18,7 @@ Satu timer dengan deadline yang dapat diganti memberi pesan Bubble Tea bertanda 
 | Kedipan idle | Setelah 9 detik idle, satu kedipan |
 | Frame kerja berulang | Selama status kerja masih aktif dan tampilan terlihat |
 
-Alur kerja memakai wajah mini dengan aksesori di area tetap 10 sel dekat label tugas. Layout yang sempit memakai wajah lima sel. Galeri pada terminal lebar menampilkan gambar 16×6. Pada terminal yang terlalu kecil petunjuk resize tetap tersedia. Angka metrik dan teks hasil tampil utuh ketika data tiba.
+Prompt memakai Piko 16×6 di margin kanan saat tersedia 18 sel untuk margin itu dan terminal memiliki sedikitnya 28 baris. Pada 80×24, wajah dan aksesori memakai 10 sel di header. Layout lebih sempit memakai wajah lima sel. Galeri lebar menampilkan pose lengkap. Pada terminal yang terlalu kecil petunjuk resize tetap tersedia. Angka metrik dan teks hasil tampil utuh ketika data tiba.
 
 Tambahkan pose di `internal/tui/mascot/piko.go` dengan deskripsi mata, mulut, lengan, lantai, dan aksesori. Daftarkan di galeri agar tes memeriksa lebar sel ASCII dan Unicode. Hubungkan pose dengan aktivitas atau hasil yang benar di `internal/tui/presentation.go`. Gunakan status terverifikasi untuk gestur berhasil.
 
@@ -41,4 +41,4 @@ Tambahkan pose di `internal/tui/mascot/piko.go` dengan deskripsi mata, mulut, le
 
 Galeri memuat skenario normal, peringatan, kritis, unknown, pembatalan, dan hasil parsial. Transisi skenario mengikuti Enter untuk memudahkan review setiap keadaan. Jalur aksi nyata mengikuti pesan backend tanpa durasi tunggu buatan.
 
-Rekaman berasal dari executable yang berjalan dalam PTY. Versi ringkas memakai `--ascii --motion off`. [Demo 120×36](assets/piko-demo.gif) · [Asciicast 120×36](assets/piko-demo.cast) · [Asciicast 80×24](assets/piko-compact.cast)
+Rekaman berasal dari executable yang berjalan dalam PTY. Versi ringkas galeri memakai `--ascii --motion off`. [Pembukaan prompt 120×36](assets/ux/wide-piko.cast) · [Demo galeri 120×36](assets/piko-demo.gif) · [Asciicast galeri 120×36](assets/piko-demo.cast) · [Asciicast galeri 80×24](assets/piko-compact.cast)

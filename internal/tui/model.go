@@ -597,7 +597,9 @@ func (m *Model) submit() tea.Cmd {
 			kind, id, ok := strings.Cut(m.parameter.Value, " ")
 			m.screen = results
 			if err != nil || !ok {
+				m.choice, m.scroll = 0, 0
 				m.page = Page{Availability: domain.Error, Found: []string{m.tr(Words{"Nilai integer tidak valid.", "Invalid integer value."})}}
+				m.showReply()
 				return nil
 			}
 			return m.start(assistant.GPU, Choice{Kind: kind, Value: id + "=" + strconv.FormatInt(n, 10)})

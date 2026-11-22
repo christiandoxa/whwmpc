@@ -236,9 +236,17 @@ func (m Model) View() tea.View {
 	if context != "" {
 		label += "  /  " + context
 	}
-	face := mascot.Face(m.visual.pose, m.visual.frame, m.options.ASCII)
-	if m.canAnimate() && ansi.StringWidth(label)+mascot.CompactWidth+8 <= w {
-		face = mascot.Compact(m.visual.pose, m.visual.frame, m.options.ASCII)
+	header := m.palette.secondary.Render(label)
+	const mascotGap = 2
+	var art []string
+	if !m.narrow && m.screen != gallery && h >= 28 && m.width-w-len(pad) >= mascot.Width+mascotGap {
+		art = mascot.Render(m.visual.pose, m.visual.frame, m.options.ASCII)
+	} else {
+		face := mascot.Face(m.visual.pose, m.visual.frame, m.options.ASCII)
+		if m.canAnimate() && ansi.StringWidth(label)+mascot.CompactWidth+8 <= w {
+			face = mascot.Compact(m.visual.pose, m.visual.frame, m.options.ASCII)
+		}
+		header += "   " + m.palette.muted.Render(face+" Piko")
 	}
 	separator := ""
 	if left := m.visual.panelUntil.Sub(m.now()); left > 0 && m.canAnimate() && m.screen != reviewPlan {
@@ -255,7 +263,7 @@ func (m Model) View() tea.View {
 		}
 		separator = m.palette.frame.Render(strings.Repeat(mark, width))
 	}
-	rows := []string{m.palette.secondary.Render(label) + "   " + m.palette.muted.Render(face+" Piko"), separator}
+	rows := []string{header, separator}
 	body := m.body(w)
 	choices := m.choices()
 
@@ -330,8 +338,15 @@ func (m Model) View() tea.View {
 		rows = append(rows, m.palette.secondary.Render(m.toast))
 	}
 	rows = append(rows, "", m.palette.muted.Render(footer))
+	for len(rows) < len(art) {
+		rows = append(rows, "")
+	}
 	for i, line := range rows {
-		rows[i] = pad + ansi.Truncate(line, w, "")
+		line = ansi.Truncate(line, w, "")
+		if i < len(art) {
+			line += strings.Repeat(" ", w+mascotGap-ansi.StringWidth(line)) + m.palette.muted.Render(art[i])
+		}
+		rows[i] = pad + line
 	}
 	v := tea.NewView(strings.Join(rows[:min(h, len(rows))], "\n"))
 	v.AltScreen = true
