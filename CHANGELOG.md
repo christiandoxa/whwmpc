@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.1.0
 
 - Asisten Bubble Tea dengan overview Linux, pertanyaan Bahasa Indonesia/Inggris, diagnosis berbasis beberapa sampel, dan preferensi konteks daya.
 - Audit SMART/NVMe, TRIM per filesystem, CPUFreq, dan backend daya dengan status capability yang eksplisit.
