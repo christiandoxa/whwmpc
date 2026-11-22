@@ -23,7 +23,7 @@ Unduh arsip platform dan `SHA256SUMS` dari rilis yang sama. Installer README men
 Pada Linux atau macOS, ganti nama arsip sesuai unduhan. Gunakan direktori baru untuk ekstraksi.
 
 ```sh
-archive=whwmpc_v0.3.3_darwin_arm64.tar.gz
+archive=whwmpc_v0.3.4_darwin_arm64.tar.gz
 shasum -a 256 "$archive"
 # Cocokkan hash dengan SHA256SUMS sebelum lanjut.
 tar -xzf "$archive" ./whwmpc
@@ -34,7 +34,7 @@ tar -xzf "$archive" ./whwmpc
 Pada Windows, jalankan di PowerShell.
 
 ```powershell
-$archive = 'whwmpc_v0.3.3_windows_amd64.zip'
+$archive = 'whwmpc_v0.3.4_windows_amd64.zip'
 Get-FileHash -Algorithm SHA256 $archive
 # Cocokkan hash dengan SHA256SUMS sebelum lanjut.
 Expand-Archive $archive -DestinationPath .\whwmpc

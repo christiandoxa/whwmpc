@@ -1,6 +1,6 @@
 # Changelog
 
-## Belum dirilis
+## 0.3.4
 
 - Keluar segera setelah mengganti mode gerak tetap menyimpan pilihan terakhir.
 
