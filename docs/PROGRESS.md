@@ -108,3 +108,5 @@ Jalur CLI/TUI mengaudit inventaris. Metadata LVFS dan staging firmware memerluka
 ## Backlog J · Matriks paket standalone
 
 Build arsip untuk Linux amd64/arm64, macOS arm64, dan Windows amd64. Manifest memuat checksum keempat target. Workflow rilis menjalankan smoke terhadap executable yang diekstrak dari arsip pada runner dengan OS dan arsitektur sesuai, lalu menerbitkan aset dari artefak yang sama.
+
+Verifikasi firmware pascarestart mengikuti format riwayat fwupd 2.0.20. Versi yang dicoba berasal dari entri release dalam riwayat. Hasil sukses juga memerlukan versi aktif yang cocok. Fixture mencakup riwayat pending, sukses, duplikat, dan target yang berbeda.

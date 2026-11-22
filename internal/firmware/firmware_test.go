@@ -131,23 +131,49 @@ func TestRebootHandoffUsesVerifiedInstalledAndLastResult(t *testing.T) {
 		t.Skip("Linux fwupd inventory")
 	}
 	for _, step := range []struct {
-		installed, returned string
-		state               int
-		want                string
+		name, installed, previous, release string
+		state                              int
+		want                               string
+		availability                       domain.Availability
 	}{
-		{"1.0", "2.0", 1, "reboot_required"},
-		{"2.0", "2.0", 4, "reboot_required"},
-		{"1.0", "2.0", 2, "unknown"},
-		{"2.0", "1.0", 2, "unknown"},
-		{"2.0", "2.0", 2, "verified"},
-		{"1.0", "2.0", 3, "failed"},
+		{"pending", "1.0", "1.0", "2.0", 1, "reboot_required", domain.Partial},
+		{"needs reboot", "2.0", "1.0", "2.0", 4, "reboot_required", domain.Partial},
+		{"installed version differs", "1.0", "1.0", "2.0", 2, "unknown", domain.Partial},
+		{"previous version matches only", "2.0", "2.0", "3.0", 2, "unknown", domain.Unknown},
+		{"installed and attempted versions match", "2.0", "1.0", "2.0", 2, "verified", domain.Available},
+		{"explicit failure", "1.0", "1.0", "2.0", 3, "failed", domain.Error},
+	} {
+		t.Run(step.name, func(t *testing.T) {
+			history := fmt.Sprintf(`{"Devices":[{"DeviceId":%q,"Version":%q,"UpdateState":%d,"Releases":[{"Version":%q}]}]}`,
+				testID, step.previous, step.state, step.release)
+			got := Outcome(context.Background(), runner{responses: map[string]sysrun.Result{
+				"get-devices": result(strings.Replace(inventory(""), `"1.0"`, fmt.Sprintf("%q", step.installed), 1)),
+				"get-history": result(history),
+			}}, testID+"@2.0")
+			if got.State != step.want || got.Availability != step.availability {
+				t.Fatalf("handoff state %+v, want %q with %q", got, step.want, step.availability)
+			}
+		})
+	}
+}
+
+func TestRebootHandoffRequiresUnambiguousHistory(t *testing.T) {
+	if runtime.GOOS != "linux" {
+		t.Skip("Linux fwupd inventory")
+	}
+	record := fmt.Sprintf(`{"DeviceId":%q,"Version":"1.0","UpdateState":2,"Releases":[{"Version":"2.0"}]}`, testID)
+	for _, history := range []string{
+		`{"Devices":[]}`,
+		`{"Devices":[` + record + `,` + record + `]}`,
+		`{"Devices":[` + strings.Replace(record, `[{"Version":"2.0"}]`, `[]`, 1) + `]}`,
+		`{"Devices":[` + strings.Replace(record, testID, strings.Repeat("2", 40), 1) + `]}`,
 	} {
 		got := Outcome(context.Background(), runner{responses: map[string]sysrun.Result{
-			"get-devices": result(strings.Replace(inventory(""), `"1.0"`, fmt.Sprintf("%q", step.installed), 1)),
-			"get-results": result(fmt.Sprintf(`{"DeviceId":%q,"Version":%q,"UpdateState":%d}`, testID, step.returned, step.state)),
+			"get-devices": result(strings.Replace(inventory(""), `"1.0"`, `"2.0"`, 1)),
+			"get-history": result(history),
 		}}, testID+"@2.0")
-		if got.State != step.want {
-			t.Fatalf("handoff state %+v, want %q", got, step.want)
+		if got.State != "unknown" || got.Availability != domain.Unknown {
+			t.Fatalf("unproven handoff accepted %s: %+v", history, got)
 		}
 	}
 }
@@ -176,7 +202,8 @@ func TestPackageDigestAndTargetBinding(t *testing.T) {
 	if err := download(ctx, client, selected, io.Discard); err == nil {
 		t.Fatal("changed bytes accepted")
 	}
-	details := inventory(release("lvfs", `["trusted-payload"]`))
+	details := inventory(`{"Version":"2.0","Flags":["trusted-payload"]},` +
+		`{"RemoteId":"lvfs","Checksum":["` + testDigest + `"]}`)
 	dev := Device{ID: testID, GUIDs: []string{"firmware-guid"}}
 	r := runner{responses: map[string]sysrun.Result{"get-details": result(details)}}
 	if err := PackageMatches(ctx, r, "/tmp/demo.cab", dev, selected); err != nil {
@@ -185,6 +212,7 @@ func TestPackageDigestAndTargetBinding(t *testing.T) {
 	for _, bad := range []string{
 		strings.Replace(details, "trusted-payload", "trusted-metadata", 1),
 		strings.Replace(details, "firmware-guid", "wrong-device", 1),
+		strings.Replace(details, `"Version":"2.0"`, `"Version":"3.0"`, 1),
 		strings.Replace(details, testDigest, strings.Repeat("b", 64), 1),
 	} {
 		r.responses["get-details"] = result(bad)

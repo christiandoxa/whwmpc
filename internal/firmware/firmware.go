@@ -352,18 +352,34 @@ func Outcome(ctx context.Context, run sysrun.Runner, target string) Verification
 		verification.Availability = domain.Unknown
 		return verification
 	}
-	r := query(ctx, run, Args("get-results", id))
+	// fwupd's get-results only returns terminal outcomes. get-history also exposes a staged capsule.
+	r := query(ctx, run, Args("get-history"))
 	status := availability(r)
 	if status == domain.PermissionRequired || status == domain.DependencyMissing {
 		verification.Availability = status
 		return verification
 	}
-	var d Device
-	if status != domain.Available || json.Unmarshal(r.Output, &d) != nil || d.ID != id || d.Version != wanted {
-		verification.Availability = domain.Unknown
+	verification.Availability = domain.Unknown
+	var history struct{ Devices []Device }
+	if status != domain.Available || json.Unmarshal(r.Output, &history) != nil {
 		return verification
 	}
-	switch d.UpdateState {
+	var record *Device
+	for i := range history.Devices {
+		item := &history.Devices[i]
+		if item.ID != id {
+			continue
+		}
+		if record != nil {
+			return verification
+		}
+		record = item
+	}
+	// A historical device Version is the previous version, and its release holds the attempted one.
+	if record == nil || len(record.Releases) != 1 || record.Releases[0].Version != wanted {
+		return verification
+	}
+	switch record.UpdateState {
 	case 1, 4: // FWUPD_UPDATE_STATE_PENDING and NEEDS_REBOOT
 		verification.State, verification.Availability = "reboot_required", domain.Partial
 	case 3, 5: // FWUPD_UPDATE_STATE_FAILED and FAILED_TRANSIENT
@@ -374,8 +390,6 @@ func Outcome(ctx context.Context, run sysrun.Runner, target string) Verification
 			break
 		}
 		verification.Availability = domain.Partial
-	default:
-		verification.Availability = domain.Unknown
 	}
 	return verification
 }
