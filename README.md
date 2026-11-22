@@ -24,7 +24,7 @@ Untuk memasang versi tertentu, sertakan tag rilis.
 curl -fsSL https://raw.githubusercontent.com/christiandoxa/whwmpc/main/install.sh | sh -s -- v0.1.0
 ```
 
-Checksum diambil dari rilis GitHub yang sama. Untuk macOS arm64 atau Windows amd64, pilih arsip platform dari halaman rilis lalu ikuti petunjuk ekstraksi. [Unduhan manual](https://github.com/christiandoxa/whwmpc/releases/latest) · [Cara memasang dari arsip](docs/RELEASE.md)
+Checksum diambil dari rilis GitHub yang sama. Untuk macOS atau Windows, pilih arsip yang cocok dengan arsitektur perangkat lalu ikuti petunjuk ekstraksi. [Unduhan manual](https://github.com/christiandoxa/whwmpc/releases/latest) · [Cara memasang dari arsip](docs/RELEASE.md)
 
 Beranda menyediakan **Cek kondisi PC**, **PC terasa lambat**, dan **Bersihkan ruang**. Tekan Enter pada pilihan pertama untuk memulai pemeriksaan. Gunakan **Lainnya…** untuk SSD, TRIM, daya, riwayat, laporan, pengaturan, dan pertanyaan bebas. **Tugas lanjutan** membuka GPU, firmware, filesystem, benchmark, dan status observasi terjadwal.
 
@@ -89,9 +89,9 @@ Gunakan `trim --mount /mountpoint`, `trim --enable-timer`, atau `clean --dry-run
 | --- | --- | --- |
 | Linux amd64, baseline Ubuntu 24.04 LTS | `/proc` dan `/sys`, SMART, TRIM, CPUFreq, PPD, GPU yang didukung driver, fwupd, filesystem ext offline, cache APT | CI Ubuntu, PTY 80×24/120×36, probe/preview hardware baca-saja, dan tes perbaikan pada image ext2/3/4 sementara |
 | Linux arm64 | Provider dan backend Linux yang sama, mengikuti capability host | Build lintas arsitektur. Workflow rilis melakukan smoke executable pada Linux arm64 |
-| Debian, Fedora 44, Arch | APT serta versi DNF5 dan pacman yang tercantum di matriks | Fixture dan CI kontainer Fedora/Arch. [Cakupan cache paket](docs/PACKAGE-CACHE.md) |
+| Debian, Fedora 44, Arch Linux, Arch Linux ARM aarch64 | APT serta versi DNF5 dan pacman yang tercantum di matriks | Fixture dan CI kontainer Fedora/Arch. [Cakupan cache paket](docs/PACKAGE-CACHE.md) |
 | Container, VM, WSL, Linux tanpa systemd | Pemeriksaan menurut data yang diekspos. Operasi membutuhkan backend dan target yang terverifikasi | Deteksi fixture |
-| macOS 14+ arm64, Windows 11/Server 2025 amd64 | CPU, memori, disk, proses, uptime, daya, data storage yang tersedia, dan cek APFS/NTFS baca-saja | CI pada macOS 15 dan Windows Server 2025. [API dan batas native](docs/NATIVE.md) |
+| macOS 14+ dan Windows 11/Server 2025, amd64/arm64 | CPU, memori, disk, proses, uptime, daya, status pengisian ketika tersedia, data storage, serta cek APFS/NTFS baca-saja | Lihat versi, arsitektur, dan cakupan perangkat yang diuji. [Matriks native](docs/NATIVE.md) |
 
 Tool opsional di Linux mencakup `smartctl` (smartmontools), util-linux dan systemd/journal untuk audit TRIM, BusyBox dengan applet `fstrim` untuk aksi manual, serta `busctl` dan daemon profil daya. `doctor` menampilkan ketersediaan tool dan capability aktual. Pengujian mutasi memakai fixture, image sementara, atau kontainer. [Bukti dan batas pengujian per fitur](docs/BACKLOG.md)
 

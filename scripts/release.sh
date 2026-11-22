@@ -18,7 +18,7 @@ umask 022
 export GOTOOLCHAIN=local CGO_ENABLED=0 GOAMD64=v1 GOARM64=v8.0 LC_ALL=C
 shopt -s nullglob
 archives=()
-for target in linux/amd64 linux/arm64 darwin/arm64 windows/amd64; do
+for target in linux/amd64 linux/arm64 darwin/amd64 darwin/arm64 windows/amd64 windows/arm64; do
     export GOOS=${target%/*} GOARCH=${target#*/}
     name="whwmpc_${version}_${GOOS}_${GOARCH}"
     executable=whwmpc

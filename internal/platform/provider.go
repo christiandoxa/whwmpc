@@ -12,6 +12,13 @@ type Provider interface {
 	Overview(context.Context) domain.Overview
 }
 
+type PowerReading struct {
+	OnAC          *bool
+	Percent       *float64
+	BatteryStatus string
+	Availability  domain.Availability
+}
+
 func baseOverview(now time.Time, status domain.Availability) domain.Overview {
 	return domain.Overview{
 		Availability: status, CapturedAt: now.UTC(), OS: runtime.GOOS, Arch: runtime.GOARCH,

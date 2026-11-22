@@ -43,7 +43,8 @@ func (Native) Overview(ctx context.Context) domain.Overview {
 		o.UptimeSeconds = &seconds
 	}
 	o.Disks, o.DiskStatus = windowsDisks()
-	o.OnAC, o.Battery, o.PowerStatus = ReadPower(ctx, nil)
+	power := ReadPower(ctx, nil)
+	o.OnAC, o.Battery, o.PowerStatus = power.OnAC, power.Percent, power.Availability
 	o.Temperature.Availability = domain.Unsupported
 
 	o.CPU.StartedAt = time.Now().UTC()
@@ -192,29 +193,37 @@ type powerStatus struct {
 	batteryLifeTime, batteryFullLifeTime               uint32
 }
 
-func ReadPower(_ context.Context, _ sysrun.Runner) (ac *bool, percent *float64, status domain.Availability) {
+func ReadPower(_ context.Context, _ sysrun.Runner) PowerReading {
 	var state powerStatus
 	ok, _, err := getSystemPowerStatus.Call(uintptr(unsafe.Pointer(&state)))
 	if ok == 0 {
-		return nil, nil, nativeAvailability(err)
+		return PowerReading{Availability: nativeAvailability(err)}
 	}
 	return windowsPower(state)
 }
 
-func windowsPower(state powerStatus) (ac *bool, percent *float64, status domain.Availability) {
-	status = domain.Unknown
+func windowsPower(state powerStatus) PowerReading {
+	const (
+		charging  = 8
+		noBattery = 128
+		unknown   = 255
+	)
+	reading := PowerReading{Availability: domain.Unknown}
 	if state.acLine <= 1 {
-		online := state.acLine == 1
-		ac = &online
+		reading.OnAC = new(state.acLine == 1)
 	}
-	if state.batteryFlags&128 == 0 && state.batteryPercent <= 100 {
-		value := float64(state.batteryPercent)
-		percent = &value
+	if state.batteryFlags == unknown || state.batteryFlags&noBattery == 0 {
+		if state.batteryPercent <= 100 {
+			reading.Percent = new(float64(state.batteryPercent))
+		}
+		if state.batteryFlags != unknown && state.batteryFlags&charging != 0 {
+			reading.BatteryStatus = "Charging"
+		}
 	}
-	if ac != nil || percent != nil {
-		status = domain.Available
+	if reading.OnAC != nil || reading.Percent != nil || reading.BatteryStatus != "" {
+		reading.Availability = domain.Available
 	}
-	return
+	return reading
 }
 
 type memoryCounters struct {

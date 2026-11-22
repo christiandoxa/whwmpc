@@ -18,6 +18,6 @@ func (Native) Overview(context.Context) domain.Overview {
 	return o
 }
 
-func ReadPower(context.Context, sysrun.Runner) (*bool, *float64, domain.Availability) {
-	return nil, nil, domain.Unsupported
+func ReadPower(context.Context, sysrun.Runner) PowerReading {
+	return PowerReading{Availability: domain.Unsupported}
 }

@@ -22,12 +22,20 @@ func TestDarwinSensorParsers(t *testing.T) {
 	if p := darwinPS(" 120.0 2000 /System/Test Helper\n999.0 2 /bad\n0.0 500 kernel_task", 4); len(p) != 2 || p[0].CPU != 30 || p[0].Name != "Test Helper" {
 		t.Fatalf("processes %+v", p)
 	}
-	ac, charge, status := darwinPower("Now drawing from 'Battery Power'\n -InternalBattery-0 (id=314)\t66%; discharging;")
-	if ac == nil || *ac || charge == nil || *charge != 66 || status != domain.Available {
-		t.Fatalf("power %v %v %s", ac, charge, status)
+	battery := darwinPower("Now drawing from 'Battery Power'\n -InternalBattery-0 (id=314)\t66%; discharging;")
+	if battery.OnAC == nil || *battery.OnAC || battery.Percent == nil || *battery.Percent != 66 ||
+		battery.Availability != domain.Available || battery.BatteryStatus != "Discharging" {
+		t.Fatalf("power %+v", battery)
 	}
-	_, charge, status = darwinPower("garbage 99%;")
-	if charge != nil || status != domain.Unknown {
+	if unknown := darwinPower("garbage 99%;"); unknown.Percent != nil || unknown.Availability != domain.Unknown {
 		t.Fatalf("unidentified power source was treated as a battery")
+	}
+	for _, input := range []struct{ raw, want string }{
+		{"charging", "Charging"}, {"not charging", "Not charging"}, {"charged", "Full"}, {"unknown", ""},
+	} {
+		battery := darwinPower("Now drawing from 'AC Power'\n -InternalBattery-0 (id=314)\t66%; " + input.raw + ";")
+		if battery.OnAC == nil || !*battery.OnAC || battery.BatteryStatus != input.want {
+			t.Fatalf("%s: %+v", input.raw, battery)
+		}
 	}
 }

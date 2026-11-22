@@ -12,7 +12,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-24.04, ubuntu-24.04-arm, macos-15, windows-2025]
+        os: [ubuntu-24.04, ubuntu-24.04-arm, macos-15, macos-15-intel, windows-2025, windows-11-arm]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 10
     env:
@@ -23,6 +23,8 @@ jobs:
       - uses: actions/setup-go@v7.1.0
         with:
           go-version: '1.27.4'
+          architecture: ${{ runner.arch == 'ARM64' && 'arm64' || 'x64' }}
+      - run: go env GOOS GOARCH
       - run: go test -v ./internal/platform ./internal/storage ./internal/filesystem ./internal/power ./internal/diagnostics ./internal/report
       - run: go build -trimpath ./cmd/whwmpc
       - if: runner.os == 'macOS'

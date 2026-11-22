@@ -13,8 +13,8 @@ tar -xzf whwmpc_snapshot_linux_amd64.tar.gz ./whwmpc
 | Target | Arsip | Executable |
 | --- | --- | --- |
 | Linux amd64/arm64 | `whwmpc_<versi>_linux_<arch>.tar.gz` | `whwmpc` |
-| macOS arm64 | `whwmpc_<versi>_darwin_arm64.tar.gz` | `whwmpc` |
-| Windows amd64 | `whwmpc_<versi>_windows_amd64.zip` | `whwmpc.exe` |
+| macOS amd64/arm64 | `whwmpc_<versi>_darwin_<arch>.tar.gz` | `whwmpc` |
+| Windows amd64/arm64 | `whwmpc_<versi>_windows_<arch>.zip` | `whwmpc.exe` |
 
 ## Pasang dari arsip
 
@@ -23,7 +23,7 @@ Unduh arsip platform dan `SHA256SUMS` dari rilis yang sama. Installer README men
 Pada Linux atau macOS, ganti nama arsip sesuai unduhan. Gunakan direktori baru untuk ekstraksi.
 
 ```sh
-archive=whwmpc_v0.2.0_darwin_arm64.tar.gz
+archive=whwmpc_v0.3.0_darwin_arm64.tar.gz
 shasum -a 256 "$archive"
 # Cocokkan hash dengan SHA256SUMS sebelum lanjut.
 tar -xzf "$archive" ./whwmpc
@@ -34,7 +34,7 @@ tar -xzf "$archive" ./whwmpc
 Pada Windows, jalankan di PowerShell.
 
 ```powershell
-$archive = 'whwmpc_v0.2.0_windows_amd64.zip'
+$archive = 'whwmpc_v0.3.0_windows_amd64.zip'
 Get-FileHash -Algorithm SHA256 $archive
 # Cocokkan hash dengan SHA256SUMS sebelum lanjut.
 Expand-Archive $archive -DestinationPath .\whwmpc
@@ -46,7 +46,7 @@ Paket macOS berisi executable command-line tanpa notarization. Dependency sistem
 
 ## Publikasi
 
-Untuk rilis stabil, tinjau hasil CI pada commit tujuan, buat tag beranotasi `vX.Y.Z`, lalu push tag tersebut. Workflow Release membangun paket dari commit yang ditag. Publikasi menunggu checksum dan smoke executable hasil paket pada keempat runner yang sesuai arsitektur. [Verifikasi tag di GitHub CLI](https://cli.github.com/manual/gh_release_create)
+Untuk rilis stabil, tinjau hasil CI pada commit tujuan, buat tag beranotasi `vX.Y.Z`, lalu push tag tersebut. Workflow Release membangun paket dari commit yang ditag. Publikasi menunggu checksum dan smoke executable hasil paket pada enam runner yang sesuai OS dan arsitektur. [Verifikasi tag di GitHub CLI](https://cli.github.com/manual/gh_release_create)
 
 ## Uji terminal dan rekaman
 

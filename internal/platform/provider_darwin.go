@@ -46,7 +46,8 @@ func (Native) Overview(ctx context.Context) domain.Overview {
 	}
 	o.Memory = darwinMemory(ctx, runner)
 	o.Disks, o.DiskStatus = darwinDisks()
-	o.OnAC, o.Battery, o.PowerStatus = ReadPower(ctx, runner)
+	power := ReadPower(ctx, runner)
+	o.OnAC, o.Battery, o.PowerStatus = power.OnAC, power.Percent, power.Availability
 
 	processes := runner.Run(ctx, "/bin/ps", "-A", "-r", "-o", "pcpu=", "-o", "rss=", "-o", "comm=")
 	o.ProcessStatus = runAvailability(processes)
@@ -104,13 +105,13 @@ func darwinDisks() ([]domain.Disk, domain.Availability) {
 	return []domain.Disk{volume}, volume.Availability
 }
 
-func ReadPower(ctx context.Context, runner sysrun.Runner) (*bool, *float64, domain.Availability) {
+func ReadPower(ctx context.Context, runner sysrun.Runner) PowerReading {
 	if runner == nil {
 		runner = sysrun.Native{}
 	}
 	result := runner.Run(ctx, "/usr/bin/pmset", "-g", "batt")
 	if status := runAvailability(result); status != domain.Available {
-		return nil, nil, status
+		return PowerReading{Availability: status}
 	}
 	return darwinPower(string(result.Output))
 }

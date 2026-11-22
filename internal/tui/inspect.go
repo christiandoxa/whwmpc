@@ -303,6 +303,10 @@ func powerPage(snapshot power.Snapshot, lang string) Page {
 	page := Page{Availability: snapshot.CPUFreqStatus}
 	p := snapshot.Profiles
 	page.Found = []string{fmt.Sprintf("CPUFreq · %s · %d %s", statusNames[snapshot.CPUFreqStatus].Text(lang), len(snapshot.Policies), l("policy", "policies"))}
+	if snapshot.OS == "darwin" || snapshot.OS == "windows" {
+		page.Availability = snapshot.PowerStatus
+		page.Found = []string{l("Status daya", "Power status") + " · " + statusNames[snapshot.PowerStatus].Text(lang)}
+	}
 	if p.Active != "" {
 		page.Found = append(page.Found, fmt.Sprintf("%s · %s", l("Profil aktif", "Active profile"), p.Active))
 	}

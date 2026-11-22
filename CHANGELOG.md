@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.3.0
+
+- Stress CPU memakai kanal suhu yang sama sepanjang uji. Guard menghentikan beban saat pembacaan hilang, terlambat, atau mencapai 85 °C.
+- Cleaner Pacman mendukung Arch Linux ARM aarch64 dengan cakupan, lock, dan verifikasi paket yang sama.
+- Preview firmware memerlukan bukti baterai tidak terpasang jika kapasitas tidak tersedia. Inventaris AMD menyembunyikan kontrol hanya-baca.
+- Piko menampilkan status pengisian yang dilaporkan macOS atau Windows. Aset standalone menambah macOS amd64 dan Windows arm64.
+
 ## 0.2.0
 
 - Beranda tiga tugas, ringkasan berbasis cakupan, detail terpisah, review dengan pilihan awal Kembali, dan ekspor snapshot. Piko ringkas mengikuti pemeriksaan dan hasil.

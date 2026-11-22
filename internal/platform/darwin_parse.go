@@ -75,29 +75,43 @@ func darwinPS(out string, cpus int) []domain.Process {
 	return topNativeProcesses(processes)
 }
 
-var pmsetPercent = regexp.MustCompile(`\s([0-9]{1,3})%;`)
+var pmsetCharge = regexp.MustCompile(`\s([0-9]{1,3})%;\s*([^;]*)`)
 
-func darwinPower(out string) (ac *bool, percent *float64, status domain.Availability) {
-	status = domain.Unknown
+func darwinPower(out string) PowerReading {
+	reading := PowerReading{Availability: domain.Unknown}
 	for line := range strings.SplitSeq(out, "\n") {
-		switch strings.TrimSpace(line) {
+		line = strings.TrimSpace(line)
+		switch line {
 		case "Now drawing from 'AC Power'":
-			value := true
-			ac = &value
+			reading.OnAC = new(true)
 		case "Now drawing from 'Battery Power'":
-			value := false
-			ac = &value
+			reading.OnAC = new(false)
 		}
-		if strings.HasPrefix(strings.TrimSpace(line), "-InternalBattery") {
-			if match := pmsetPercent.FindStringSubmatch(line); match != nil {
-				if value, err := strconv.ParseFloat(match[1], 64); err == nil && goodPercent(value) {
-					percent = &value
-				}
+		if !strings.HasPrefix(line, "-InternalBattery") {
+			continue
+		}
+		match := pmsetCharge.FindStringSubmatch(line)
+		if match == nil {
+			continue
+		}
+		if value, err := strconv.ParseFloat(match[1], 64); err == nil && goodPercent(value) {
+			reading.Percent = &value
+			switch strings.TrimSpace(match[2]) {
+			case "charging":
+				reading.BatteryStatus = "Charging"
+			case "discharging":
+				reading.BatteryStatus = "Discharging"
+			case "charged":
+				reading.BatteryStatus = "Full"
+			case "not charging":
+				reading.BatteryStatus = "Not charging"
+			default:
+				reading.BatteryStatus = ""
 			}
 		}
 	}
-	if ac != nil || percent != nil {
-		status = domain.Available
+	if reading.OnAC != nil || reading.Percent != nil {
+		reading.Availability = domain.Available
 	}
-	return
+	return reading
 }

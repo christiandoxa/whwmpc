@@ -14,19 +14,22 @@ import (
 )
 
 func Scan(ctx context.Context, fsys fs.FS, runner sysrun.Runner) Snapshot {
-	ac, charge, status := platform.ReadPower(ctx, runner)
+	reading := platform.ReadPower(ctx, runner)
 	snapshot := Snapshot{OS: runtime.GOOS, At: time.Now().UTC(), CPUFreqStatus: domain.Unsupported,
-		PowerStatus: status, PowerSource: "unknown", Profiles: InspectProfiles(ctx, fsys, runner)}
-	if ac != nil {
-		if *ac {
+		PowerStatus: reading.Availability, PowerSource: "unknown", Profiles: InspectProfiles(ctx, fsys, runner)}
+	if reading.OnAC != nil {
+		if *reading.OnAC {
 			snapshot.PowerSource = "ac"
 		} else {
 			snapshot.PowerSource = "battery"
 		}
 	}
-	if charge != nil {
-		percent := uint64(*charge)
-		snapshot.Batteries = []Battery{{Percent: &percent}}
+	if reading.Percent != nil || reading.BatteryStatus != "" {
+		battery := Battery{Status: reading.BatteryStatus}
+		if reading.Percent != nil {
+			battery.Percent = new(uint64(*reading.Percent))
+		}
+		snapshot.Batteries = []Battery{battery}
 	}
 	return snapshot
 }
