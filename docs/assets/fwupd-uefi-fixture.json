@@ -1,0 +1,24 @@
+{
+  "backend_package": "2.0.20-1ubuntu2~24.04.2",
+  "capsule_bytes_in_temporary_esp": 4112,
+  "local_test_signature": "SHA256 + PKCS7 verified",
+  "before_simulated_boot": {
+    "cli_exit": 1,
+    "state": "reboot_required",
+    "availability": "partial",
+    "installed": "0.1.50",
+    "fwupd_update_state": 4,
+    "history_device_version": "0.1.50",
+    "history_release_version": "0.1.51"
+  },
+  "after_simulated_boot": {
+    "cli_exit": 0,
+    "state": "verified",
+    "availability": "available",
+    "installed": "0.1.51",
+    "fwupd_update_state": 2,
+    "history_device_version": "0.1.50",
+    "history_release_version": "0.1.51"
+  },
+  "limits": "Native staging with a private test key and direct whwmpc verification. No real LVFS download, whwmpc Apply, hardware flash, or OS reboot."
+}

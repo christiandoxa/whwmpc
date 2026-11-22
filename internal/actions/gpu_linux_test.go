@@ -90,3 +90,50 @@ func TestGPUChangeStopsOnConflictAndClassifiesCancellation(t *testing.T) {
 		t.Fatalf("assumed commit succeeded: %+v", got)
 	}
 }
+
+func TestOverdriveVoltageRequiresCommitWithStagedReadback(t *testing.T) {
+	for _, tc := range []struct {
+		name        string
+		initial     int64
+		desired     int64
+		mode        string
+		commitError error
+		status      Status
+	}{
+		{"apply", -10, -11, "manual", nil, Verified},
+		{"restore", -11, -10, "auto", nil, Verified},
+		{"failed commit", -10, -11, "manual", errors.New("driver rejected commit"), Partial},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			current := gpuFixture(1900, "manual")
+			baseTable := current.Table + "\nVDDGFX_OFFSET: -150mV 0mV\nOD_VDDGFX_OFFSET:\n"
+			current.Table = baseTable + fmt.Sprintf("%dmV", tc.initial)
+			current.Control = hardware.Control{Kind: hardware.VoltageOffset, Current: tc.initial, Unit: "mV", Min: -150, Max: 0}
+			change := hardware.Change{Before: current, Desired: tc.desired, Mode: tc.mode}
+			var writes []gpuWrite
+			stage := fmt.Sprintf("vo %d", tc.desired)
+			step := executeOverdrive(t.Context(), change, func(context.Context) (hardware.Settings, error) { return current, nil },
+				func(_ context.Context, path, value string) attempt {
+					writes = append(writes, gpuWrite{path, value})
+					switch value {
+					case stage:
+						current.Control.Current = tc.desired
+						current.Table = baseTable + fmt.Sprintf("%dmV", tc.desired)
+					case "c":
+						return attempt{started: true, err: tc.commitError}
+					case "auto":
+						current.Mode = value
+					}
+					return attempt{started: true}
+				})
+			want := []gpuWrite{{hardware.OverdriveFile, stage}, {hardware.OverdriveFile, "c"}}
+			if tc.mode == "auto" {
+				want = append(want, gpuWrite{hardware.PerformanceFile, "auto"})
+			}
+			result := verifyGPU(change, current, "fixture read-back", step)
+			if !slices.Equal(writes, want) || result.Status != tc.status || (result.AfterIdentity != "") != (tc.status == Verified) {
+				t.Fatalf("voltages %+v, steps %v, result %+v", change, writes, result)
+			}
+		})
+	}
+}

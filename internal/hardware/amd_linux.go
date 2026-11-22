@@ -50,14 +50,14 @@ func readAMD(pciRoot, pci string) (amdState, error) {
 	if err != nil {
 		return amdState{}, err
 	}
-	mode, err := readSys(filepath.Join(dir, PerformanceFile))
+	mode, err := readAMDControl(filepath.Join(dir, PerformanceFile))
 	if err != nil {
 		return amdState{}, err
 	}
 	if mode != "auto" && mode != "manual" {
 		return amdState{}, fmt.Errorf("mode daya GPU %q di luar mode auto dan manual", mode)
 	}
-	table, err := readSys(filepath.Join(dir, OverdriveFile))
+	table, err := readAMDControl(filepath.Join(dir, OverdriveFile))
 	if err != nil {
 		return amdState{}, err
 	}
@@ -66,6 +66,17 @@ func readAMD(pciRoot, pci string) (amdState, error) {
 		return amdState{}, err
 	}
 	return amdState{PCI: pci, Device: device, Subsystem: subVendor + "/" + subDevice, Mode: mode, Table: table, Dir: canonical}, nil
+}
+
+func readAMDControl(path string) (string, error) {
+	info, err := os.Lstat(path)
+	if err != nil {
+		return "", err
+	}
+	if !info.Mode().IsRegular() || info.Mode().Perm()&0200 == 0 {
+		return "", fmt.Errorf("driver tidak menyediakan kontrol %s yang dapat ditulis administrator", filepath.Base(path))
+	}
+	return readSys(path)
 }
 
 func (a amdState) controls() []Control {

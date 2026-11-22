@@ -161,4 +161,25 @@ func TestLinuxScanPreservesBackendCoverage(t *testing.T) {
 	if snapshot.Devices[0].Availability != domain.DependencyMissing {
 		t.Fatalf("missing NVIDIA tool yielded %+v", snapshot.Devices[0])
 	}
+	for _, name := range []string{OverdriveFile, PerformanceFile} {
+		t.Run(name+" read-only", func(t *testing.T) {
+			path := filepath.Join(card, name)
+			if err := os.Chmod(path, 0400); err != nil {
+				t.Fatal(err)
+			}
+			t.Cleanup(func() {
+				if err := os.Chmod(path, 0600); err != nil {
+					t.Error(err)
+				}
+			})
+			device := scanAt(t.Context(), &gpuRunner{lookErr: os.ErrNotExist}, root).Devices[1]
+			if device.Availability != domain.Available || device.Metrics.TemperatureC == nil ||
+				device.TuningAvailability != domain.Unsupported || len(device.Controls) != 0 || !strings.Contains(device.TuningDetail, name) {
+				t.Fatalf("read-only attribute affected availability incorrectly: %+v", device)
+			}
+			if _, err := amdSettings(root, CoreMax, pci); err == nil {
+				t.Fatal("read-only attribute accepted by the planner")
+			}
+		})
+	}
 }

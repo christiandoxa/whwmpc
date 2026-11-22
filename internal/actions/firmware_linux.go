@@ -52,7 +52,7 @@ func checkFirmwarePower(ctx context.Context, p linuxPlatform) error {
 		return errors.New("daya baterai di bawah persyaratan fwupd atau pembacaan daya tidak valid")
 	}
 	// fwupd reports 101 for unknown charge. A desktop without a battery can still be on AC.
-	if charge == 101 && minimum <= 100 {
+	if charge == 101 {
 		battery, err := busProperty(ctx, p, "org.freedesktop.UPower", "/org/freedesktop/UPower/devices/DisplayDevice", "IsPresent")
 		if err != nil || battery != "b false" {
 			return errors.New("kapasitas baterai sistem belum dapat diverifikasi")

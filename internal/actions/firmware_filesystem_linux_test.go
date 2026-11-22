@@ -31,9 +31,12 @@ func TestFirmwarePowerRequiresACAndAdmissibleCharge(t *testing.T) {
 	}{
 		{"u 95", "u 40", "b false", "b true", true},
 		{"u 101", "u 40", "b false", "b false", true},
+		{"u 101", "u 101", "b false", "b false", true},
 		{"u 39", "u 40", "b false", "b true", false},
 		{"u 101", "u 40", "b false", "b true", false},
 		{"u 101", "u 40", "b false", "", false},
+		{"u 101", "u 101", "b false", "b true", false},
+		{"u 101", "u 101", "b false", "", false},
 		{"u 95", "u 40", "b true", "b true", false},
 	} {
 		host := linuxPlatform{runner: firmwarePowerRunner{
