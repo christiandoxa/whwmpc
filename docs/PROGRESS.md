@@ -82,3 +82,7 @@ Satu layar review memperlihatkan Kembali sebagai pilihan awal dan aksi spesifik 
 ## Revamp UX 4 · Bukti PTY dan inventaris backlog
 
 Review sebelum/sesudah 80×24, beranda 120×36, dan rekaman tiga alur demo memakai binari yang dibangun dari sumber. Smoke PTY menelusuri pemeriksaan, detail, hasil, diagnosis lambat, serta pembatalan pada review cleanup. Daftar cakupan dan status pekerjaan lanjutan dikelola di [Backlog](BACKLOG.md).
+
+## Backlog G · Benchmark dan stress
+
+Jalur CLI/TUI memisahkan CPU, stress dengan sensor, pembacaan file reguler, dan penulisan sementara. Tes clock, cap, pembatalan, sensor hilang, dan file sementara lulus. Uji stress pada hardware development tetap opt-in.

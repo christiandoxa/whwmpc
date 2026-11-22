@@ -56,6 +56,9 @@ func (m *Model) launch(req Request, pose mascot.Pose) tea.Cmd {
 	m.busy, m.cancelling, m.workName = true, false, ""
 	m.activity = pose
 	switch req.Choice.Kind {
+	case "benchmark-run":
+		m.runningAction = true
+		m.workName = m.tr(Words{"Menjalankan beban yang dipilih", "Running the selected workload"})
 	case "export":
 		m.runningAction = true // retain the file result if cancellation arrives after the write
 		m.workName = m.tr(Words{"Mengumpulkan bukti laporan", "Collecting report evidence"})

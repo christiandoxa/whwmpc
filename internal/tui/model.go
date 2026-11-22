@@ -93,6 +93,7 @@ type screenState struct {
 	choice, scroll int
 	reviewThrough  int
 	exportType     string
+	pendingOutput  string
 }
 
 type Model struct {
@@ -215,7 +216,7 @@ func (m *Model) start(intent assistant.Intent, choice Choice) tea.Cmd {
 	case "more":
 		m.remember()
 		m.screenState = screenState{screen: more}
-		for _, id := range []assistant.Intent{assistant.Storage, assistant.Trim, assistant.Power, assistant.History, assistant.Report, assistant.Settings} {
+		for _, id := range []assistant.Intent{assistant.Storage, assistant.Trim, assistant.Power, assistant.History, assistant.Report, assistant.Settings, assistant.Benchmark} {
 			m.page.Choices = append(m.page.Choices, Choice{m.tr(menuNames[id]), "navigate", string(id)})
 		}
 		m.page.Choices = append(m.page.Choices, Choice{m.tr(Words{"Tanya sesuatu", "Ask a question"}), "ask", ""})
@@ -252,6 +253,23 @@ func (m *Model) start(intent assistant.Intent, choice Choice) tea.Cmd {
 		page.Meaning = []string{m.tr(Words{"Gunakan hasil yang sedang dibuka.", "Export the results already open."})}
 		m.page = page
 		return nil
+	case "bench-review":
+		m.remember()
+		m.screen, m.choice, m.scroll = taskQuestion, 0, 0
+		duration := m.tr(Words{"3 detik, satu worker", "3 seconds, one worker"})
+		if choice.Value == "stress" {
+			duration = m.tr(Words{"15 detik, satu worker, berhenti pada 85 °C atau saat sensor hilang", "15 seconds, one worker, stops at 85 °C or if the sensor is lost"})
+		}
+		m.page = Page{Found: []string{m.tr(Words{"Jalankan pengujian CPU?", "Start the CPU workload?"}), duration},
+			Choices: []Choice{{m.tr(Words{"Kembali", "Back"}), "back", ""}, {m.tr(Words{"Mulai pengujian", "Start workload"}), "benchmark-run", choice.Value}}}
+		return nil
+	case "bench-path":
+		m.remember()
+		m.screen = fileInput
+		m.exportType = choice.Value
+		m.input.Placeholder = m.tr(Words{"Path file atau direktori yang diuji", "Path to the file or directory to test"})
+		m.input.Reset()
+		return m.input.Focus()
 	case "export-select":
 		m.remember()
 		m.screen = fileInput
@@ -276,11 +294,15 @@ func (m *Model) start(intent assistant.Intent, choice Choice) tea.Cmd {
 	if choice.Kind != "rescan" && choice.Kind != "apply" && choice.Kind != "workload" {
 		m.remember()
 	}
-	req := Request{Intent: intent, Choice: choice, Overview: m.overview, Plan: plan, Findings: m.page.Findings,
+	req := Request{Intent: intent, Choice: choice, Output: m.pendingOutput, Overview: m.overview, Plan: plan, Findings: m.page.Findings,
 		Language: m.options.Language, Workload: m.options.Workload}
 	m.screenState = screenState{screen: results, active: intent}
 	if choice.Kind == "" && intent == assistant.Settings {
 		m.settingsPage()
+		return nil
+	}
+	if choice.Kind == "" && intent == assistant.Benchmark {
+		m.page = benchmarkPage(m.options.Language)
 		return nil
 	}
 	if choice.Kind == "" && intent == assistant.Report {
@@ -506,6 +528,15 @@ func (m *Model) submit() tea.Cmd {
 	m.input.Reset()
 	if m.screen == fileInput {
 		format := m.exportType
+		if format == "read" || format == "write" {
+			m.screen = taskQuestion
+			m.page = Page{Found: []string{m.tr(Words{"Uji lokasi ini?", "Test this location?"}), domain.SafeText(value),
+				m.tr(Words{"16 MiB, maksimal 30 detik.", "16 MiB, up to 30 seconds."})},
+				Choices: []Choice{{m.tr(Words{"Kembali", "Back"}), "back", ""}, {m.tr(Words{"Mulai pengujian", "Start workload"}), "benchmark-run", format}}}
+			m.choice, m.scroll = 0, 0
+			m.pendingOutput = value
+			return nil
+		}
 		m.screen = results
 		return m.launch(Request{Intent: assistant.Report, Choice: Choice{Kind: "export", Value: format}, Output: value,
 			Overview: m.overview, Snapshot: m.page.Snapshot, Language: m.options.Language}, mascot.Scanning)

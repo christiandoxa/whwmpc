@@ -18,11 +18,13 @@ const (
 	History   Intent = "history"
 	Settings  Intent = "settings"
 	Report    Intent = "report"
+	Benchmark Intent = "benchmark"
 )
 
-var Menu = []Intent{Overview, Slow, Storage, Trim, Power, Cleanup, Recommend, History, Report, Settings}
+var Menu = []Intent{Overview, Slow, Storage, Trim, Power, Cleanup, Recommend, History, Report, Settings, Benchmark}
 
 var phrases = map[Intent][]string{
+	Benchmark: {"benchmark", "stress test", "uji kinerja"},
 	Overview:  {"overview", "check everything", "system status", "health check", "keseluruhan", "ringkasan", "kondisi komputer"},
 	Slow:      {"slow", "lag", "sluggish", "bottleneck", "lambat", "lemot", "macet"},
 	Storage:   {"ssd", "nvme", "smart", "drive health", "kesehatan disk"},

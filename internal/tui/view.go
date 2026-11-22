@@ -71,6 +71,9 @@ func (m Model) choices() []Choice {
 		return append(choices, Choice{m.tr(Words{"Kembali", "Back"}), "back", ""})
 	}
 	choices := slices.Clone(m.page.Choices)
+	if m.page.Snapshot != nil {
+		choices = append(choices, Choice{m.tr(Words{"Simpan hasil ini", "Save these results"}), "save-snapshot", ""})
+	}
 	if len(m.page.Findings) > 0 || len(m.page.Evidence) > 0 {
 		choices = append(choices, Choice{m.tr(Words{"Lihat semua hasil", "View all results"}), "details", ""})
 	}
@@ -122,7 +125,14 @@ func (m Model) body(w int) []string {
 		title(l("Apa yang ingin kamu tanyakan?", "What would you like to ask?"))
 		text(m.input.View(), m.palette.text)
 	case fileInput:
-		title(l("Simpan ke file mana?", "Where should I save the file?"))
+		switch m.exportType {
+		case "read":
+			title(l("File mana yang ingin dibaca?", "Which file should be read?"))
+		case "write":
+			title(l("Direktori mana untuk file sementara?", "Which directory should hold the temporary file?"))
+		default:
+			title(l("Simpan ke file mana?", "Where should I save the file?"))
+		}
 		text(m.input.View(), m.palette.text)
 	case scanning, executing:
 		label := m.workName

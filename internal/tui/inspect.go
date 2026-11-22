@@ -33,6 +33,9 @@ func Inspector(scanner *inspection.Scanner, store state.Store, maintenance *work
 		if page, handled := previewAction(ctx, maintenance, req); handled {
 			return page
 		}
+		if req.Choice.Kind == "benchmark-run" {
+			return runBenchmark(ctx, scanner, store, req, maintenance.Demo)
+		}
 		if req.Choice.Kind == "export" {
 			return exportReport(ctx, scanner, store, req, maintenance.Demo)
 		}
