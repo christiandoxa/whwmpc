@@ -37,7 +37,7 @@ func actionCommand(ctx context.Context, args []string, m *workflow.Maintenance, 
 	}
 	switch cmd {
 	case "clean":
-		dryRun = flags.Bool("dry-run", false, "inventaris dan pratinjau cache APT")
+		dryRun = flags.Bool("dry-run", false, "inventaris dan pratinjau cache paket")
 	case "power":
 		target = flags.String("plan", "", "profil yang ingin ditinjau")
 	case "trim":
@@ -75,7 +75,11 @@ func actionCommand(ctx context.Context, args []string, m *workflow.Maintenance, 
 		}
 		var preview *actions.Plan
 		if *writePlan != "" {
-			plan, err = m.Preview(ctx, actions.CleanAPT, "", true)
+			kind := inventory.Kind
+			if kind == "" {
+				kind = actions.CleanAPT
+			}
+			plan, err = m.Preview(ctx, kind, "", true)
 			if err != nil {
 				return printError(stderr, err), true
 			}

@@ -30,7 +30,11 @@ func readCommand(ctx context.Context, args []string, source *inspection.Scanner,
 	case "doctor":
 		d := source.Doctor(ctx)
 		cleanup, _ := maintenance.Cleanup(ctx)
-		d.Capabilities["apt_cache_cleanup"] = cleanup.Availability
+		d.Capabilities["package_cache_cleanup"] = cleanup.Availability
+		d.Capabilities["apt_cache_cleanup"] = domain.Unsupported
+		if cleanup.Kind == "" || cleanup.Kind == actions.CleanAPT {
+			d.Capabilities["apt_cache_cleanup"] = cleanup.Availability
+		}
 		switch {
 		case demo || d.Overview.OS != "linux":
 			d.Capabilities["trim_manual_action"] = domain.Unsupported

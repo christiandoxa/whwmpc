@@ -25,6 +25,8 @@ const (
 	TrimMount        = "trim-mount"
 	EnableTrimTimer  = "enable-trim-timer"
 	CleanAPT         = "clean-apt"
+	CleanPacman      = "clean-pacman"
+	CleanDNF         = "clean-dnf5"
 	FirmwareUpdate   = "firmware-update"
 	FirmwareRefresh  = "firmware-refresh"
 	FilesystemRepair = "filesystem-repair"
@@ -132,10 +134,11 @@ type prepared struct {
 }
 
 type attempt struct {
-	output  []byte
-	started bool
-	stopped bool
-	err     error
+	output   []byte
+	exitCode int
+	started  bool
+	stopped  bool
+	err      error
 }
 
 func New() *Service {
@@ -159,7 +162,7 @@ func (s *Service) TrimTargets(ctx context.Context) ([]TrimTarget, error) {
 
 func (s *Service) Preview(ctx context.Context, kind, target string) (Plan, error) {
 	switch kind {
-	case PowerProfile, TrimMount, EnableTrimTimer, CleanAPT, FirmwareUpdate, FirmwareRefresh, FilesystemRepair, hardware.PowerLimit, hardware.CoreMax, hardware.VoltageOffset:
+	case PowerProfile, TrimMount, EnableTrimTimer, CleanAPT, CleanPacman, CleanDNF, FirmwareUpdate, FirmwareRefresh, FilesystemRepair, hardware.PowerLimit, hardware.CoreMax, hardware.VoltageOffset:
 		return s.preview(ctx, kind, target, "", "")
 	default:
 		return Plan{}, errors.New("tindakan tidak dikenal")
@@ -304,7 +307,7 @@ func (s *Service) ExecuteWithProgress(ctx context.Context, plan Plan, confirmedI
 
 func (s *Service) validate(plan Plan, confirmedID string) error {
 	switch plan.Kind {
-	case PowerProfile, TrimMount, EnableTrimTimer, CleanAPT, FirmwareUpdate, FirmwareRefresh, FilesystemRepair, hardware.PowerLimit, hardware.CoreMax, hardware.VoltageOffset:
+	case PowerProfile, TrimMount, EnableTrimTimer, CleanAPT, CleanPacman, CleanDNF, FirmwareUpdate, FirmwareRefresh, FilesystemRepair, hardware.PowerLimit, hardware.CoreMax, hardware.VoltageOffset:
 		if plan.Restores != "" {
 			return errors.New("jenis rencana tidak valid untuk pemulihan")
 		}

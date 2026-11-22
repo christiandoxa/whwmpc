@@ -215,7 +215,7 @@ func publicSource(value string) string {
 
 func publicAction(kind string) string {
 	switch kind {
-	case actions.PowerProfile, actions.TrimMount, actions.EnableTrimTimer, actions.CleanAPT, actions.RestorePower, actions.RestoreTrimTimer,
+	case actions.PowerProfile, actions.TrimMount, actions.EnableTrimTimer, actions.CleanAPT, actions.CleanPacman, actions.CleanDNF, actions.RestorePower, actions.RestoreTrimTimer,
 		actions.FirmwareUpdate, actions.FirmwareRefresh, actions.FilesystemRepair,
 		hardware.PowerLimit, hardware.CoreMax, hardware.VoltageOffset, hardware.RestorePowerLimit, hardware.RestoreCoreMax, hardware.RestoreVoltageOffset,
 		"rescan", "navigate", "workload":

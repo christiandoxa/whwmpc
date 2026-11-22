@@ -47,6 +47,10 @@ func (p linuxPlatform) prepare(ctx context.Context, kind, target string) (prepar
 		return p.filesystemRepair(ctx, target)
 	case CleanAPT:
 		return p.apt(ctx, target)
+	case CleanPacman:
+		return p.cleanPacman(ctx, target)
+	case CleanDNF:
+		return p.cleanDNF(ctx, target)
 	case hardware.PowerLimit, hardware.CoreMax, hardware.VoltageOffset, hardware.RestorePowerLimit, hardware.RestoreCoreMax, hardware.RestoreVoltageOffset:
 		return p.gpu(ctx, kind, target)
 	default:
@@ -83,6 +87,8 @@ var executablePaths = map[string][]string{
 	"env":         {"/usr/bin/env", "/bin/env"},
 	"find":        {"/usr/bin/find", "/bin/find"},
 	"dd":          {"/usr/bin/dd", "/bin/dd"},
+	"dnf5":        {"/usr/bin/dnf5"},
+	"flock":       {"/usr/bin/flock", "/bin/flock"},
 	"nvidia-smi":  {"/usr/bin/nvidia-smi"},
 	"fstrim":      {"/usr/sbin/fstrim", "/sbin/fstrim"},
 	"fwupdmgr":    {"/usr/bin/fwupdmgr"},
@@ -197,6 +203,7 @@ type invocation struct {
 	spec      []string
 	exe       executable
 	sudo      executable
+	children  []executable
 	privilege string
 }
 
@@ -222,7 +229,16 @@ func newInvocation(name string, args []string, needsRoot bool) (invocation, erro
 	return inv, nil
 }
 
-func (inv invocation) identity() string { return digest(inv.exe.id, inv.sudo.id) }
+func (inv invocation) identity() string {
+	if len(inv.children) == 0 {
+		return digest(inv.exe.id, inv.sudo.id)
+	}
+	ids := make([]fileID, len(inv.children))
+	for i, child := range inv.children {
+		ids[i] = child.id
+	}
+	return digest(inv.exe.id, inv.sudo.id, ids)
+}
 
 func (inv invocation) run(ctx context.Context, timeout time.Duration) attempt {
 	return inv.runInput(ctx, timeout, nil)
@@ -233,6 +249,7 @@ func (inv invocation) runInput(ctx context.Context, timeout time.Duration, stdin
 	if inv.privilege == Sudo {
 		paths = append(paths, inv.sudo)
 	}
+	paths = append(paths, inv.children...)
 	for _, expected := range paths {
 		current, err := trustedExecutable(expected.path)
 		if err != nil || current != expected {
@@ -331,7 +348,7 @@ func runInput(ctx context.Context, timeout time.Duration, path string, args []st
 	case errors.As(err, &exitErr) && exit >= 0:
 		err = nil
 	}
-	return attempt{output: stdout.buffer.Bytes(), started: true, stopped: ctx.Err() != nil, err: err}, stderr.buffer.Bytes(), exit
+	return attempt{output: stdout.buffer.Bytes(), exitCode: exit, started: true, stopped: ctx.Err() != nil, err: err}, stderr.buffer.Bytes(), exit
 }
 
 func boolPointer(value bool) *bool { return &value }

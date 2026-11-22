@@ -1,0 +1,39 @@
+name: Native package cache
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  cache:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - distro: arch
+            image: archlinux@sha256:d4594bb2300cba11f41c2f27923eb56f63d9988909c402f9c95517d1e362c899
+          - distro: fedora
+            image: fedora@sha256:15da97ed9aa94dd3d92c3925eb89520f6c80e07ea7ee24cba848d1f8b6912b3e
+    env:
+      GOTOOLCHAIN: local
+      CGO_ENABLED: '0'
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-go@v7.1.0
+        with:
+          go-version: '1.27.4'
+      - run: go test -c -o "$RUNNER_TEMP/cache.test" ./internal/actions
+      - name: Exercise native cleaner on a fixture cache
+        env:
+          DISTRO: ${{ matrix.distro }}
+          IMAGE: ${{ matrix.image }}
+        run: |
+          docker run --rm --network none \
+            -e "WHWMPC_TEST_CACHE_CONTAINER=$DISTRO" \
+            --mount "type=bind,src=$RUNNER_TEMP/cache.test,dst=/cache.test,readonly" \
+            "$IMAGE" /cache.test -test.v -test.run '^TestNativePackageManagerContainer$'

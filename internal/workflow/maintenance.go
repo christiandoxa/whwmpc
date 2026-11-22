@@ -58,7 +58,7 @@ func (m *Maintenance) signer(persist bool) (*actions.Service, [32]byte, error) {
 func (m *Maintenance) Cleanup(ctx context.Context) (actions.Cleanup, error) {
 	if m.Demo {
 		return actions.Cleanup{
-			Availability: domain.Available, Category: "APT (fixture)",
+			Kind: actions.CleanAPT, Availability: domain.Available, Category: "APT (fixture)",
 			Scope:      []string{"/var/cache/apt/archives", "/var/cache/apt/archives/partial", "/var/lib/apt/lists/partial", "pkgcache.bin", "srcpkgcache.bin"},
 			KnownBytes: 376 << 20, KnownFiles: 19, Impact: "Fixture cache removal may require downloading packages again.",
 		}, nil

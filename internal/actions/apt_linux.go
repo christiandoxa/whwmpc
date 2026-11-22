@@ -213,7 +213,7 @@ func (layout aptLayout) inventory(ctx context.Context) (aptInventory, error) {
 type fileGuard func(string, uint32, bool) (os.FileInfo, error)
 
 func (layout aptLayout) readInventory(ctx context.Context, guard fileGuard, rootUID uint32) (aptInventory, error) {
-	inventory := aptInventory{Cleanup: Cleanup{Availability: domain.Available, Category: "Cache paket APT", Impact: aptImpact}}
+	inventory := aptInventory{Cleanup: Cleanup{Kind: CleanAPT, Availability: domain.Available, Category: "Cache paket APT", Impact: aptImpact}}
 	protected := map[string]bool{}
 	for _, path := range []string{layout.Cache, layout.Archives, layout.State, layout.Lists} {
 		if protected[path] {
@@ -362,21 +362,21 @@ func aptRemoves(name, prefix string) bool {
 	return true
 }
 
-func (p linuxPlatform) cleanup(ctx context.Context) (Cleanup, error) {
+func (p linuxPlatform) aptCleanup(ctx context.Context) (Cleanup, error) {
 	layout, _, err := p.aptLayout(ctx)
 	if err == nil {
 		inventory, err := layout.inventory(ctx)
 		if err == nil {
 			return inventory.Cleanup, nil
 		}
-		return Cleanup{Availability: availability(err), Category: "Cache paket APT", Detail: safeText(err.Error())}, err
+		return cleanupUnavailable(CleanAPT, "Cache paket APT", err), err
 	}
-	return Cleanup{Availability: availability(err), Category: "Cache paket APT", Detail: safeText(err.Error())}, err
+	return cleanupUnavailable(CleanAPT, "Cache paket APT", err), err
 }
 
 func availability(err error) domain.Availability {
 	switch {
-	case errors.Is(err, errAPTUnsupported):
+	case errors.Is(err, errAPTUnsupported), errors.Is(err, errCacheUnsupported):
 		return domain.Unsupported
 	case errors.Is(err, os.ErrPermission):
 		return domain.PermissionRequired

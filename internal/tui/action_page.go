@@ -147,16 +147,17 @@ func (m *Model) cancelCurrent() bool {
 func aimFor(intent assistant.Intent, choice Choice, plan *actions.Plan) mascot.Pose {
 	if choice.Kind == "apply" && plan != nil {
 		switch plan.Kind {
-		case actions.CleanAPT:
+		case actions.CleanAPT, actions.CleanPacman, actions.CleanDNF:
 			return mascot.Cleaning
-		case actions.RestorePower, actions.RestoreTrimTimer:
+		case actions.RestorePower, actions.RestoreTrimTimer, hardware.RestorePowerLimit, hardware.RestoreCoreMax, hardware.RestoreVoltageOffset:
 			return mascot.Restore
 		default:
 			return mascot.Applying
 		}
 	}
 	switch choice.Kind {
-	case actions.PowerProfile, actions.TrimMount, actions.EnableTrimTimer, actions.CleanAPT, "restore":
+	case actions.PowerProfile, actions.TrimMount, actions.EnableTrimTimer, actions.CleanAPT, actions.CleanPacman, actions.CleanDNF,
+		hardware.PowerLimit, hardware.CoreMax, hardware.VoltageOffset, actions.FirmwareUpdate, actions.FirmwareRefresh, actions.FilesystemRepair, "restore":
 		return mascot.Preview
 	default:
 		return poseFor(intent)
@@ -172,7 +173,7 @@ func previewAction(ctx context.Context, m *workflow.Maintenance, req Request) (P
 	}
 
 	switch req.Choice.Kind {
-	case actions.PowerProfile, actions.TrimMount, actions.CleanAPT, actions.EnableTrimTimer, hardware.PowerLimit, hardware.CoreMax, hardware.VoltageOffset, actions.FirmwareUpdate, actions.FirmwareRefresh, actions.FilesystemRepair:
+	case actions.PowerProfile, actions.TrimMount, actions.CleanAPT, actions.CleanPacman, actions.CleanDNF, actions.EnableTrimTimer, hardware.PowerLimit, hardware.CoreMax, hardware.VoltageOffset, actions.FirmwareUpdate, actions.FirmwareRefresh, actions.FilesystemRepair:
 		p, err := m.Preview(ctx, req.Choice.Kind, req.Choice.Value, false)
 		if err != nil {
 			return unavailableAction(err, req.Language), true
@@ -217,7 +218,7 @@ func cancellationPage(lang string, intent assistant.Intent) Page {
 func actionLabel(kind, lang string) string {
 	l := translator(lang)
 	switch kind {
-	case actions.CleanAPT:
+	case actions.CleanAPT, actions.CleanPacman, actions.CleanDNF:
 		return l("Bersihkan cache paket", "Clean package cache")
 	case actions.FirmwareUpdate:
 		return l("Jadwalkan pembaruan firmware", "Schedule firmware update")
@@ -267,7 +268,7 @@ func planPage(plan actions.Plan, lang string) Page {
 		after = l("cache metadata diperbarui", "metadata cache refreshed")
 	case actions.FilesystemRepair:
 		after = l("metadata diperbaiki bila e2fsck menilainya aman; verifikasi ulang", "repair metadata when e2fsck can do so; recheck")
-	case actions.CleanAPT:
+	case actions.CleanAPT, actions.CleanPacman, actions.CleanDNF:
 		after = l("cache paket dalam cakupan dihapus permanen", "package cache in scope is permanently deleted")
 	case actions.EnableTrimTimer:
 		after = l("jadwal aktif", "schedule active")
@@ -385,7 +386,7 @@ func cleanupPage(ctx context.Context, m *workflow.Maintenance, lang string) Page
 		page.Pose = mascot.Broom
 		page.Found = append(page.Found, fmt.Sprintf("%s · %d %s", bytesText(inv.KnownBytes), inv.KnownFiles, l("file teramati", "observed files")))
 		page.Meaning = []string{inv.Impact, l("Paket yang sudah terpasang tetap tersedia. Isi cache yang dihapus perlu diunduh ulang.", "Installed packages stay available. Removed cache contents may need to be downloaded again.")}
-		page.Advice = []string{l("Seluruh kategori cache APT. Penghapusan permanen.", "Entire APT cache category. Permanent deletion.")}
+		page.Advice = []string{l("Seluruh kategori cache yang ditawarkan. Penghapusan permanen.", "Entire displayed cache category. Permanent deletion.")}
 		page.Evidence = append(page.Evidence, inv.Scope...)
 	}
 	if len(inv.Unknown) > 0 {
@@ -396,7 +397,11 @@ func cleanupPage(ctx context.Context, m *workflow.Maintenance, lang string) Page
 		page.Evidence = append(page.Evidence, inv.Detail)
 	}
 	if (m.Demo || m.Available() == nil) && len(inv.Scope) > 0 && (inv.Availability == domain.Available || inv.Availability == domain.Partial) {
-		page.Choices = []Choice{{Label: l("Tinjau seluruh cache APT", "Preview entire APT cache"), Kind: actions.CleanAPT}}
+		kind := inv.Kind
+		if kind == "" {
+			kind = actions.CleanAPT
+		}
+		page.Choices = []Choice{{Label: l("Tinjau cakupan pembersihan", "Review cleanup scope"), Kind: kind}}
 	}
 	if m.Demo {
 		page.Advice = append(page.Advice, l("DEMO · tindakan terkunci.", "DEMO · actions locked."))
