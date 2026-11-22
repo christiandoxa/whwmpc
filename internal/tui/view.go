@@ -13,6 +13,8 @@ import (
 
 	"github.com/christiandoxa/whwmpc/internal/assistant"
 	"github.com/christiandoxa/whwmpc/internal/domain"
+	"github.com/christiandoxa/whwmpc/internal/tui/mascot"
+	"github.com/christiandoxa/whwmpc/internal/tui/motion"
 )
 
 type palette struct {
@@ -44,7 +46,13 @@ func inputStyles(p palette) textinput.Styles {
 	return textinput.Styles{Focused: focused, Blurred: focused, Cursor: textinput.CursorStyle{Blink: false}}
 }
 
-func (m Model) bounds() (w, h int) { return min(138, max(1, m.width)), min(38, max(1, m.height)) }
+func (m Model) bounds() (w, h int) {
+	w, h = min(138, max(1, m.width)), min(38, max(1, m.height))
+	if m.narrow {
+		return min(w, 60), min(h, 18)
+	}
+	return w, h
+}
 
 func (m Model) split() (nav, session, evidence int) {
 	w, h := m.bounds()
@@ -82,7 +90,7 @@ func (m Model) View() tea.View {
 	w, h := m.bounds()
 	var lines []string
 	if w < 43 || h < 14 {
-		lines = []string{"What Happens With My PC", m.tr(copy.fallback), "q / Ctrl+C"}
+		lines = []string{"What Happens With My PC", "Piko " + mascot.Face(m.visual.pose, m.visual.frame, m.options.ASCII), m.tr(copy.fallback), "q / Ctrl+C"}
 		for i := range lines {
 			lines[i] = ansi.Truncate(lines[i], w, "")
 		}
@@ -130,7 +138,7 @@ func (m Model) View() tea.View {
 	if m.focus == inputFocus && y < h {
 		if c := m.input.Cursor(); c != nil {
 			c.Y = y
-			c.X += min(ansi.StringWidth(m.tr(copy.ask))+6, w)
+			c.X = min(c.X+ansi.StringWidth(m.tr(copy.ask))+6, w)
 			v.Cursor = c
 		}
 	}
@@ -145,7 +153,11 @@ func (m Model) symbol(unicode, ascii string) string {
 }
 
 func (m Model) header(w int) []string {
-	title := m.palette.accent.Render("WHAT HAPPENS WITH MY PC")
+	titleStyle := m.palette.accent
+	if m.visual.pose == mascot.Greeting && m.visual.frame < 2 && m.options.Motion == motion.Full {
+		titleStyle = m.palette.secondary
+	}
+	title := titleStyle.Render("WHAT HAPPENS WITH MY PC")
 	host := m.overview.Distro
 	if host == "" {
 		host = m.overview.OS
@@ -156,7 +168,7 @@ func (m Model) header(w int) []string {
 	status := m.palette.secondary.Render(m.tr(copy.ready))
 	if m.busy {
 		status = m.palette.secondary.Render(m.tr(copy.scanning))
-		if !m.options.ReduceMotion {
+		if m.options.Motion == motion.Full {
 			status = m.spinner.View() + " " + status
 		}
 	}
@@ -166,6 +178,9 @@ func (m Model) header(w int) []string {
 	sub := m.palette.muted.Render(m.tr(copy.tagline))
 	if m.options.Demo {
 		sub = m.palette.secondary.Render(m.tr(copy.demo))
+	}
+	if _, _, evidence := m.split(); evidence == 0 {
+		status = m.palette.accent.Render(mascot.Face(m.visual.pose, m.visual.frame, m.options.ASCII)+" Piko") + "   " + status
 	}
 	return []string{place(title, m.palette.muted.Render(host), w), place(sub, status, w)}
 }
@@ -226,9 +241,9 @@ func (m Model) meter(v float64, available bool, width int) string {
 	if !available {
 		return ""
 	}
-	full := int(math.Round(math.Max(0, math.Min(v/100, 1)) * float64(width)))
-	return m.palette.secondary.Render(strings.Repeat(m.symbol("━", "#"), full)) +
-		m.palette.frame.Render(strings.Repeat(m.symbol("━", "-"), width-full))
+	bar := m.meterModel
+	bar.SetWidth(width)
+	return bar.ViewAs(v / 100)
 }
 
 func (m Model) spark(samples []float64) string {
@@ -263,6 +278,9 @@ func (m Model) box(width, height int, title string, lines []string, focus bool) 
 	if focus {
 		border, head = m.palette.accent, m.palette.accent
 	}
+	if title == m.tr(copy.session) && !m.visual.panelUntil.IsZero() {
+		border, head = m.palette.secondary, m.palette.secondary
+	}
 	tl, tr := m.symbol("╭", "+"), m.symbol("╮", "+")
 	bl, br := m.symbol("╰", "+"), m.symbol("╯", "+")
 	h, v := m.symbol("─", "-"), border.Render(m.symbol("│", "|"))
@@ -284,7 +302,11 @@ func (m Model) navPanel(width int) string {
 		name := m.tr(menuNames[intent])
 		line := "  " + name
 		if m.selected == i {
-			line = m.palette.selected.Render(m.symbol("›", ">") + " " + name)
+			style := m.palette.selected
+			if !m.visual.focusUntil.IsZero() && m.focus == menuFocus {
+				style = m.palette.secondary
+			}
+			line = style.Render(m.symbol("›", ">") + " " + name)
 		} else if m.active == intent {
 			line = m.palette.accent.Render(m.symbol("·", "*") + " " + name)
 		}
@@ -310,7 +332,7 @@ func (m Model) sessionPanel(width int) string {
 		visible = append(visible, "")
 	}
 	visible = append(visible, action)
-	return m.box(width, height, m.tr(copy.session), visible, m.focus == pageFocus)
+	return m.box(width, height, m.tr(copy.session), visible, m.focus == pageFocus || !m.visual.panelUntil.IsZero())
 }
 
 func (m Model) sessionLines(w int) []string {
@@ -337,6 +359,7 @@ func (m Model) sessionLines(w int) []string {
 			"Tab / Shift+Tab · " + m.tr(Words{"pindah fokus", "change focus"}),
 			"Enter · " + m.tr(Words{"buka atau lanjut", "open or continue"}),
 			"/ · " + m.tr(copy.palette),
+			"m · " + m.tr(Words{"atur mode gerak", "change motion mode"}),
 			"d · " + m.tr(copy.details),
 			"r · " + m.tr(Words{"periksa ulang", "scan again"}),
 			"Esc · " + m.tr(Words{"kembali", "back"}),
@@ -348,23 +371,25 @@ func (m Model) sessionLines(w int) []string {
 			entries = []string{m.tr(copy.needsData)}
 		}
 		section(copy.details, entries)
-	case m.overview.CapturedAt.IsZero():
+	case m.overview.CapturedAt.IsZero() && !m.options.Gallery:
 		add(m.palette.text.Bold(true).Render(m.tr(copy.greeting)))
 		add(m.palette.muted.Render(m.tr(copy.initial)))
 		add(m.palette.secondary.Render(m.tr(copy.waiting)))
 	default:
-		if m.active == assistant.Overview && m.page.Availability != domain.Unknown {
+		if m.question != "" && !m.options.Gallery {
+			add(m.palette.secondary.Render(m.tr(Words{"Kamu", "You"}) + " › " + domain.SafeText(m.question)))
+		}
+		if m.active == assistant.Overview && m.page.Availability != domain.Unknown && !m.options.Gallery {
 			add(m.palette.text.Bold(true).Render(m.tr(copy.greeting)))
 			add("")
 		}
 		if m.busy && m.page.Availability == "" {
-			add(m.palette.secondary.Render(m.tr(copy.waiting)))
+			add(m.palette.secondary.Render(displayStage(m.activity, m.options.Language)))
 		}
 		section(copy.found, m.page.Found)
 		section(copy.meaning, m.page.Meaning)
 		section(copy.advice, m.page.Advice)
 		if len(m.page.Choices) > 0 {
-			section(copy.choices, nil)
 			add(m.palette.muted.Render(m.tr(copy.choices) + " · " + m.tr(copy.choicesHint)))
 		}
 	}
@@ -376,7 +401,16 @@ func (m Model) evidencePanel(width int) string {
 	if len(override) == 0 {
 		override = overviewPage(m.overview, m.options.Language).Evidence
 	}
-	lines := []string{""}
+	name := m.palette.accent.Render("Piko")
+	lines := []string{name}
+	style := m.palette.secondary
+	if m.visual.pose == mascot.Critical || m.visual.pose == mascot.Warning || m.visual.pose == mascot.Error {
+		style = m.palette.alert
+	}
+	for _, line := range mascot.Render(m.visual.pose, m.visual.frame, m.options.ASCII) {
+		lines = append(lines, "  "+style.Render(line))
+	}
+	lines = append(lines, "")
 	for _, evidence := range override {
 		lines = append(lines, strings.Split(ansi.Wrap(m.palette.muted.Render(domain.SafeText(evidence)), width-4, ""), "\n")...)
 	}
@@ -393,6 +427,12 @@ func (m Model) prompt(width int) string {
 
 func (m Model) footer(w int) string {
 	var text string
+	if m.toast != "" {
+		return m.palette.secondary.Render(ansi.Truncate(m.toast, w, m.symbol("…", ".")))
+	}
+	if m.options.Gallery && m.focus != inputFocus {
+		return m.palette.muted.Render(ansi.Truncate("←/→  Enter  Esc   m · "+string(m.options.Motion)+"   n · "+m.tr(Words{"ukuran ringkas", "narrow"})+"   q", w, ""))
+	}
 	switch m.focus {
 	case inputFocus:
 		text = m.tr(Words{"Enter kirim   Esc kembali   Tab fokus", "Enter send   Esc back   Tab focus"})

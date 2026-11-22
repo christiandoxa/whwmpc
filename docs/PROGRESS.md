@@ -14,3 +14,10 @@
 - Windows/macOS menyediakan identitas runtime dan jumlah CPU logis. Data lain berstatus unsupported.
 - Gate lokal mencakup gofmt, vet, test, race, build, dan fixture untuk sampling, pergantian PID, input fokus, serta layout.
 - Berikutnya motion Piko dan integrasi collector SMART, TRIM, CPUFreq, dan daya.
+
+## 2a · Motion dan galeri Piko
+
+- Piko memakai pose terminal berukuran tetap, timer satu deadline, ekspresi fokus/input, indikator scan, serta aksen panel tanpa menggeser layout.
+- Tiga mode gerak, alias off, preferensi lokal, ASCII, dan galeri dengan enam skenario fixture. Tidak ada aksi host di galeri.
+- Gate lokal mencakup gofmt, vet, test, race, build, ukuran sel pose, generasi tick, resize, fokus, dan save preferensi berulang.
+- Berikutnya hubungan status collector dan lifecycle aksi dengan pose yang sesuai.

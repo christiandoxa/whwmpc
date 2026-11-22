@@ -23,6 +23,7 @@ var menuNames = map[assistant.Intent]Words{
 	assistant.Cleanup:   {"Bersihkan ruang", "Free up space"},
 	assistant.Recommend: {"Rekomendasi", "Recommendations"},
 	assistant.History:   {"Riwayat", "History"},
+	assistant.Settings:  {"Pengaturan", "Settings"},
 }
 
 var statusNames = map[domain.Availability]Words{

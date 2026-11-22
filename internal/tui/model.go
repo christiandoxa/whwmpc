@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"charm.land/bubbles/v2/progress"
 	"charm.land/bubbles/v2/spinner"
 	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
@@ -13,11 +14,16 @@ import (
 	"github.com/christiandoxa/whwmpc/internal/assistant"
 	"github.com/christiandoxa/whwmpc/internal/domain"
 	"github.com/christiandoxa/whwmpc/internal/platform"
+	"github.com/christiandoxa/whwmpc/internal/tui/mascot"
+	"github.com/christiandoxa/whwmpc/internal/tui/motion"
 )
 
 type Options struct {
-	Language, Theme           string
-	Demo, ASCII, ReduceMotion bool
+	Language, Theme      string
+	Demo, ASCII, Gallery bool
+	Motion               motion.Mode
+	Scheduler            *motion.Scheduler
+	SaveMotion           func(motion.Mode) error
 }
 
 type Choice struct {
@@ -28,6 +34,7 @@ type Choice struct {
 
 type Page struct {
 	Availability     domain.Availability
+	Pose             mascot.Pose
 	Found, Meaning   []string
 	Advice, Evidence []string
 	Choices          []Choice
@@ -51,30 +58,46 @@ const (
 )
 
 type Model struct {
-	ctx       context.Context
-	source    platform.Provider
-	inspect   Inspect
-	options   Options
-	palette   palette
-	input     textinput.Model
-	spinner   spinner.Model
-	width     int
-	height    int
-	focus     focus
-	selected  int
-	active    assistant.Intent
-	queued    assistant.Intent
-	page      Page
-	overview  domain.Overview
-	busy      bool
-	help      bool
-	detail    bool
-	palSearch bool
-	scroll    int
-	choice    int
+	ctx           context.Context
+	source        platform.Provider
+	inspect       Inspect
+	options       Options
+	palette       palette
+	input         textinput.Model
+	spinner       spinner.Model
+	meterModel    progress.Model
+	width         int
+	height        int
+	focus         focus
+	selected      int
+	active        assistant.Intent
+	queued        assistant.Intent
+	page          Page
+	overview      domain.Overview
+	busy          bool
+	help          bool
+	detail        bool
+	palSearch     bool
+	scroll        int
+	choice        int
+	now           func() time.Time
+	scheduler     *motion.Scheduler
+	visual        presentation
+	activity      mascot.Pose
+	refreshing    bool
+	question      string
+	toast         string
+	stage         int
+	scenario      string
+	narrow        bool
+	motionSaving  bool
+	motionPending motion.Mode
 }
 
 func New(ctx context.Context, source platform.Provider, inspect Inspect, opts Options) Model {
+	if !opts.Motion.Valid() {
+		opts.Motion = motion.Full
+	}
 	colors := newPalette(opts.Theme)
 	field := textinput.New()
 	field.Prompt = ""
@@ -86,31 +109,43 @@ func New(ctx context.Context, source platform.Provider, inspect Inspect, opts Op
 	if !opts.ASCII {
 		spin.Spinner = spinner.MiniDot
 	}
-	return Model{
-		ctx: ctx, source: source, inspect: inspect, options: opts, palette: colors,
-		input: field, spinner: spin, width: 80, height: 24, active: assistant.Overview, busy: true,
+	full, empty := '━', '╌'
+	if opts.ASCII {
+		full, empty = '#', '-'
 	}
+	meter := progress.New(progress.WithoutPercentage(), progress.WithFillCharacters(full, empty),
+		progress.WithColors(colors.secondary.GetForeground()))
+	meter.EmptyColor = colors.frame.GetForeground()
+	m := Model{
+		ctx: ctx, source: source, inspect: inspect, options: opts, palette: colors,
+		input: field, spinner: spin, meterModel: meter, width: 80, height: 24, active: assistant.Overview, busy: true,
+		now: time.Now, scheduler: opts.Scheduler, activity: mascot.Scanning,
+	}
+	if opts.Gallery {
+		m.focus = pageFocus
+		m.galleryPage()
+	} else {
+		m.show(mascot.Greeting, mascot.Scanning, false)
+	}
+	return m
 }
 
 type overviewMsg struct{ data domain.Overview }
 type replyMsg struct{ page Page }
 type refreshMsg struct{}
+type motionSavedMsg struct {
+	mode motion.Mode
+	err  error
+}
 
 func (m Model) Init() tea.Cmd {
-	return tea.Batch(m.sample(), m.animate(), m.nextRefresh())
+	return tea.Batch(m.sample(), m.nextRefresh())
 }
 
 func (m Model) sample() tea.Cmd {
 	return func() tea.Msg {
 		return overviewMsg{m.source.Overview(m.ctx)}
 	}
-}
-
-func (m Model) animate() tea.Cmd {
-	if m.options.ReduceMotion {
-		return nil
-	}
-	return m.spinner.Tick
 }
 
 func (m Model) nextRefresh() tea.Cmd {
@@ -124,6 +159,7 @@ func (m Model) tr(w Words) string { return w.Text(m.options.Language) }
 
 func (m *Model) setFocus(f focus) tea.Cmd {
 	m.focus = f
+	m.showingFocus()
 	if f == inputFocus {
 		return m.input.Focus()
 	}
@@ -134,6 +170,13 @@ func (m *Model) setFocus(f focus) tea.Cmd {
 }
 
 func (m *Model) start(intent assistant.Intent, choice Choice) tea.Cmd {
+	if strings.HasPrefix(choice.Kind, "gallery-") && m.options.Gallery {
+		m.galleryChoice(choice)
+		return nil
+	}
+	if choice.Kind == "motion" {
+		return m.setMotion(motion.Mode(choice.Value))
+	}
 	if m.busy {
 		if choice.Kind == "" {
 			m.queued = intent
@@ -146,25 +189,51 @@ func (m *Model) start(intent assistant.Intent, choice Choice) tea.Cmd {
 	}
 	if choice.Kind == "" && intent == assistant.Overview {
 		m.page = overviewPage(m.overview, m.options.Language)
+		m.showReply()
 		return nil
 	}
 	if m.inspect == nil && choice.Kind == "" && intent == assistant.Slow {
 		m.page = overviewPage(m.overview, m.options.Language)
+		m.showReply()
+		return nil
+	}
+	if choice.Kind == "" && intent == assistant.Settings {
+		m.settingsPage()
 		return nil
 	}
 	if m.inspect == nil {
 		m.page = Page{Availability: domain.Unsupported, Found: []string{m.tr(copy.needsData)}}
+		m.showReply()
 		return nil
 	}
 	m.busy = true
+	m.activity = poseFor(intent)
+	m.show(m.activity, "", true)
 	m.page = Page{}
 	request := Request{Intent: intent, Choice: choice, Overview: m.overview, Language: m.options.Language}
-	return tea.Batch(func() tea.Msg { return replyMsg{m.inspect(m.ctx, request)} }, m.animate())
+	return func() tea.Msg { return replyMsg{m.inspect(m.ctx, request)} }
 }
 
 func (m *Model) updateOverview(data domain.Overview) tea.Cmd {
 	wasInitial := m.overview.CapturedAt.IsZero()
-	m.overview, m.busy = data, false
+	wasRefreshing := m.refreshing
+	m.overview, m.refreshing = data, false
+	if wasRefreshing {
+		if m.active == assistant.Overview && !m.busy && m.page.Availability != domain.Unknown {
+			m.page = overviewPage(data, m.options.Language)
+		}
+		return nil
+	}
+	m.busy = false
+	if m.options.Gallery {
+		return nil
+	}
+	if wasInitial && m.visual.pose == mascot.Greeting && data.Availability == domain.Available {
+		m.visual.rest = mascot.Idle
+		m.scheduleMotion(m.now())
+	} else if wasInitial || m.visual.pose == mascot.Scanning {
+		m.show(replyPose(Page{Availability: data.Availability}), "", false)
+	}
 	if m.queued != "" {
 		intent := m.queued
 		m.queued = ""
@@ -181,11 +250,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.width, m.height = msg.Width, msg.Height
-		m.input.SetWidth(max(1, min(m.width, 138)-13))
+		m.scheduleMotion(m.now())
+		w, _ := m.bounds()
+		m.input.SetWidth(max(1, w-13))
 	case overviewMsg:
 		cmd = m.updateOverview(msg.data)
 	case replyMsg:
 		m.page, m.busy = msg.page, false
+		m.showReply()
 		if m.queued != "" {
 			intent := m.queued
 			m.queued = ""
@@ -193,13 +265,24 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	case refreshMsg:
 		cmd = m.nextRefresh()
-		if !m.busy {
-			m.busy = true
-			cmd = tea.Batch(cmd, m.sample(), m.animate())
+		if !m.busy && !m.refreshing {
+			m.refreshing = true
+			cmd = tea.Batch(cmd, m.sample())
 		}
-	case spinner.TickMsg:
-		if m.busy {
-			m.spinner, cmd = m.spinner.Update(msg)
+	case motion.Tick:
+		m.motionTick(msg)
+	case motionSavedMsg:
+		m.motionSaving = false
+		if requested := m.motionPending; requested != "" && requested != msg.mode {
+			m.motionPending = ""
+			cmd = m.saveMotion(requested)
+		} else {
+			m.motionPending = ""
+			if msg.err != nil {
+				m.toast = m.tr(Words{"Preferensi gagal disimpan", "Could not save preference"}) + " · " + domain.SafeText(msg.err.Error())
+			} else {
+				m.toast = m.tr(Words{"Preferensi disimpan", "Preference saved"}) + " · " + string(msg.mode)
+			}
 		}
 	case tea.KeyPressMsg:
 		cmd = m.key(msg)
@@ -212,15 +295,21 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m *Model) key(msg tea.KeyPressMsg) tea.Cmd {
+	m.toast = ""
 	switch msg.String() {
 	case "ctrl+c":
-		return tea.Quit
+		return m.quit()
 	case "tab":
 		return m.setFocus((m.focus + 1) % 3)
 	case "shift+tab":
 		return m.setFocus((m.focus + 2) % 3)
 	case "esc":
 		m.help, m.detail = false, false
+		if m.options.Gallery {
+			m.galleryPage()
+			return m.setFocus(pageFocus)
+		}
+		m.question = ""
 		m.input.Reset()
 		return m.setFocus(menuFocus)
 	}
@@ -234,9 +323,19 @@ func (m *Model) key(msg tea.KeyPressMsg) tea.Cmd {
 	}
 	switch msg.String() {
 	case "q":
-		return tea.Quit
+		return m.quit()
 	case "?":
 		m.help, m.scroll = !m.help, 0
+		m.accent(false, true)
+	case "m":
+		return m.setMotion(m.options.Motion.Next())
+	case "n":
+		if m.options.Gallery {
+			m.narrow = !m.narrow
+			w, _ := m.bounds()
+			m.input.SetWidth(max(1, w-13))
+			m.accent(false, true)
+		}
 	case "/":
 		cmd := m.setFocus(inputFocus)
 		m.palSearch = true
@@ -244,10 +343,13 @@ func (m *Model) key(msg tea.KeyPressMsg) tea.Cmd {
 		return cmd
 	case "d":
 		m.detail, m.scroll = !m.detail, 0
+		m.accent(false, true)
 	case "r":
-		if m.active == assistant.Overview && !m.busy {
+		if m.active == assistant.Overview && !m.busy && !m.refreshing {
 			m.busy = true
-			return tea.Batch(m.sample(), m.animate())
+			m.activity = mascot.Scanning
+			m.show(m.activity, "", true)
+			return m.sample()
 		}
 		return m.start(m.active, Choice{})
 	case "up", "k", "down", "j", "pgup", "pgdown":
@@ -257,6 +359,7 @@ func (m *Model) key(msg tea.KeyPressMsg) tea.Cmd {
 		}
 		if m.focus == menuFocus {
 			m.selected = (m.selected + len(assistant.Menu) + step) % len(assistant.Menu)
+			m.showingFocus()
 		} else {
 			if msg.String() == "pgup" || msg.String() == "pgdown" {
 				step *= 6
@@ -270,13 +373,18 @@ func (m *Model) key(msg tea.KeyPressMsg) tea.Cmd {
 				step = -1
 			}
 			m.choice = (m.choice + len(m.page.Choices) + step) % len(m.page.Choices)
+			m.accent(true, false)
 		}
 	case "enter":
+		if m.options.Gallery && m.focus == menuFocus {
+			return m.setFocus(pageFocus)
+		}
 		if m.help {
 			m.help, m.scroll = false, 0
 			return nil
 		}
 		if m.focus == menuFocus {
+			m.question = ""
 			return m.start(assistant.Menu[m.selected], Choice{})
 		}
 		if m.focus == pageFocus && len(m.page.Choices) > 0 {
@@ -298,6 +406,16 @@ func (m *Model) submit() tea.Cmd {
 	}
 	m.input.Reset()
 	m.setFocus(pageFocus)
+	m.question = domain.SafeText(value)
+	if m.options.Gallery {
+		for _, choice := range m.page.Choices {
+			if strings.EqualFold(choice.Label, value) || strings.EqualFold(choice.Value, value) {
+				m.galleryChoice(choice)
+				break
+			}
+		}
+		return nil
+	}
 	m.help, m.detail, m.scroll, m.choice = false, false, 0, 0
 	intents := assistant.Route(value)
 	if palette {
@@ -314,7 +432,13 @@ func (m *Model) submit() tea.Cmd {
 	}
 	switch len(intents) {
 	case 1:
-		return m.start(intents[0], Choice{})
+		cmd := m.start(intents[0], Choice{})
+		if m.busy {
+			m.show(mascot.Thinking, m.activity, false)
+		} else if m.page.Pose == "" && m.page.Availability == domain.Available {
+			m.show(mascot.Thinking, mascot.Idle, false)
+		}
+		return cmd
 	case 0:
 		m.clarify(m.tr(copy.unknown), assistant.Menu)
 	default:
@@ -325,7 +449,56 @@ func (m *Model) submit() tea.Cmd {
 
 func (m *Model) clarify(message string, intents []assistant.Intent) {
 	m.page = Page{Availability: domain.Unknown, Found: []string{message}}
+	m.show(mascot.Thinking, mascot.Unknown, false)
 	for _, intent := range intents {
 		m.page.Choices = append(m.page.Choices, Choice{Label: m.tr(menuNames[intent]), Kind: "navigate", Value: string(intent)})
 	}
+}
+
+func (m *Model) quit() tea.Cmd {
+	m.show(mascot.Farewell, "", false)
+	if m.scheduler != nil {
+		m.scheduler.Set(m.visual.generation, time.Time{})
+	}
+	return tea.Quit
+}
+
+func (m *Model) settingsPage() {
+	m.page = Page{Availability: domain.Available, Found: []string{
+		m.tr(Words{"Mode gerak Piko", "Piko motion mode"}) + " · " + string(m.options.Motion),
+	}, Advice: []string{m.tr(Words{
+		"Pilih full, reduced (pose sederhana), atau off (tanpa timer animasi).",
+		"Select full, reduced (simple poses), or off (no motion timers).",
+	})}}
+	for _, mode := range []motion.Mode{motion.Full, motion.Reduced, motion.Off} {
+		m.page.Choices = append(m.page.Choices, Choice{Label: string(mode), Kind: "motion", Value: string(mode)})
+	}
+	m.showReply()
+}
+
+func (m *Model) setMotion(mode motion.Mode) tea.Cmd {
+	if !mode.Valid() {
+		return nil
+	}
+	m.options.Motion = mode
+	m.visual.focusUntil, m.visual.panelUntil = time.Time{}, time.Time{}
+	m.show(m.visual.pose, m.visual.rest, m.visual.loop)
+	if m.active == assistant.Settings {
+		m.settingsPage()
+	}
+	m.toast = m.tr(Words{"Gerak", "Motion"}) + " · " + string(mode)
+	return m.saveMotion(mode)
+}
+
+func (m *Model) saveMotion(mode motion.Mode) tea.Cmd {
+	save := m.options.SaveMotion
+	if save == nil || m.options.Gallery {
+		return nil
+	}
+	if m.motionSaving {
+		m.motionPending = mode
+		return nil
+	}
+	m.motionSaving = true
+	return func() tea.Msg { return motionSavedMsg{mode, save(mode)} }
 }
