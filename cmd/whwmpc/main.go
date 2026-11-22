@@ -12,7 +12,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/term"
 
-	"github.com/christiandoxa/whwmpc/internal/platform"
+	"github.com/christiandoxa/whwmpc/internal/inspection"
 	"github.com/christiandoxa/whwmpc/internal/state"
 	"github.com/christiandoxa/whwmpc/internal/tui"
 	"github.com/christiandoxa/whwmpc/internal/tui/motion"
@@ -39,7 +39,7 @@ func run(ctx context.Context, args []string, stdin *os.File, stdout *os.File, st
 	reduced := flags.Bool("reduced-motion", false, "kurangi animasi")
 	showVersion := flags.Bool("version", false, "tampilkan versi")
 	flags.Usage = func() {
-		fmt.Fprintln(stderr, "whwmpc [opsi] [check --json | demo animations]")
+		fmt.Fprintln(stderr, "whwmpc [opsi] [check --json | doctor | power | trim | demo animations]")
 		flags.PrintDefaults()
 	}
 	if err := flags.Parse(args); err == flag.ErrHelp {
@@ -74,10 +74,7 @@ func run(ctx context.Context, args []string, stdin *os.File, stdout *os.File, st
 	case *reduced:
 		options.Motion = motion.Reduced
 	}
-	var source platform.Provider = platform.Native{}
-	if options.Demo {
-		source = platform.Demo{}
-	}
+	source := inspection.New(options.Demo)
 	if len(args) == 2 && args[0] == "check" && args[1] == "--json" {
 		data := struct {
 			Demo     bool `json:"demo"`
@@ -88,6 +85,9 @@ func run(ctx context.Context, args []string, stdin *os.File, stdout *os.File, st
 			return 1
 		}
 		return 0
+	}
+	if status, handled := readCommand(ctx, args, source, options.Demo, stdout, stderr); handled {
+		return status
 	}
 	if len(args) > 0 {
 		flags.Usage()
@@ -115,7 +115,7 @@ func run(ctx context.Context, args []string, stdin *os.File, stdout *os.File, st
 	}
 	scheduler := motion.NewScheduler()
 	options.Scheduler = scheduler
-	p := tea.NewProgram(tui.New(ctx, source, nil, options), tea.WithContext(ctx), tea.WithInput(stdin), tea.WithOutput(stdout))
+	p := tea.NewProgram(tui.New(ctx, source, tui.Inspector(source), options), tea.WithContext(ctx), tea.WithInput(stdin), tea.WithOutput(stdout))
 	motionCtx, stopMotion := context.WithCancel(ctx)
 	defer stopMotion()
 	go scheduler.Run(motionCtx, func(tick motion.Tick) { p.Send(tick) })

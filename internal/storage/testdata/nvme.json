@@ -1,0 +1,21 @@
+{
+  "json_format_version": [1, 0],
+  "smartctl": {"exit_status": 8},
+  "device": {"name": "/dev/nvme42n1", "protocol": "NVMe"},
+  "model_name": "Fixture NVMe",
+  "serial_number": "private-fixture-serial",
+  "smart_status": {"passed": false},
+  "nvme_smart_health_information_log": {
+    "critical_warning": 4,
+    "temperature": 48,
+    "available_spare": 83,
+    "available_spare_threshold": 10,
+    "percentage_used": 144,
+    "media_errors": 18446744073709551618,
+    "unsafe_shutdowns": 27,
+    "power_on_hours": 0,
+    "data_units_read": 340282366920938463463374607431768211455,
+    "data_units_read_s": "340282366920938463463374607431768211455",
+    "data_units_written_le": [17, 1]
+  }
+}

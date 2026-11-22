@@ -351,6 +351,9 @@ func (m *Model) key(msg tea.KeyPressMsg) tea.Cmd {
 			m.show(m.activity, "", true)
 			return m.sample()
 		}
+		if m.active == assistant.Storage {
+			return m.start(m.active, Choice{Kind: "rescan"})
+		}
 		return m.start(m.active, Choice{})
 	case "up", "k", "down", "j", "pgup", "pgdown":
 		step := 1
