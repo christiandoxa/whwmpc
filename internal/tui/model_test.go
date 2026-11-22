@@ -71,7 +71,7 @@ func TestHomeAndQuestionReturn(t *testing.T) {
 
 func TestViewFitsTerminal(t *testing.T) {
 	m := New(context.Background(), platform.Demo{}, nil, Options{Demo: true})
-	for _, size := range []tea.WindowSizeMsg{{Width: 80, Height: 24}, {Width: 120, Height: 36}, {Width: 46, Height: 14}} {
+	for _, size := range []tea.WindowSizeMsg{{Width: 80, Height: 24}, {Width: 120, Height: 36}, {Width: 48, Height: 18}} {
 		m = step(m, size)
 		for _, line := range strings.Split(m.View().Content, "\n") {
 			if ansi.StringWidth(line) > size.Width {

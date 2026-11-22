@@ -45,9 +45,13 @@ func inputStyles(p palette) textinput.Styles {
 	return textinput.Styles{Focused: focused, Blurred: focused, Cursor: textinput.CursorStyle{Blink: false}}
 }
 
+const minWidth, minHeight = 48, 18
+
+func (m Model) hasRoom() bool { return m.width >= minWidth && m.height >= minHeight }
+
 func (m Model) bounds() (int, int) {
 	if m.narrow {
-		return min(m.width, 58) - 4, min(m.height, 18)
+		return max(1, min(m.width, 58)-4), min(m.height, minHeight)
 	}
 	return max(1, min(m.width-4, 76)), m.height
 }
@@ -86,15 +90,15 @@ func (m Model) bodyRoom(h, options int) int {
 
 func (m Model) reviewReady() bool {
 	w, h := m.bounds()
-	return w >= 32 && h >= 12 && (len(m.body(w)) <= m.bodyRoom(h, 2) || m.reviewThrough >= len(m.body(w)))
+	return m.hasRoom() && (len(m.body(w)) <= m.bodyRoom(h, 2) || m.reviewThrough >= len(m.body(w)))
 }
 
 func (m *Model) recordReview() {
-	if m.screen != reviewPlan {
+	if m.screen != reviewPlan || !m.hasRoom() {
 		return
 	}
 	w, h := m.bounds()
-	if w >= 32 && h >= 12 && m.scroll <= m.reviewThrough {
+	if m.scroll <= m.reviewThrough {
 		m.reviewThrough = max(m.reviewThrough, min(len(m.body(w)), m.scroll+m.bodyRoom(h, 2)))
 	}
 }
@@ -224,8 +228,14 @@ func (m Model) maxScroll() int {
 
 func (m Model) View() tea.View {
 	w, h := m.bounds()
-	if w < 16 || h < 7 {
-		v := tea.NewView(ansi.Truncate(m.tr(copy.fallback), max(1, m.width), ""))
+	if !m.hasRoom() {
+		hint := fmt.Sprintf("%s (%dx%d)", m.tr(copy.fallback), minWidth, minHeight)
+		controls := m.tr(Words{"Esc Kembali  /  q Keluar", "Esc Back  /  q Quit"})
+		if ansi.StringWidth(controls) > m.width {
+			controls = "Esc / q"
+		}
+		rows := []string{ansi.Truncate(hint, max(1, m.width), ""), ansi.Truncate(controls, max(1, m.width), "")}
+		v := tea.NewView(strings.Join(rows[:min(len(rows), max(h, 1))], "\n"))
 		v.AltScreen = true
 		return v
 	}
@@ -337,7 +347,17 @@ func (m Model) View() tea.View {
 		footer = m.tr(Words{"↑↓ Gulir  ·  Esc Kembali", "↑↓ Scroll  ·  Esc Back"})
 	}
 	if m.options.ASCII {
-		footer = strings.NewReplacer("↑↓", "Up/Down", "·", "|").Replace(footer)
+		footer = strings.NewReplacer("↑↓", "Up/Down", "↓", "Down", "·", "|").Replace(footer)
+	}
+	if ansi.StringWidth(footer) > w && m.screen != reviewPlan {
+		switch m.screen {
+		case detail:
+			footer = m.tr(Words{"Enter Pilihan  /  Esc Kembali", "Enter Options  /  Esc Back"})
+		case home:
+			footer = m.tr(Words{"Enter Buka  /  ? Bantuan  /  q Keluar", "Enter Open  /  ? Help  /  q Quit"})
+		default:
+			footer = m.tr(Words{"Enter Buka  /  Esc Kembali", "Enter Open  /  Esc Back"})
+		}
 	}
 	if m.toast != "" {
 		rows = append(rows, m.palette.secondary.Render(m.toast))

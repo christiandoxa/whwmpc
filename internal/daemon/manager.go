@@ -28,6 +28,11 @@ type Manager struct {
 	Runner sysrun.Runner
 }
 
+type TimerStatus struct {
+	ActiveState, UnitFileState string
+	Raw                        string
+}
+
 func Default() (Manager, error) {
 	if runtime.GOOS != "linux" {
 		return Manager{}, errors.New("daemon memerlukan systemd user di Linux")
@@ -115,6 +120,24 @@ func (m Manager) installed() error {
 	return nil
 }
 
+func (m Manager) Status(ctx context.Context) (TimerStatus, error) {
+	if err := m.installed(); err != nil {
+		return TimerStatus{}, err
+	}
+	raw, err := m.command(ctx, "show", "--property=ActiveState,UnitFileState,NextElapseUSecMonotonic,LastTriggerUSec", timer)
+	status := TimerStatus{Raw: raw}
+	for _, line := range strings.Split(raw, "\n") {
+		key, value, _ := strings.Cut(line, "=")
+		switch key {
+		case "ActiveState":
+			status.ActiveState = value
+		case "UnitFileState":
+			status.UnitFileState = value
+		}
+	}
+	return status, err
+}
+
 func (m Manager) Manage(ctx context.Context, verb string, interval time.Duration) (string, error) {
 	servicePath, timerPath := filepath.Join(m.Dir, service), filepath.Join(m.Dir, timer)
 	switch verb {
@@ -139,12 +162,12 @@ func (m Manager) Manage(ctx context.Context, verb string, interval time.Duration
 			return "", fmt.Errorf("unit ditulis; muat ulang systemd: %w", err)
 		}
 		return "Unit terpasang. Jalankan daemon enable dan daemon start untuk menjadwalkan observasi.", nil
-	case "enable", "start", "disable", "stop", "status", "uninstall":
+	case "status":
+		status, err := m.Status(ctx)
+		return status.Raw, err
+	case "enable", "start", "disable", "stop", "uninstall":
 		if err := m.installed(); err != nil {
 			return "", err
-		}
-		if verb == "status" {
-			return m.command(ctx, "show", "--property=ActiveState,UnitFileState,NextElapseUSecMonotonic,LastTriggerUSec", timer)
 		}
 		if verb == "stop" {
 			return m.command(ctx, verb, timer, service)

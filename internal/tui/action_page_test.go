@@ -193,7 +193,7 @@ func TestLongReviewBlocksApplyUntilRead(t *testing.T) {
 	m.remember()
 	plan := actions.Plan{ID: "review", Kind: actions.CleanAPT, Initial: strings.Repeat("/var/cache/apt/archives ", 28), Risk: "Permanent deletion", Privilege: actions.Sudo}
 	m.screen, m.page = reviewPlan, planPage(plan, "en")
-	m = step(m, tea.WindowSizeMsg{Width: 48, Height: 16})
+	m = step(m, tea.WindowSizeMsg{Width: 48, Height: 18})
 	if m.reviewReady() || !strings.Contains(m.View().Content, "review first") {
 		t.Fatal("did not gate long review")
 	}

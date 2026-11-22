@@ -93,7 +93,7 @@ func (m *Model) scheduleMotion(at time.Time) {
 	}
 }
 
-func (m Model) canAnimate() bool { return m.width >= 43 && m.height >= 14 }
+func (m Model) canAnimate() bool { return m.hasRoom() }
 
 func (m *Model) motionTick(msg motion.Tick) {
 	p := &m.visual

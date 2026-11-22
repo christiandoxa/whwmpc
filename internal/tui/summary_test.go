@@ -3,6 +3,7 @@ package tui
 import (
 	"context"
 	"math"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -12,15 +13,104 @@ import (
 	"github.com/christiandoxa/whwmpc/internal/actions"
 
 	"github.com/christiandoxa/whwmpc/internal/assistant"
+	"github.com/christiandoxa/whwmpc/internal/benchmark"
 	"github.com/christiandoxa/whwmpc/internal/diagnostics"
 	"github.com/christiandoxa/whwmpc/internal/domain"
+	"github.com/christiandoxa/whwmpc/internal/firmware"
+	"github.com/christiandoxa/whwmpc/internal/hardware"
 	"github.com/christiandoxa/whwmpc/internal/inspection"
 	"github.com/christiandoxa/whwmpc/internal/platform"
 	"github.com/christiandoxa/whwmpc/internal/power"
 	"github.com/christiandoxa/whwmpc/internal/state"
 	"github.com/christiandoxa/whwmpc/internal/storage"
+	"github.com/christiandoxa/whwmpc/internal/tui/mascot"
+	"github.com/christiandoxa/whwmpc/internal/tui/motion"
 	"github.com/christiandoxa/whwmpc/internal/workflow"
 )
+
+func TestAdvancedSummaryUsesTypedProviderResults(t *testing.T) {
+	at := platform.DemoTime
+	gpu := gpuSummary(hardware.Snapshot{At: at, Availability: domain.Partial, Devices: []hardware.Device{
+		{Availability: domain.Unsupported, Model: "Unreadable"},
+		{Availability: domain.Available, Model: "GPU test", Backend: "fixture", Metrics: hardware.Metrics{
+			UtilizationPct: new(int64(0)), VRAMUsedBytes: new(int64(1 << 30)), VRAMTotalBytes: new(int64(4 << 30)), PowerMilliW: new(int64(8750)), PowerScope: "soc",
+		}},
+	}}, "en")
+	if gpu.Metrics[0].Value != "2" || gpu.Metrics[1].Value != "0" || gpu.Metrics[1].Usage == nil ||
+		gpu.Metrics[2].Value != "1.0 GiB / 4.0 GiB" || gpu.Metrics[3].Label != "SoC power" || gpu.Metrics[3].Value != "8.75" || !strings.Contains(gpu.Statuses[0].Value, "GPU test") {
+		t.Fatalf("GPU summary = %+v", gpu)
+	}
+	fw := firmwareInventoryPage(firmware.Snapshot{Availability: domain.Available, Devices: []firmware.Device{{Name: "UEFI", Version: "20.3"}}}, "en", false, false).Summary
+	if fw.Metrics[0].Value != "1" || fw.Statuses[0].Value != "20.3 · UEFI" {
+		t.Fatalf("firmware summary = %+v", fw)
+	}
+	b := benchmarkSummary(benchmark.Result{Mode: benchmark.CPU, Complete: true, DurationSec: 3.14, MiBPerSec: 22.25, ProcessedBytes: 70 << 20}, at, "en", nil)
+	if b.Metrics[0].Value != "3.14" || b.Metrics[2].Label != "SHA-256 throughput" || b.Metrics[2].Unit != "MiB/s" {
+		t.Fatalf("benchmark summary = %+v", b)
+	}
+	entries := []state.Entry{{Category: "overview", Kind: "scan", At: at}, {Category: "daemon", Kind: "scan", At: at.Add(-6 * time.Minute)}}
+	if row := daemonSample(entries, at, nil, "en"); row.Availability != domain.Available || !strings.Contains(row.Value, "age 6m0s") {
+		t.Fatalf("scheduled sample = %+v", row)
+	}
+	if row := daemonSample(entries[:1], at, nil, "en"); row.Availability != domain.Unknown || row.Value != "" {
+		t.Fatalf("manual scan counted as daemon sample: %+v", row)
+	}
+}
+
+func TestResultLayoutAndMotionKeepTheSnapshot(t *testing.T) {
+	scanner := inspection.New(true)
+	store := state.Store{}
+	inspect := Inspector(scanner, store, workflow.NewMaintenance(store, true))
+	calls := 0
+	m := New(t.Context(), scanner, func(ctx context.Context, req Request) Page {
+		calls++
+		return inspect(ctx, req)
+	}, Options{Demo: true, Language: "en", ASCII: true, Motion: motion.Full})
+	at := platform.DemoTime
+	m.now = func() time.Time { return at }
+	next, scan := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	m = step(next.(Model), scan())
+	sample := m.page.Snapshot
+	wantBody := m.body(76)
+	m.show(mascot.Warning, "", false)
+	for range 8 {
+		at = at.Add(motion.FrameInterval)
+		m = step(m, motion.Tick{Generation: m.visual.generation, At: at})
+	}
+	if calls != 1 || m.page.Snapshot != sample || !slices.Equal(wantBody, m.body(76)) {
+		t.Fatal("motion changed the measurements or ran another scan")
+	}
+	for _, theme := range []string{"dark", "light", "terminal"} {
+		m.palette = newPalette(theme)
+		for _, mode := range []motion.Mode{motion.Full, motion.Reduced, motion.Off} {
+			m.options.Motion = mode
+			for _, size := range []tea.WindowSizeMsg{{Width: 80, Height: 24}, {Width: 120, Height: 36}, {Width: 48, Height: 18}} {
+				m = step(m, size)
+				view := ansi.Strip(m.View().Content)
+				if !strings.Contains(view, "View all results") || !strings.Contains(view, "24%") || !strings.Contains(view, "[##") || strings.ContainsAny(view, "█░") {
+					t.Fatalf("%s/%s at %dx%d lost data or fallback: %s", theme, mode, size.Width, size.Height, view)
+				}
+				lines := strings.Split(view, "\n")
+				if len(lines) > size.Height || slices.ContainsFunc(lines, func(line string) bool { return ansi.StringWidth(line) > size.Width }) {
+					t.Fatalf("view overflows %dx%d: %s", size.Width, size.Height, view)
+				}
+			}
+		}
+	}
+	m = step(m, tea.WindowSizeMsg{Width: 40, Height: 12})
+	m = step(m, tea.KeyPressMsg{Code: tea.KeyEnter})
+	if m.screen != results || !strings.Contains(m.View().Content, "Enlarge the terminal (48x18)") || m.canAnimate() {
+		t.Fatal("small terminal still accepted a hidden action")
+	}
+	m = step(m, tea.KeyPressMsg{Code: tea.KeyEsc})
+	if m.screen != home {
+		t.Fatal("Esc did not return from results below the minimum size")
+	}
+	_, quit := m.Update(tea.KeyPressMsg{Code: 'q'})
+	if quit == nil {
+		t.Fatal("q did not quit below the minimum size")
+	}
+}
 
 func TestComponentSummariesKeepIndependentMeasurements(t *testing.T) {
 	at := platform.DemoTime
@@ -97,7 +187,7 @@ func TestOverviewMetricsPreserveMeasurements(t *testing.T) {
 	if rows[0].Usage == nil || rows[0].Value != "0" || rows[0].Note != "3 samples / 780ms · 0–35%" {
 		t.Fatalf("CPU = %+v", rows[0])
 	}
-	if rows[1].Value != "81.2" || rows[1].Availability != domain.Partial || !strings.Contains(rows[1].Note, "3.0 GiB / 16.0 GiB free, lower bound") {
+	if rows[1].Value != "81.2" || rows[1].Availability != domain.Partial || rows[1].Note != "free ≥3.0 GiB / 16.0 GiB" {
 		t.Fatalf("RAM = %+v", rows[1])
 	}
 	if rows[2].Value != "94" || rows[2].Note != "10.0 GiB available" || rows[3].Value != "" || rows[3].Availability != domain.Error {

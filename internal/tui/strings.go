@@ -60,7 +60,7 @@ var copy = struct {
 	scanning:     Words{"MEMERIKSA", "SCANNING"},
 	waiting:      Words{"Menunggu hasil pemeriksaan…", "Waiting for scan results…"},
 	demo:         Words{"DEMO · data contoh · aksi terkunci", "DEMO · fixture data · actions locked"},
-	fallback:     Words{"Terminal kecil. Perbesar untuk melihat semua panel.", "Small terminal. Enlarge it to see all panels."},
+	fallback:     Words{"Perbesar terminal", "Enlarge the terminal"},
 	initial:      Words{"Pilih pemeriksaan di menu atau ketik pertanyaan di bawah.", "Pick a check from the menu or type a question below."},
 	found:        Words{"Yang ditemukan", "What I found"},
 	meaning:      Words{"Artinya", "What it means"},

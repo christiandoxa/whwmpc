@@ -72,8 +72,12 @@ func exportReport(ctx context.Context, scanner *inspection.Scanner, store state.
 		Found:   []string{l("Laporan tersimpan", "Report saved"), domain.SafeText(path)},
 		Meaning: []string{l("File ditulis secara lokal.", "The file was written locally.")},
 	}
+	page.Summary = &ResultSummary{Headline: page.Found[0], At: doc.GeneratedAt, Statuses: []resultStatus{
+		{Label: l("Lokasi", "Location"), Value: path, Availability: domain.Available},
+	}}
 	if historyErr != nil {
 		page.Advice = []string{l("Riwayat tidak terbaca", "History could not be read") + " · " + domain.SafeText(historyErr.Error())}
+		page.Summary.Statuses = append(page.Summary.Statuses, resultStatus{Label: l("Riwayat", "History"), Value: historyErr.Error(), Availability: domain.Error})
 	}
 	return page
 }
@@ -94,6 +98,21 @@ func historyPage(store state.Store, maintenance *workflow.Maintenance, lang stri
 		page.Advice = []string{l("Simpan ringkasan dari overview atau jalankan tindakan yang kamu tinjau.", "Save a summary from the overview or run a reviewed action.")}
 		return page
 	}
+	latest := entries[0]
+	s := &ResultSummary{Headline: l("Riwayat lokal", "Local history"), At: latest.At, Metrics: []resultMetric{
+		{Label: l("Entri tersimpan", "Stored entries"), Value: fmt.Sprint(len(entries)), Availability: domain.Available},
+	}}
+	last := resultStatus{Label: l("Terbaru", "Latest"), Value: latest.Category, Availability: domain.Available}
+	if a := latest.Action; a != nil {
+		last.Value += " · " + string(a.Status)
+		if a.CancellationRequested {
+			last.Value += " · " + l("penghentian diminta", "cancel requested")
+		}
+	} else if f := latest.Findings; f != nil {
+		last.Value += fmt.Sprintf(l(" · %d temuan · %d kritis", " · %d findings · %d critical"), f.Total, f.Critical)
+	}
+	s.Statuses = []resultStatus{last}
+	page.Summary = s
 	for _, entry := range entries {
 		line := entry.At.Local().Format("02 Jan 15:04") + " · " + entry.Category
 		if a := entry.Action; a != nil {

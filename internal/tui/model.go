@@ -501,7 +501,7 @@ func (m *Model) key(msg tea.KeyPressMsg) tea.Cmd {
 	}
 	m.toast = ""
 	key := msg.String()
-	if key == "ctrl+c" || (key == "q" && !m.typing()) {
+	if key == "ctrl+c" || (key == "q" && (!m.typing() || !m.hasRoom())) {
 		if m.cancelCurrent() {
 			m.quitPending = true
 			return nil
@@ -516,6 +516,9 @@ func (m *Model) key(msg tea.KeyPressMsg) tea.Cmd {
 			return nil
 		}
 		return m.returnTo()
+	}
+	if !m.hasRoom() {
+		return nil
 	}
 	if m.typing() {
 		if key == "enter" {

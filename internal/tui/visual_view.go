@@ -12,7 +12,7 @@ import (
 	"github.com/christiandoxa/whwmpc/internal/domain"
 )
 
-var asciiVisual = strings.NewReplacer("·", "|", "–", "-", "—", "-", "…", "...", "°C", "C", "×", "x")
+var asciiVisual = strings.NewReplacer("·", "|", "–", "-", "—", "-", "…", "...", "°C", "C", "≥", ">=", "×", "x")
 
 func (m Model) visualText(s string) string {
 	s = domain.SafeText(s)
@@ -47,7 +47,10 @@ func (m Model) summaryBody(s ResultSummary, w, room int) []string {
 		text = ansi.Truncate(m.visualText(text), w, ellipsis)
 		rows = append(rows, row{style.Render(text), priority})
 	}
-	headline := strings.Split(ansi.Hardwrap(ansi.Wrap(m.visualText(s.Headline), w, ""), w, false), "\n")
+	wrap := func(text string) []string {
+		return strings.Split(ansi.Hardwrap(ansi.Wrap(m.visualText(text), w, ""), w, false), "\n")
+	}
+	headline := wrap(s.Headline)
 	for _, line := range headline[:min(2, len(headline))] {
 		add(line, m.palette.accent, 0)
 	}
@@ -66,7 +69,11 @@ func (m Model) summaryBody(s ResultSummary, w, room int) []string {
 	}
 	add(coverage, m.palette.secondary, 0)
 	for i, exception := range s.Highlights {
-		add("!  "+exception, m.palette.alert, 1+min(i, 1))
+		parts := wrap("!  " + exception)
+		add(parts[0], m.palette.alert, 1+min(i, 1))
+		if len(parts) > 1 && w >= 60 && i == 0 {
+			add(parts[1], m.palette.alert, 3)
+		}
 	}
 	if len(s.Metrics)+len(s.Statuses) > 0 {
 		add("", m.palette.text, 4)

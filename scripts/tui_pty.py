@@ -147,6 +147,8 @@ def task_flow(terminal, flow, resize=False):
         terminal.expect("file teramati", offset)
         return
     terminal.expect("selesai", offset)
+    for measurement in ("24%", "56%", "71%", "148.0 GiB"):
+        terminal.expect(measurement, offset)
     if flow == "slow":
         terminal.expect("Periksa ulang saat gejala muncul", offset)
         press(terminal, b"\x1b[B")
@@ -155,6 +157,9 @@ def task_flow(terminal, flow, resize=False):
     press(terminal, b"\r")
     terminal.expect("Semua hasil", offset)
     if resize:
+        offset = len(terminal.output)
+        terminal.resize(40, 14)
+        terminal.expect("Perbesar terminal (48x18)", offset)
         terminal.resize(60, 18)
         terminal.hold(0.3)
         terminal.resize(80, 24)

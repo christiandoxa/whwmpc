@@ -79,11 +79,11 @@ func overviewMetrics(o domain.Overview, lang string) []resultMetric {
 	if !hasData(mem.Availability) && ram.Availability == "" {
 		ram.Availability = mem.Availability
 	} else if hasData(mem.Availability) && mem.TotalBytes > 0 && mem.FreeBytes <= mem.TotalBytes {
-		label := l("tersedia", "available")
+		capacity := bytesText(mem.FreeBytes) + " / " + bytesText(mem.TotalBytes)
+		ram.Note = capacity + " " + l("tersedia", "available")
 		if o.OS == "darwin" {
-			label = l("bebas, batas bawah", "free, lower bound")
+			ram.Note = l("bebas", "free") + " ≥" + capacity
 		}
-		ram.Note = bytesText(mem.FreeBytes) + " / " + bytesText(mem.TotalBytes) + " " + label
 		if mem.Availability == domain.Partial && ram.Availability == domain.Available {
 			ram.Availability = domain.Partial
 		}
@@ -132,7 +132,7 @@ func overviewStatuses(smart *storage.SMARTAudit, trim *storage.TrimAudit, p *pow
 	var rows []resultStatus
 	if smart != nil {
 		row := resultStatus{Category: "ssd", Label: "SSD", Availability: smart.Availability}
-		passed, failed := 0, 0
+		passed, failed, nativeHealthy := 0, 0, 0
 		for _, d := range smart.Drives {
 			if h := d.Health; h != nil && h.Passed != nil && hasData(d.Availability) {
 				if *h.Passed {
@@ -141,12 +141,17 @@ func overviewStatuses(smart *storage.SMARTAudit, trim *storage.TrimAudit, p *pow
 					failed++
 				}
 			}
+			if smart.Source == storage.WindowsStorageSource && hasData(d.Availability) && d.HealthStatus == "healthy" {
+				nativeHealthy++
+			}
 		}
 		switch {
 		case failed > 0:
 			row.Value = fmt.Sprintf(l("SMART gagal %d/%d", "SMART failed %d/%d"), failed, len(smart.Drives))
 		case passed > 0:
 			row.Value = fmt.Sprintf(l("SMART lolos %d/%d", "SMART passed %d/%d"), passed, len(smart.Drives))
+		case nativeHealthy > 0:
+			row.Value = fmt.Sprintf(l("Provider melaporkan healthy %d/%d", "Provider reports healthy %d/%d"), nativeHealthy, len(smart.Drives))
 		case hasData(row.Availability):
 			row.Value = l("Status SMART belum terbaca", "SMART status not read")
 		}
@@ -175,6 +180,9 @@ func activeProfile(p power.Snapshot, lang string) resultStatus {
 	row := resultStatus{Category: "power", Label: l("Profil daya", "Power profile"), Availability: p.Profiles.Status}
 	if hasData(p.Profiles.Status) {
 		row.Value = p.Profiles.Active
+		if row.Value == "" {
+			row.Availability = domain.Unknown
+		}
 	}
 	if !p.LinuxInterfaces() && row.Availability == "" {
 		row.Availability = domain.Unsupported

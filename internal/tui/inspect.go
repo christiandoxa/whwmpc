@@ -46,7 +46,7 @@ func Inspector(scanner *inspection.Scanner, store state.Store, maintenance *work
 		a := diagnostics.Analyzer{Language: req.Language, Now: scanner.Now()}
 		switch req.Intent {
 		case assistant.Daemon:
-			return daemonPage(ctx, maintenance.Demo, req.Language)
+			return daemonPage(ctx, store, scanner.Now, maintenance.Demo, req.Language)
 		case assistant.Firmware:
 			return firmwarePage(ctx, maintenance, req)
 		case assistant.Filesystem:
