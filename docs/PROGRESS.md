@@ -86,3 +86,7 @@ Review sebelum/sesudah 80×24, beranda 120×36, dan rekaman tiga alur demo memak
 ## Backlog G · Benchmark dan stress
 
 Jalur CLI/TUI memisahkan CPU, stress dengan sensor, pembacaan file reguler, dan penulisan sementara. Tes clock, cap, pembatalan, sensor hilang, dan file sementara lulus. Uji stress pada hardware development tetap opt-in.
+
+## Backlog F · Observasi terjadwal
+
+CLI menyediakan lifecycle user timer, proses observasi read-only, retensi riwayat, batas log/resource, dan lock lintas proses. Gate unit memeriksa instalasi tidak mengaktifkan timer serta unit asing dipertahankan. Tidak ada unit yang dipasang atau diaktifkan di host development.
