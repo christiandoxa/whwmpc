@@ -12,6 +12,10 @@ import (
 )
 
 func TestPacmanCacheConfig(t *testing.T) {
+	if !supportsPacman("arch", "amd64") || !supportsPacman("archarm", "arm64") ||
+		supportsPacman("archarm", "arm") || supportsPacman("archarm", "amd64") || supportsPacman("manjaro", "arm64") {
+		t.Fatal("unexpected platform support for Pacman")
+	}
 	const config = "RootDir = /\nDBPath = /var/lib/pacman/\nCacheDir = /var/cache/pacman/pkg/\nCacheDir = /var/cache/pacman/secondary/\n"
 	layout, err := parsePacmanLayout(config)
 	if err != nil || len(layout.Caches) != 2 || layout.Caches[1] != "/var/cache/pacman/secondary" {
@@ -162,8 +166,9 @@ func TestNativePackageManagerContainer(t *testing.T) {
 		t.Fatalf("unexpected test platform %q, error %v", distroID(release), err)
 	}
 	var kind, path, keep string
+	pacman := platform == "arch" || platform == "archarm"
 	switch platform {
-	case "arch":
+	case "arch", "archarm":
 		kind, path, keep = CleanPacman, "/var/cache/pacman/pkg/whwmpc-fixture-1-1-any.pkg.tar.zst", "/var/lib/pacman/sync/whwmpc-fixture.db"
 	case "fedora":
 		kind, path, keep = CleanDNF, "/var/cache/libdnf5/whwmpc-fixture-123/packages/whwmpc-fixture-1-1.noarch.rpm", "/var/cache/libdnf5/whwmpc-fixture-123/repodata/whwmpc-fixture.xml"
@@ -205,7 +210,7 @@ func TestNativePackageManagerContainer(t *testing.T) {
 		if stage != Executing {
 			return
 		}
-		if platform == "arch" {
+		if pacman {
 			lock := filepath.Join(pacmanDBPath, "db.lck")
 			file, err := os.OpenFile(lock, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0600)
 			if err != nil {
@@ -234,7 +239,7 @@ func TestNativePackageManagerContainer(t *testing.T) {
 	}
 	releaseLock()
 	releaseLock = nil
-	if platform == "arch" {
+	if pacman {
 		if err != nil || locked.Status != Failed || locked.Changed == nil || *locked.Changed {
 			t.Fatalf("Pacman did not respect its lock: %+v, error %v", locked, err)
 		}

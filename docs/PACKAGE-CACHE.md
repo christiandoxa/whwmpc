@@ -4,7 +4,7 @@ Buka **Bersihkan ruang** di Home atau jalankan `whwmpc clean --dry-run`. Keduany
 
 | Distro | Backend yang diuji | Cakupan |
 | --- | --- | --- |
-| Arch Linux | Pacman 7.1.0 dengan libalpm 16.0 | Arsip paket, tanda tangan, dan unduhan parsial di direktori `CacheDir` tepercaya di bawah `/var/cache/pacman`. Paket terpasang dan database repositori dipertahankan. |
+| Arch Linux amd64 dan Arch Linux ARM aarch64 | Pacman 7.1.0 dengan libalpm 16.0 | Arsip paket, tanda tangan, dan unduhan parsial di direktori `CacheDir` tepercaya di bawah `/var/cache/pacman`. Paket terpasang dan database repositori dipertahankan. |
 | Fedora 44 | DNF5 dan libdnf5 5.4.6.0 dengan util-linux `flock --fcntl` | Unduhan RPM yang bisa diinventaris di direktori `packages` dari cache sistem aktual di bawah `/var/cache/libdnf5`. Paket terpasang, metadata repositori, dan cache solver dipertahankan. |
 | Debian dan Ubuntu | APT 2.6, 2.8, dan 3.0 | Unduhan paket, indeks parsial, dan indeks biner cache sesuai konfigurasi APT yang didukung. |
 
@@ -16,4 +16,4 @@ Tindakan memerlukan akses root atau otorisasi sudo. Pemeriksaan ulang menolak pe
 
 Hasil memisahkan ukuran logis kandidat, ukuran file kandidat yang teramati hilang, serta selisih ruang bebas filesystem. Selisih ruang bebas dapat terpengaruh alokasi blok, cache filesystem, dan aktivitas lain pada volume. Aksi hanya menampilkan hasil terverifikasi sesudah cakupan dibaca ulang.
 
-Workflow memakai digest terpin dan jaringan dimatikan. Fedora diuji pada amd64 dan arm64. Image Arch terpin menyediakan amd64. Fixture mencakup perubahan kandidat, lock yang sedang dipakai, penghapusan paket cache, dan sentinel di luar cakupan. [Hasil CI kontainer](https://github.com/christiandoxa/whwmpc/actions/runs/45008131828)
+Fixture mencakup perubahan kandidat, lock aktif, penghapusan cache, dan sentinel di luar cakupan. Fedora memakai image terpin pada amd64 dan arm64, sedangkan Arch Linux memakai image amd64. Untuk aarch64, workflow mengimpor rootfs resmi Arch Linux ARM 2026.08 setelah mencocokkan SHA-256 dan tanda tangan OpenPGP. Arsip bertanggal mengikuti retensi mirror resmi. Semua pengujian cleaner berjalan tanpa jaringan di dalam kontainer. [Workflow kontainer](../.github/workflows/package-cache.yml) · [Arsip Arch Linux ARM](https://ca.us.mirror.archlinuxarm.org/os/multi/) · [Paket Pacman AArch64](https://archlinuxarm.org/packages/aarch64/pacman)

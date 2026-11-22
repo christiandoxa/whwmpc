@@ -34,7 +34,7 @@ func (p linuxPlatform) cleanup(ctx context.Context) (Cleanup, error) {
 		return cleanupUnavailable("", "Cache paket sistem", err), err
 	}
 	switch distroID(release) {
-	case "arch":
+	case "arch", "archarm":
 		layout, _, err := p.pacmanLayout(ctx)
 		if err == nil {
 			var inventory cacheInventory

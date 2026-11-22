@@ -20,6 +20,10 @@ jobs:
             arch: amd64
             runner: ubuntu-24.04
             image: archlinux@sha256:d4594bb2300cba11f41c2f27923eb56f63d9988909c402f9c95517d1e362c899
+          - distro: archarm
+            arch: arm64
+            runner: ubuntu-24.04-arm
+            image: whwmpc-archarm-fixture:20260805
           - distro: fedora
             arch: amd64
             runner: ubuntu-24.04
@@ -37,6 +41,23 @@ jobs:
         with:
           go-version: '1.27.4'
       - run: go test -c -o "$RUNNER_TEMP/cache.test" ./internal/actions
+      - name: Import the signed Arch Linux ARM fixture
+        if: matrix.distro == 'archarm'
+        shell: bash
+        env:
+          IMAGE: ${{ matrix.image }}
+        run: |
+          verification=$(mktemp -d "$RUNNER_TEMP/archarm.XXXXXXXX")
+          snapshot="$verification/ArchLinuxARM-2026.08-aarch64-rootfs.tar.gz"
+          mirror=https://ca.us.mirror.archlinuxarm.org/os/multi
+          curl --proto '=https' -fsSL --retry 2 --max-time 240 "$mirror/${snapshot##*/}" -o "$snapshot"
+          curl --proto '=https' -fsSL --retry 2 --max-time 30 "$mirror/${snapshot##*/}.sig" -o "$snapshot.sig"
+          curl --proto '=https' -fsSL --retry 2 --max-time 30 https://raw.githubusercontent.com/archlinuxarm/archlinuxarm-keyring/91e6b11698f8df66042d56aaa56fbe9c9263847d/archlinuxarm.gpg -o "$verification/keys.asc"
+          printf '%s  %s\n' '42a4eeaa038994ffd31fa173256ef2f0ef511358eeb41b9ea1f8626391b9b319' "$snapshot" | sha256sum --check
+          gpg --batch --no-options --homedir "$verification" --dearmor --output "$verification/keys.gpg" "$verification/keys.asc"
+          gpgv --homedir "$verification" --keyring "$verification/keys.gpg" --status-fd 1 "$snapshot.sig" "$snapshot" |
+            grep -F '[GNUPG:] VALIDSIG 68B3537F39A313B3E574D06777193F152BDBE6A6 '
+          docker import --platform linux/arm64 "$snapshot" "$IMAGE"
       - name: Exercise native cleaner on a fixture cache
         env:
           DISTRO: ${{ matrix.distro }}

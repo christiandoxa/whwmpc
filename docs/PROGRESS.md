@@ -144,3 +144,5 @@ Manifest image Fedora terpin menyediakan amd64 dan arm64. Workflow cache menjala
 Ubuntu arm64 lulus alur repair ext4 bertanda tangan dan lifecycle systemd. Fedora DNF5 lulus pada amd64 dan arm64. Arch pacman lulus pada amd64, satu-satunya arsitektur Linux dalam manifest image Arch yang terpin. [Job Ubuntu arm64](https://github.com/christiandoxa/whwmpc/actions/runs/45008131794/job/137164194201) · [CI cache](https://github.com/christiandoxa/whwmpc/actions/runs/45008131828)
 
 Guard stress membaca kanal suhu CPU secara langsung. Beban menunggu sampel segar dengan timeout dan berhenti jika saluran berubah, hilang, panas, atau dibatalkan. Fixture waktu palsu memeriksa jumlah blok saat penghentian. Workflow native menambahkan uji binari dalam kontainer dengan kuota CPU dan memori. [Metodologi](BENCHMARK.md)
+
+Adapter Pacman mengenali Arch Linux ARM aarch64 dengan guard versi dan cakupan yang sama. Kontainer aarch64 dalam emulasi lulus penghapusan cache fixture, lock, rencana berubah, perlindungan database, dan dry-run tanpa privilege. Workflow memakai rootfs bertanggal yang diverifikasi tanda tangan dan SHA-256 sebelum diimpor. [Matriks cleaner](PACKAGE-CACHE.md)

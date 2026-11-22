@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"slices"
 	"strconv"
 	"strings"
@@ -34,13 +35,17 @@ type pacmanLayout struct {
 	DownloadUID uint32
 }
 
+func supportsPacman(id, arch string) bool {
+	return id == "arch" || (id == "archarm" && arch == "arm64")
+}
+
 func (p linuxPlatform) pacmanLayout(ctx context.Context) (pacmanLayout, string, error) {
 	release, err := os.ReadFile("/etc/os-release")
 	if err != nil {
 		return pacmanLayout{}, "", err
 	}
-	if distroID(release) != "arch" {
-		return pacmanLayout{}, "", fmt.Errorf("backend Pacman memerlukan Arch Linux: %w", errCacheUnsupported)
+	if !supportsPacman(distroID(release), runtime.GOARCH) {
+		return pacmanLayout{}, "", fmt.Errorf("backend Pacman memerlukan Arch Linux atau Arch Linux ARM aarch64: %w", errCacheUnsupported)
 	}
 	if config, err := protectedPath(pacmanConfig, 0, false); err != nil || !config.Mode().IsRegular() {
 		return pacmanLayout{}, "", errors.New("konfigurasi Pacman sistem tidak aman atau tidak dapat dibaca")
