@@ -1,51 +1,89 @@
 package main
 
 import (
+	"context"
+	"encoding/json"
+	"flag"
 	"fmt"
+	"io"
 	"os"
+	"os/signal"
 
-	"charm.land/bubbles/v2/key"
 	tea "charm.land/bubbletea/v2"
-	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/term"
+
+	"github.com/christiandoxa/whwmpc/internal/platform"
+	"github.com/christiandoxa/whwmpc/internal/tui"
 )
 
 var version = "dev"
 
-type welcome struct{}
-
-func (welcome) Init() tea.Cmd { return nil }
-
-func (w welcome) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	if pressed, ok := msg.(tea.KeyPressMsg); ok && key.Matches(pressed, key.NewBinding(key.WithKeys("q", "esc", "ctrl+c"))) {
-		return w, tea.Quit
-	}
-	return w, nil
-}
-
-func (welcome) View() tea.View {
-	v := tea.NewView(lipgloss.NewStyle().Bold(true).Render("What Happens With My PC") +
-		"\n\nHai! Mau cek apa di komputermu hari ini?\n\nq  Keluar")
-	v.AltScreen = true
-	return v
-}
-
 func main() {
-	args := os.Args[1:]
-	switch {
-	case len(args) == 1 && args[0] == "--version":
-		fmt.Println("whwmpc", version)
-	case len(args) == 1 && (args[0] == "--help" || args[0] == "-h"):
-		fmt.Println("whwmpc [--version]")
-	case len(args) != 0:
-		fmt.Fprintln(os.Stderr, "Gunakan whwmpc --help.")
-		os.Exit(2)
-	case term.IsTerminal(os.Stdin.Fd()) && term.IsTerminal(os.Stdout.Fd()):
-		if _, err := tea.NewProgram(welcome{}).Run(); err != nil {
-			fmt.Fprintln(os.Stderr, err)
-			os.Exit(1)
-		}
-	default:
-		fmt.Println("What Happens With My PC")
+	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
+	defer cancel()
+	os.Exit(run(ctx, os.Args[1:], os.Stdin, os.Stdout, os.Stderr))
+}
+
+func run(ctx context.Context, args []string, stdin *os.File, stdout *os.File, stderr io.Writer) int {
+	flags := flag.NewFlagSet("whwmpc", flag.ContinueOnError)
+	flags.SetOutput(stderr)
+	options := tui.Options{}
+	flags.BoolVar(&options.Demo, "demo", false, "pakai data contoh tanpa tindakan sistem")
+	flags.StringVar(&options.Language, "lang", "id", "bahasa: id atau en")
+	flags.StringVar(&options.Theme, "theme", "dark", "tema: dark, light, terminal")
+	flags.BoolVar(&options.ASCII, "ascii", false, "pakai simbol ASCII")
+	flags.BoolVar(&options.ReduceMotion, "reduced-motion", false, "kurangi animasi")
+	showVersion := flags.Bool("version", false, "tampilkan versi")
+	flags.Usage = func() {
+		fmt.Fprintln(stderr, "whwmpc [opsi] [check --json]")
+		flags.PrintDefaults()
 	}
+	if err := flags.Parse(args); err == flag.ErrHelp {
+		return 0
+	} else if err != nil {
+		return 2
+	}
+	if *showVersion {
+		fmt.Fprintln(stdout, "whwmpc", version)
+		return 0
+	}
+	if (options.Language != "id" && options.Language != "en") ||
+		(options.Theme != "dark" && options.Theme != "light" && options.Theme != "terminal") {
+		flags.Usage()
+		return 2
+	}
+	if _, noColor := os.LookupEnv("NO_COLOR"); noColor {
+		options.Theme = "terminal"
+	}
+	var source platform.Provider = platform.Native{}
+	if options.Demo {
+		source = platform.Demo{}
+	}
+	args = flags.Args()
+	if len(args) == 2 && args[0] == "check" && args[1] == "--json" {
+		data := struct {
+			Demo     bool `json:"demo"`
+			Overview any  `json:"overview"`
+		}{options.Demo, source.Overview(ctx)}
+		if err := json.NewEncoder(stdout).Encode(data); err != nil {
+			fmt.Fprintln(stderr, err)
+			return 1
+		}
+		return 0
+	}
+	if len(args) > 0 {
+		flags.Usage()
+		return 2
+	}
+	if !term.IsTerminal(stdin.Fd()) || !term.IsTerminal(stdout.Fd()) {
+		o := source.Overview(ctx)
+		fmt.Fprintf(stdout, "whwmpc · %s %s · %s\n", o.OS, o.Arch, o.Availability)
+		return 0
+	}
+	p := tea.NewProgram(tui.New(ctx, source, nil, options), tea.WithContext(ctx), tea.WithInput(stdin), tea.WithOutput(stdout))
+	if _, err := p.Run(); err != nil {
+		fmt.Fprintln(stderr, err)
+		return 1
+	}
+	return 0
 }
