@@ -62,3 +62,5 @@
 - Workflow tag siap. Paket yang diperiksa adalah snapshot lokal.
 
 Checkpoint awal di `main` mencakup `db4f687` (fondasi), `01f01ca` (asisten), `a5f0342` (motion), `854f9b3` (collector), `675c36b` (diagnostik), `8a478ab` (tindakan), dan `038667f` (laporan).
+
+Audit akhir menguji pembatas subprocess dengan keluaran yang melampaui kuota pada stdout dan stderr. Buffer penyimpanan memakai field bernama agar fast path `io.Copy` tidak melewati pembatas.

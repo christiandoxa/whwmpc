@@ -31,14 +31,14 @@ const outputLimit = 2 << 20
 var errOutputLimit = errors.New("subprocess output limit exceeded")
 
 type limitedBuffer struct {
-	bytes.Buffer
+	data      bytes.Buffer
 	truncated bool
 }
 
 func (b *limitedBuffer) Write(p []byte) (int, error) {
-	size := min(len(p), outputLimit-b.Len())
+	size := min(len(p), outputLimit-b.data.Len())
 	b.truncated = b.truncated || size < len(p)
-	_, _ = b.Buffer.Write(p[:size])
+	_, _ = b.data.Write(p[:size])
 	return len(p), nil
 }
 
@@ -56,7 +56,7 @@ func (Native) Run(ctx context.Context, file string, args ...string) Result {
 	var out, errOut limitedBuffer
 	cmd.Stdout, cmd.Stderr = &out, &errOut
 	err := cmd.Run()
-	result := Result{Output: out.Bytes(), Stderr: errOut.Bytes(), ExitCode: -1, Err: err}
+	result := Result{Output: out.data.Bytes(), Stderr: errOut.data.Bytes(), ExitCode: -1, Err: err}
 	if cmd.ProcessState != nil {
 		result.ExitCode = cmd.ProcessState.ExitCode()
 	}
