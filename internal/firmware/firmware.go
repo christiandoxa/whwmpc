@@ -37,25 +37,27 @@ type Snapshot struct {
 }
 
 type Device struct {
-	ID          string    `json:"DeviceId"`
-	Name        string    `json:"Name,omitempty"`
-	Vendor      string    `json:"Vendor,omitempty"`
-	Plugin      string    `json:"Plugin,omitempty"`
-	Version     string    `json:"Version,omitempty"`
-	Flags       []string  `json:"Flags,omitempty"`
-	GUIDs       []string  `json:"Guid,omitempty"`
-	Releases    []Release `json:"Releases,omitempty"`
-	UpdateState uint      `json:"UpdateState,omitempty"`
+	ID            string    `json:"DeviceId"`
+	Name          string    `json:"Name,omitempty"`
+	Vendor        string    `json:"Vendor,omitempty"`
+	Plugin        string    `json:"Plugin,omitempty"`
+	Version       string    `json:"Version,omitempty"`
+	VersionFormat string    `json:"VersionFormat,omitempty"`
+	Flags         []string  `json:"Flags,omitempty"`
+	GUIDs         []string  `json:"Guid,omitempty"`
+	Releases      []Release `json:"Releases,omitempty"`
+	UpdateState   uint      `json:"UpdateState,omitempty"`
 }
 
 type Release struct {
-	Version   string   `json:"Version"`
-	Remote    string   `json:"RemoteId"`
-	Checksums []string `json:"Checksum,omitempty"`
-	Locations []string `json:"Locations,omitempty"`
-	Flags     []string `json:"Flags,omitempty"`
-	SHA256    string   `json:"-"`
-	URL       string   `json:"-"`
+	Version     string   `json:"Version"`
+	AppstreamID string   `json:"AppstreamId,omitempty"`
+	Remote      string   `json:"RemoteId"`
+	Checksums   []string `json:"Checksum,omitempty"`
+	Locations   []string `json:"Locations,omitempty"`
+	Flags       []string `json:"Flags,omitempty"`
+	SHA256      string   `json:"-"`
+	URL         string   `json:"-"`
 }
 
 type Remote struct {

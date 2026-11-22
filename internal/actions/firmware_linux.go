@@ -181,7 +181,19 @@ func (p linuxPlatform) firmwareUpdate(ctx context.Context, target string) (prepa
 			if err != nil {
 				return attempt{err: err}
 			}
-			if err := firmware.PackageMatches(ctx, p.runner, path, device, release); err != nil {
+			err = firmware.PackageMatches(ctx, p.runner, path, device, release)
+			if errors.Is(err, firmware.ErrRawVersion) {
+				readMetadata, lookupErr := newInvocation("cabextract", []string{"-s", "-p", "-F", "*.metainfo.xml", "--", path}, false)
+				if lookupErr != nil {
+					return attempt{err: fmt.Errorf("verifikasi versi CAB memerlukan cabextract sistem: %w", lookupErr)}
+				}
+				metadata := readMetadata.run(ctx, 8*time.Second)
+				if metadata.err != nil {
+					return attempt{err: fmt.Errorf("metainfo CAB tidak dapat dibaca: %w", metadata.err)}
+				}
+				err = firmware.VerifyRawVersion(metadata.output, device, release)
+			}
+			if err != nil {
 				return attempt{err: err}
 			}
 			nowDevice, nowRelease, nowRemote, nowVersion, err := p.firmwareState(ctx, target)

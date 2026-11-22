@@ -1,9 +1,10 @@
 # Changelog
 
-## Unreleased
+## 0.3.9
 
 - Rencana batas clock AMDGPU memakai minimum untuk slot Fmax yang terverifikasi. SMU 13.0.0/7/10 dapat memakai layout `pp_table` yang dikenali dan cocok dengan `OD_RANGE`.
 - Audit storage Windows mempertahankan health dan counter yang sudah terbaca saat inventaris mencapai batas 65 drive, dengan cakupan parsial.
+- Capsule LVFS dengan versi heksadesimal bisa diverifikasi dari metainfo bertanda tangan ketika fwupd 2.0.x melaporkan kegagalan konversi versi yang dikenali. Verifikasi ini memakai `cabextract` sistem.
 
 ## 0.3.8
 

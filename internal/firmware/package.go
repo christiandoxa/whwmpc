@@ -20,6 +20,9 @@ import (
 
 const maxCabinetSize = 128 << 20
 
+// ErrRawVersion requires the version in the authenticated CAB metainfo to be checked separately.
+var ErrRawVersion = errors.New("fwupd tidak dapat menampilkan versi heksadesimal CAB")
+
 // Download downloads only the official CAB recorded in the plan and hashes its exact bytes.
 func Download(ctx context.Context, release Release, dst io.Writer) error {
 	client := &http.Client{
@@ -75,7 +78,12 @@ func download(ctx context.Context, client *http.Client, release Release, dst io.
 // PackageMatches independently checks the downloaded CAB through the fwupd daemon.
 func PackageMatches(ctx context.Context, runner sysrun.Runner, path string, expected Device, want Release) error {
 	r := query(ctx, runner, Args("get-details", path))
-	var doc struct{ Devices []Device }
+	var doc struct {
+		Devices []struct {
+			Device
+			UpdateError string `json:"UpdateError"`
+		}
+	}
 	if availability(r) != domain.Available || json.Unmarshal(r.Output, &doc) != nil || len(doc.Devices) != 1 {
 		return errors.New("CAB bukan paket satu-komponen yang dapat diverifikasi oleh fwupd")
 	}
@@ -89,8 +97,26 @@ func PackageMatches(ctx context.Context, runner sysrun.Runner, path string, expe
 	matchedDigest := slices.ContainsFunc(component.Releases, func(r Release) bool {
 		return r.Remote == LVFS && slices.Contains(r.Checksums, want.SHA256)
 	})
-	if component.ID != expected.ID || !matchedDevice || !matchedRelease || !matchedDigest {
-		return errors.New("perangkat, versi, tanda tangan payload, atau checksum CAB tidak cocok dengan rencana")
+	if component.ID == expected.ID && matchedDevice && matchedDigest {
+		if matchedRelease {
+			return nil
+		}
+		if component.UpdateError == "->convert_version not implemented" && hasRawVersionEvidence(component.Device, expected, want) {
+			return ErrRawVersion
+		}
 	}
-	return nil
+	return errors.New("perangkat, versi, tanda tangan payload, atau checksum CAB tidak cocok dengan rencana")
+}
+
+func hasRawVersionEvidence(component, expected Device, want Release) bool {
+	if _, ok := plannedHexVersion(expected, want); !ok || component.Plugin != expected.Plugin ||
+		component.VersionFormat != expected.VersionFormat || !slices.Equal(component.GUIDs, expected.GUIDs) || len(component.Releases) != 2 {
+		return false
+	}
+	// GetDetails adds the verified CAB release first and the matching catalog digest separately.
+	metadata, digest := component.Releases[0], component.Releases[1]
+	return metadata.Version == "" && metadata.AppstreamID == want.AppstreamID && metadata.Remote == "" && len(metadata.Checksums) == 0 &&
+		slices.Contains(metadata.Flags, "trusted-payload") && slices.Contains(metadata.Flags, "trusted-metadata") &&
+		digest.Version == "" && digest.AppstreamID == "" && len(digest.Flags) == 0 && digest.Remote == LVFS &&
+		slices.Contains(digest.Checksums, want.SHA256)
 }

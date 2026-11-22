@@ -234,3 +234,7 @@ Fixture respons Storage berisi 65 drive mereproduksi galat yang sebelumnya menye
 ## Minimum Fmax SMU 13
 
 Kompilasi header AMDGPU 6.8 dan 7.0 menghasilkan offset Fmax yang sama pada dua layout SMU 13. Tiga dump `pp_table` publik lulus parser dan ditolak saat rentang teks pembanding sengaja diubah. Fixture terpisah menguji minimum Fmax 2000 MHz saat minimum Fmin 400 MHz. Inventaris menampilkan 2000 MHz sebagai batas bawah dan encoding state untuk receipt lama tetap cocok. Planner pada namespace privat menolak 1000 MHz, menerima 2200 MHz, dan mempertahankan preview offset voltase negatif serta pemulihan sah. Preview Renoir fisik tetap baca-saja. [Matriks AMDGPU](HARDWARE.md)
+
+## Versi heksadesimal capsule
+
+CAB Dell Pro Max EC dari LVFS lolos SHA-256 dan verifikasi fwupd. Di fwupd 2.0.20, `GetDetails` memberikan identitas dan trust flags dengan `UpdateError="->convert_version not implemented"` serta versi kosong. Metainfo yang dibaca ke stdout memberi `0x2000d00` yang cocok dengan `0x02000d00`. Test dari CLI menulis satu capsule 518.970 byte ke ESP sementara dengan variabel EFI dummy. Verifikasi melaporkan `reboot_required` dan versi aktif `0x02000c00`. Probe QEMU TCG Ubuntu OVMF melaporkan FMP unsupported dan ESRT absen. [Cakupan verifikasi firmware](FIRMWARE.md)

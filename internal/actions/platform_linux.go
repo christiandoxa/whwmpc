@@ -83,6 +83,7 @@ var executablePaths = map[string][]string{
 	"blkid":       {"/usr/sbin/blkid", "/sbin/blkid"},
 	"busctl":      {"/usr/bin/busctl", "/bin/busctl"},
 	"busybox":     {"/usr/bin/busybox", "/bin/busybox"},
+	"cabextract":  {"/usr/bin/cabextract"},
 	"e2fsck":      {"/usr/sbin/e2fsck", "/sbin/e2fsck"},
 	"env":         {"/usr/bin/env", "/bin/env"},
 	"find":        {"/usr/bin/find", "/bin/find"},
