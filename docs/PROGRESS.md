@@ -238,3 +238,9 @@ Kompilasi header AMDGPU 6.8 dan 7.0 menghasilkan offset Fmax yang sama pada dua 
 ## Versi heksadesimal capsule
 
 CAB Dell Pro Max EC dari LVFS lolos SHA-256 dan verifikasi fwupd. Di fwupd 2.0.20, `GetDetails` memberikan identitas dan trust flags dengan `UpdateError="->convert_version not implemented"` serta versi kosong. Metainfo yang dibaca ke stdout memberi `0x2000d00` yang cocok dengan `0x02000d00`. Test dari CLI menulis satu capsule 518.970 byte ke ESP sementara dengan variabel EFI dummy. Verifikasi melaporkan `reboot_required` dan versi aktif `0x02000c00`. Probe QEMU TCG Ubuntu OVMF melaporkan FMP unsupported dan ESRT absen. [Cakupan verifikasi firmware](FIRMWARE.md)
+
+## Rilis 0.3.9
+
+Tag `v0.3.9` menunjuk `890931c`. Keenam arsip publik lulus SHA-256 dan uji pada runner searsitektur. Manifest build lokal, artefak CI, dan rilis publik identik. Isi `LICENSE` dan `NOTICE` cocok pada keenam paket. Installer Linux lulus upgrade `v0.3.8` → `v0.3.9` sebagai pengguna biasa pada amd64 dan dengan utilitas ARM64 melalui QEMU. Pemeriksaan lokal mencakup 316 tes race, vet, build, verifikasi modul, dan govulncheck. [Rilis](https://github.com/christiandoxa/whwmpc/releases/tag/v0.3.9) · [Workflow rilis](https://github.com/christiandoxa/whwmpc/actions/runs/45034558034) · [CI](https://github.com/christiandoxa/whwmpc/actions/runs/45034264360) · [CI native](https://github.com/christiandoxa/whwmpc/actions/runs/45034264334)
+
+Binari Linux amd64 lulus PTY 80×24 dan 120×36. Urutan 61 event terminal dari galeri rilis cocok dengan rekaman Piko yang dipublikasikan setelah timestamp dikesampingkan. Binari dengan hash yang sama lulus staging CAB Dell pada ESP sementara serta preview baca-saja RTX 3060 dan Renoir. [Rekaman Piko](assets/piko-demo.cast) · [Bukti CAB Dell](assets/fwupd-lvfs-raw-version.json)

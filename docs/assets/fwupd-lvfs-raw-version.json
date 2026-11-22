@@ -1,0 +1,49 @@
+{
+  "scope": "ESRT Dell sintetis dengan bus, mount, user, PID, dan jaringan terisolasi. Firmware memakai ESP sementara dan variabel EFI dummy. Pengujian berakhir sebelum restart.",
+  "release": "v0.3.9",
+  "revision": "890931c3018c78512646ca2985a2fbf8f1179f45",
+  "linux_amd64_binary_sha256": "5b1be1bb90c72423cbe3cdaebac72577297f9aa69052084266ec6e8dc1104086",
+  "backend": {
+    "fwupd": "2.0.20",
+    "only_trusted": true
+  },
+  "cabinet": {
+    "url": "https://fwupd.org/downloads/2c25860de1363680d8172a6b3cbdb76fb77b2f87457fc0e0b87f272d3427f5d9-DGX_Spark_EC_FW_2.13.0_fuse.cab",
+    "sha256": "2c25860de1363680d8172a6b3cbdb76fb77b2f87457fc0e0b87f272d3427f5d9",
+    "bytes": 542901
+  },
+  "device": {
+    "guid": "78c7f535-9b96-43c8-8e4c-84415507151c",
+    "component": "com.dell.uefi78c7f535.firmware"
+  },
+  "metadata": {
+    "version_format": "hex",
+    "get_details_error": "->convert_version not implemented",
+    "reported_version": null,
+    "flags": [
+      "trusted-payload",
+      "trusted-metadata"
+    ],
+    "cabinet_version": "0x2000d00",
+    "selected_version": "0x02000d00"
+  },
+  "apply": {
+    "started": true,
+    "status": "partial",
+    "history_entries": 1
+  },
+  "esp": [
+    {
+      "bytes": 64280,
+      "file": "EFI/ubuntu/fwupdx64.efi"
+    },
+    {
+      "bytes": 518970,
+      "file": "EFI/ubuntu/fw/fwupd-78c7f535-9b96-43c8-8e4c-84415507151c.cap"
+    }
+  ],
+  "verification": {
+    "state": "reboot_required",
+    "installed": "0x02000c00"
+  }
+}

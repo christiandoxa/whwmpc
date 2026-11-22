@@ -39,7 +39,7 @@ $installer = [scriptblock]::Create((Invoke-WebRequest -UseBasicParsing 'https://
 & "$env:LOCALAPPDATA\Programs\whwmpc\whwmpc.exe"
 ```
 
-Jalankan ulang `& $installer` untuk memperbarui. Gunakan `& $installer -Version v0.3.8` untuk memilih tag yang menyediakan arsip Windows, atau jalankan `.\install.ps1` dari checkout repo. Tambahkan `--demo` ke perintah executable untuk mencoba data simulasi. [Skrip PowerShell](install.ps1)
+Jalankan ulang `& $installer` untuk memperbarui. Gunakan `& $installer -Version v0.3.9` untuk memilih tag yang menyediakan arsip Windows, atau jalankan `.\install.ps1` dari checkout repo. Tambahkan `--demo` ke perintah executable untuk mencoba data simulasi. [Skrip PowerShell](install.ps1)
 
 ### Instalasi manual
 
