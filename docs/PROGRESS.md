@@ -218,3 +218,5 @@ Apache License 2.0 dan hak cipta 2026 Christian Doxa Hamasiah terpasang di repos
 ## Installer Windows
 
 `install.ps1` memilih paket amd64 atau arm64, memverifikasi SHA-256, dan mendukung upgrade atau pemilihan tag tanpa Administrator. Workflow native memasang rilis publik pada Windows x64 dan ARM64 dengan Windows PowerShell dan PowerShell 7, lalu memeriksa bahwa checksum salah mempertahankan executable yang sudah terpasang. [Panduan instalasi](../README.md#windows)
+
+Tes regresi telemetry Windows memakai snapshot proses native, membatalkan context pada awal interval sampling, dan memastikan daftar proses kosong dengan status `unknown`. CPU proses baru dihitung bila snapshot pembanding benar-benar diambil. [Provider native](NATIVE.md)

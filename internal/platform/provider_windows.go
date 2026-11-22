@@ -59,8 +59,7 @@ func (Native) Overview(ctx context.Context) domain.Overview {
 		defer runtime.UnlockOSThread()
 	}
 	before, beforeOK := systemTicks()
-	lastProc := firstProc
-	lastProcAt := time.Now()
+	firstProcAt := time.Now()
 loop:
 	for range 3 {
 		timer := time.NewTimer(240 * time.Millisecond)
@@ -90,9 +89,9 @@ loop:
 		o.Memory.Use.Availability = o.Memory.Availability
 	}
 	if ctx.Err() == nil {
-		lastProc = windowsProcessSnapshot(ctx)
+		lastProc := windowsProcessSnapshot(ctx)
+		o.Processes = windowsProcesses(firstProc, lastProc, time.Since(firstProcAt), o.LogicalCPUs)
 	}
-	o.Processes = windowsProcesses(firstProc, lastProc, time.Since(lastProcAt), o.LogicalCPUs)
 	if len(o.Processes) > 0 {
 		o.ProcessStatus = domain.Partial // Protected processes and processes exiting during the window are omitted.
 	}

@@ -1,11 +1,40 @@
 package platform
 
 import (
+	"context"
+	"os"
 	"testing"
 	"time"
 
 	"github.com/christiandoxa/whwmpc/internal/domain"
 )
+
+type cancelOnSampleWait struct {
+	context.Context
+	cancel context.CancelFunc
+}
+
+func (c cancelOnSampleWait) Done() <-chan struct{} {
+	// Process enumeration checks Err. The sampling wait is the first caller of Done.
+	c.cancel()
+	return c.Context.Done()
+}
+
+func TestWindowsOverviewDoesNotReuseProcessSnapshotOnCancel(t *testing.T) {
+	if _, ok := windowsProcessSnapshot(t.Context())[uint32(os.Getpid())]; !ok {
+		t.Fatal("the native process snapshot could not read the test process")
+	}
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+
+	overview := Native{}.Overview(cancelOnSampleWait{Context: ctx, cancel: cancel})
+	if ctx.Err() != context.Canceled {
+		t.Fatal("overview did not reach the sampling wait")
+	}
+	if len(overview.Processes) != 0 || overview.ProcessStatus != domain.Unknown {
+		t.Fatalf("published processes without a second snapshot: %+v (%s)", overview.Processes, overview.ProcessStatus)
+	}
+}
 
 func TestWindowsTelemetryUnits(t *testing.T) {
 	if pct, ok := windowsBusy(tickCounts{0, 100, 0}, tickCounts{70, 180, 20}); !ok || pct != 30 {
