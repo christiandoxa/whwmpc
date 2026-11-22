@@ -2,6 +2,8 @@
 
 Linux dengan systemd user session menyediakan timer dan service oneshot khusus pengguna. Pemasangan executable tidak membuat atau mengaktifkan unit. Jalankan lifecycle secara eksplisit sebagai pengguna biasa dari binari dengan path stabil.
 
+Buka **Lainnya… → Tugas lanjutan → Observasi terjadwal** untuk memeriksa status timer dari TUI. Ubah jadwal atau jalankan lifecycle dari CLI.
+
 ```sh
 whwmpc daemon install --interval 15m
 whwmpc daemon enable

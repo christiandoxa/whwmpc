@@ -36,5 +36,6 @@ Tambahkan pose di `internal/tui/mascot/piko.go` dengan deskripsi mata, mulut, le
 | Data belum tersedia, warning, error, dan hardware kritis | Ekspresi tanya/angkat bahu, perhatian, atau bingung. Temuan kritis menampilkan saran yang diprioritaskan dan penanda header yang bertahan saat membuka hasil lain. |
 | Penghentian | Piko menutup clipboard dan label menyatakan penghentian diminta. Hasil backend tetap tampil setelah pemeriksaan lanjutan, termasuk perubahan teramati atau hasil belum diketahui. |
 | Riwayat, simpan preferensi, dan laporan | Label pembacaan/pencatatan, notifikasi mode, serta kertas printer. Lokasi laporan tampil setelah file selesai ditulis. |
+| Tugas lanjutan | Inventaris GPU, firmware, filesystem, dan timer memakai pose pemeriksaan. Review konfigurasi memakai clipboard. Pengujian kinerja menampilkan label beban yang berjalan. Firmware menunggu verifikasi setelah restart sebelum menampilkan sukses. |
 
 Galeri memuat skenario normal, peringatan, kritis, unknown, pembatalan, dan hasil parsial. Transisi skenario mengikuti Enter untuk memudahkan review setiap keadaan. Jalur aksi nyata mengikuti pesan backend tanpa durasi tunggu buatan.

@@ -16,7 +16,35 @@ tar -xzf whwmpc_snapshot_linux_amd64.tar.gz ./whwmpc
 | macOS arm64 | `whwmpc_<versi>_darwin_arm64.tar.gz` | `whwmpc` |
 | Windows amd64 | `whwmpc_<versi>_windows_amd64.zip` | `whwmpc.exe` |
 
-Arsip Linux mempertahankan nama dan struktur yang dipakai `install.sh`. Pada macOS, pakai `shasum -a 256 -c SHA256SUMS` untuk kumpulan arsip lengkap atau cocokkan hash arsip yang dipilih dengan barisnya di manifest. Pada Windows, gunakan `Get-FileHash -Algorithm SHA256` untuk membandingkan arsip dengan manifest, lalu ekstrak ZIP dan jalankan `.\whwmpc.exe` di PowerShell. Paket macOS berbentuk executable command-line hasil cross-build tanpa notarization. Dependency sistem opsional tetap mengikuti platform dan backend.
+## Pasang dari arsip
+
+Unduh arsip platform dan `SHA256SUMS` dari rilis yang sama. Installer README mengotomatiskan langkah ini untuk Linux. [Halaman rilis](https://github.com/christiandoxa/whwmpc/releases)
+
+Pada Linux atau macOS, ganti nama arsip sesuai unduhan. Gunakan direktori baru untuk ekstraksi.
+
+```sh
+archive=whwmpc_v0.2.0_darwin_arm64.tar.gz
+shasum -a 256 "$archive"
+# Cocokkan hash dengan SHA256SUMS sebelum lanjut.
+tar -xzf "$archive" ./whwmpc
+./whwmpc --version
+./whwmpc
+```
+
+Pada Windows, jalankan di PowerShell.
+
+```powershell
+$archive = 'whwmpc_v0.2.0_windows_amd64.zip'
+Get-FileHash -Algorithm SHA256 $archive
+# Cocokkan hash dengan SHA256SUMS sebelum lanjut.
+Expand-Archive $archive -DestinationPath .\whwmpc
+.\whwmpc\whwmpc.exe --version
+.\whwmpc\whwmpc.exe
+```
+
+Paket macOS berisi executable command-line tanpa notarization. Dependency sistem opsional mengikuti platform dan backend.
+
+## Publikasi
 
 Untuk rilis stabil, tinjau hasil CI pada commit tujuan, buat tag beranotasi `vX.Y.Z`, lalu push tag tersebut. Workflow Release membangun paket dari commit yang ditag. Publikasi menunggu checksum dan smoke executable hasil paket pada keempat runner yang sesuai arsitektur. [Verifikasi tag di GitHub CLI](https://cli.github.com/manual/gh_release_create)
 

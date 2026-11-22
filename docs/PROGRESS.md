@@ -120,3 +120,7 @@ Flow Bersihkan ruang memilih DNF5 atau pacman dari konfigurasi distro dan invent
 ## Backlog E dan I · Pemeriksaan APFS dan NTFS
 
 CLI dan TUI menampilkan inventaris APFS atau NTFS serta cek read-only sesuai privilege dan identitas volume. Fixture memeriksa bentuk argumen, klasifikasi output, perubahan mount dan identitas, serta pembatalan. CI native mencakup inventaris aktual. Pada Linux, tes menjaga agar peringatan dari klaim eksklusif milik pemeriksa tidak menutupi peringatan mount yang sebenarnya. [Filesystem](FILESYSTEM.md)
+
+## Review distribusi 0.2.0
+
+Tugas lanjutan membuka status observasi terjadwal secara baca-saja. Ringkasan pemeriksaan campuran menghitung hasil parsial hanya saat ada data. Benchmark tanpa sampel menampilkan status dan penyebabnya. Panduan memasang arsip, cakupan platform, peta Piko, dan changelog mengikuti fitur yang dapat dijalankan. Verifikasi modul dan govulncheck lulus.

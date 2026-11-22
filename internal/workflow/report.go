@@ -96,13 +96,34 @@ func Collect(ctx context.Context, scanner *inspection.Scanner, overview domain.O
 }
 
 func combine(status ...domain.Availability) domain.Availability {
-	first := status[0]
-	for _, value := range status[1:] {
-		if first != value {
-			return domain.Partial
+	available, withData := 0, 0
+	inaccessible := domain.Availability("")
+	for _, value := range status {
+		switch value {
+		case domain.Available:
+			available++
+			withData++
+		case domain.Partial:
+			withData++
+		case domain.Error:
+			inaccessible = domain.Error
+		case domain.PermissionRequired:
+			if inaccessible != domain.Error {
+				inaccessible = value
+			}
+		default:
+			if inaccessible == "" {
+				inaccessible = value
+			}
 		}
 	}
-	return first
+	if available == len(status) && available > 0 {
+		return domain.Available
+	}
+	if withData > 0 {
+		return domain.Partial
+	}
+	return inaccessible
 }
 
 func ScanReport(ctx context.Context, scanner *inspection.Scanner, overview domain.Overview, lang string, demo bool, entries []state.Entry) (report.Report, error) {

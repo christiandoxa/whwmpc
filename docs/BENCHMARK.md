@@ -1,6 +1,6 @@
 # Uji kinerja
 
-Di TUI buka **Lainnya… → Uji kinerja** untuk memilih beban, melihat batasnya, dan memulai secara eksplisit. Demo mengunci workload. CLI mencetak hasil JSON, termasuk apakah pengujian selesai. Ringkasan dicatat ke riwayat lokal.
+Di TUI buka **Lainnya… → Tugas lanjutan → Uji kinerja** untuk memilih beban, melihat batasnya, dan memulai secara eksplisit. Demo mengunci workload. CLI mencetak hasil JSON, termasuk apakah pengujian selesai. Riwayat lokal menyimpan ringkasan saat ada sampel yang terukur.
 
 ```sh
 whwmpc benchmark cpu --duration 3s

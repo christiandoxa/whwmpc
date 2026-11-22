@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.2.0
+
+- Beranda tiga tugas, ringkasan berbasis cakupan, detail terpisah, review dengan pilihan awal Kembali, dan ekspor snapshot. Piko ringkas mengikuti pemeriksaan dan hasil.
+- Monitoring GPU dan perubahan eksplisit yang didukung NVIDIA/AMDGPU dengan preview, verifikasi, dan restore bersyarat.
+- Inventaris fwupd, rencana pembaruan LVFS, dan verifikasi firmware setelah restart. Perbaikan ext2/3/4 memakai partisi offline dan pembacaan ulang.
+- Observasi systemd user opt-in dan benchmark CPU, stress dengan sensor, serta I/O file yang dibatasi.
+- Inventaris dan pembersihan cache paket Fedora/DNF5 dan Arch/pacman dengan verifikasi cakupan.
+- Provider macOS dan Windows, audit storage, dan cek filesystem APFS/NTFS baca-saja.
+- Paket standalone Linux amd64/arm64, macOS arm64, dan Windows amd64 dengan SHA-256 dan smoke test. Installer Linux mendukung tag rilis eksplisit.
+
 ## 0.1.0
 
 - Asisten Bubble Tea dengan overview Linux, pertanyaan Bahasa Indonesia/Inggris, diagnosis berbasis beberapa sampel, dan preferensi konteks daya.

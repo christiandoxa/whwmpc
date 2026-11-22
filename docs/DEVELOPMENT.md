@@ -20,7 +20,7 @@ go build ./cmd/whwmpc
 
 ## Bukti pengujian
 
-CI menjalankan format, vet, race detector, build, dan smoke PTY Bubble Tea v2 pada Ubuntu 24.04. Smoke memakai ukuran 120×36, 60×18, dan 80×24. Ia menguji fokus masukan, bantuan, klarifikasi, resize, dan pemulihan mode terminal. Linux arm64, macOS arm64, dan Windows amd64 adalah target compile-only di CI.
+CI menjalankan format, vet, race detector, build, dan smoke PTY Bubble Tea v2 pada Ubuntu 24.04. Smoke memakai ukuran 120×36, 60×18, dan 80×24 untuk menguji navigasi tugas, fokus masukan, bantuan, resize, dan pemulihan mode terminal. Workflow terpisah menguji provider pada macOS 15 arm64 dan Windows Server 2025 amd64 serta pembersih cache pada kontainer Arch dan Fedora. Linux arm64 masuk matriks smoke paket saat rilis.
 
 ```sh
 python3 scripts/tui_pty.py ./whwmpc --width 120 --height 36
@@ -31,4 +31,4 @@ bash scripts/release.sh snapshot dist
 
 Fixture dan fake runner meliputi parsing SMART, diagnosis, stale data, kondisi aksi, privacy report, serta preferensi/klaim lintas proses. Tes rutin tidak menjadwalkan TRIM, mengubah profil, atau membersihkan komputer. Probe native yang dicoba hanya membaca data dan membuat preview. Uji mutasi perangkat milik sendiri bersifat opt-in melalui preview/confirm normal, dengan backup dan kondisi yang bisa diperiksa kembali.
 
-[Screenshot 120×36](assets/overview.png) · [Screenshot 80×24](assets/compact.png) · [Rekaman galeri PTY](assets/piko-demo.cast). Aplikasi demo berjalan dalam PTY Linux, lalu event asciicast v2 dirender dengan agg v1.9.0 dan DejaVu Sans Mono. [Cara merekam ulang](RELEASE.md)
+Aplikasi demo berjalan dalam PTY Linux. Event asciicast v2 dirender dengan agg v1.9.0 dan DejaVu Sans Mono. [Screenshot dan rekaman tiga alur](UX.md) · [Rekaman galeri Piko](assets/piko-demo.cast) · [Cara merekam ulang](RELEASE.md)

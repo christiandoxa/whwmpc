@@ -211,11 +211,11 @@ func (m Model) View() tea.View {
 	if m.options.Demo {
 		label += "  /  DEMO"
 	}
+	if m.criticalSSD || m.criticalDisk {
+		label += "  /  " + m.tr(Words{"KRITIS", "CRITICAL"})
+	}
 	if context != "" {
 		label += "  /  " + context
-	}
-	if m.critical {
-		label += "  /  " + m.tr(Words{"KRITIS", "CRITICAL"})
 	}
 	face := mascot.Face(m.visual.pose, m.visual.frame, m.options.ASCII)
 	rows := []string{m.palette.secondary.Render(label) + "   " + m.palette.muted.Render(face+" Piko"), ""}

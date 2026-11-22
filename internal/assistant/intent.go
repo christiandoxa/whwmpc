@@ -22,11 +22,13 @@ const (
 	GPU        Intent = "gpu"
 	Firmware   Intent = "firmware"
 	Filesystem Intent = "filesystem"
+	Daemon     Intent = "daemon"
 )
 
-var Menu = []Intent{Overview, Slow, Storage, Trim, Power, Cleanup, Recommend, History, Report, Settings, Benchmark, GPU, Firmware, Filesystem}
+var Menu = []Intent{Overview, Slow, Storage, Trim, Power, Cleanup, Recommend, History, Report, Settings, Benchmark, GPU, Firmware, Filesystem, Daemon}
 
 var phrases = map[Intent][]string{
+	Daemon:     {"daemon", "observasi terjadwal", "scheduled monitoring"},
 	Firmware:   {"firmware", "uefi", "bios"},
 	Filesystem: {"filesystem", "fsck", "perbaikan storage"},
 	GPU:        {"gpu", "graphics", "kartu grafis"},

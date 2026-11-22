@@ -321,7 +321,7 @@ func validEntry(entry Entry) bool {
 }
 
 func scanCategory(category string) bool {
-	return slices.Contains(assistant.Menu, assistant.Intent(category)) || category == "check" || category == "report" || category == "doctor" || category == "daemon"
+	return slices.Contains(assistant.Menu, assistant.Intent(category)) || category == "check" || category == "report" || category == "doctor"
 }
 
 func actionCategory(category string) bool {

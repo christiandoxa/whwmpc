@@ -45,6 +45,8 @@ func Inspector(scanner *inspection.Scanner, store state.Store, maintenance *work
 		allowActions := maintenance.Available() == nil
 		a := diagnostics.Analyzer{Language: req.Language, Now: scanner.Now()}
 		switch req.Intent {
+		case assistant.Daemon:
+			return daemonPage(ctx, maintenance.Demo, req.Language)
 		case assistant.Firmware:
 			return firmwarePage(ctx, maintenance, req)
 		case assistant.Filesystem:

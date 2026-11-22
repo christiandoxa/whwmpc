@@ -62,3 +62,45 @@ func TestQuickScanThenDetailsKeepsResultAndSelection(t *testing.T) {
 		t.Fatal("back changed snapshot or selection")
 	}
 }
+
+func TestAdvancedMenuShowsDaemonStatusInDemo(t *testing.T) {
+	scanner := inspection.New(true)
+	store := state.Store{}
+	m := New(t.Context(), scanner, Inspector(scanner, store, workflow.NewMaintenance(store, true)),
+		Options{Demo: true, Motion: "off"})
+	m.start(assistant.Overview, Choice{Kind: "more"})
+	m.start(assistant.Overview, Choice{Kind: "advanced"})
+	for _, choice := range m.page.Choices {
+		if choice.Value == string(assistant.Daemon) {
+			cmd := m.start(assistant.Overview, choice)
+			m = step(m, cmd())
+			if !strings.Contains(m.View().Content, "DEMO · status host tidak dibaca") {
+				t.Fatalf("daemon demo status missing: %s", m.View().Content)
+			}
+			return
+		}
+	}
+	t.Fatal("daemon choice missing in advanced menu")
+}
+
+func TestCriticalStatusRequiresCompleteRecheck(t *testing.T) {
+	m := New(t.Context(), inspection.New(true), nil, Options{Language: "en", Motion: "off"})
+	m.page.Findings = []diagnostics.Finding{
+		{Category: "ssd", Severity: diagnostics.Critical},
+		{Category: "disk", Severity: diagnostics.Critical},
+	}
+	m.updateCritical()
+	m.page = Page{Coverage: []workflow.Coverage{
+		{ID: workflow.DiskCheck, Status: domain.Available},
+		{ID: workflow.SSDCheck, Status: domain.PermissionRequired},
+	}}
+	m.updateCritical()
+	if m.criticalDisk || !m.criticalSSD || !strings.Contains(m.View().Content, "CRITICAL") {
+		t.Fatal("critical SMART notice must survive an inaccessible recheck")
+	}
+	m.page.Coverage = []workflow.Coverage{{ID: workflow.SSDCheck, Status: domain.Available}}
+	m.updateCritical()
+	if m.criticalSSD || strings.Contains(m.View().Content, "CRITICAL") {
+		t.Fatal("complete SMART recheck should clear the previous finding")
+	}
+}

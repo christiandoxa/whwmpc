@@ -46,7 +46,10 @@ func runBenchmark(ctx context.Context, scanner *inspection.Scanner, store state.
 		headline = l("Pengujian belum selesai", "Benchmark incomplete")
 		status = domain.Partial
 	}
-	observation := fmt.Sprintf("%s · %.2f s · %.1f MiB/s · %d B", mode, result.DurationSec, result.MiBPerSec, result.ProcessedBytes)
+	observation := l("Belum ada sampel beban yang terukur.", "No workload sample was measured.")
+	if result.ProcessedBytes > 0 {
+		observation = fmt.Sprintf("%s · %.2f s · %.1f MiB/s · %d B", mode, result.DurationSec, result.MiBPerSec, result.ProcessedBytes)
+	}
 	detail := fmt.Sprintf("%s/%s · %d CPU", result.OS, result.Architecture, result.LogicalCPUs)
 	page := Page{Availability: status, Found: []string{headline, observation},
 		Meaning:  []string{l("Bandingkan hanya dengan beban dan kondisi pengujian yang sama.", "Compare only with the same workload and test conditions.")},
@@ -61,8 +64,10 @@ func runBenchmark(ctx context.Context, scanner *inspection.Scanner, store state.
 		Observation: observation, Meaning: detail, At: scanner.Now(), Source: "whwmpc benchmark",
 		Limits: page.Meaning[0]}
 	page.Snapshot = &workflow.Snapshot{Input: report.Input{At: scanner.Now(), Findings: []diagnostics.Finding{f}}}
-	if err := store.RecordScan(string(assistant.Benchmark), scanner.Now(), []diagnostics.Finding{f}); err != nil {
-		page.Advice = append(page.Advice, l("Riwayat tidak tersimpan.", "History was not saved."))
+	if result.ProcessedBytes > 0 {
+		if err := store.RecordScan(string(assistant.Benchmark), scanner.Now(), []diagnostics.Finding{f}); err != nil {
+			page.Advice = append(page.Advice, l("Riwayat tidak tersimpan.", "History was not saved."))
+		}
 	}
 	return page
 }

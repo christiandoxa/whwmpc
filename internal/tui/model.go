@@ -122,7 +122,7 @@ type Model struct {
 	narrow                                       bool
 	motionSaving                                 bool
 	motionPending                                motion.Mode
-	critical                                     bool
+	criticalSSD, criticalDisk                    bool
 	job                                          uint64
 	cancelJob                                    context.CancelFunc
 	workName                                     string
@@ -222,12 +222,12 @@ func (m *Model) start(intent assistant.Intent, choice Choice) tea.Cmd {
 			m.page.Choices = append(m.page.Choices, Choice{m.tr(menuNames[id]), "navigate", string(id)})
 		}
 		m.page.Choices = append(m.page.Choices, Choice{m.tr(Words{"Tanya sesuatu", "Ask a question"}), "ask", ""},
-			Choice{m.tr(Words{"Perangkat lanjutan", "Advanced devices"}), "advanced", ""})
+			Choice{m.tr(Words{"Tugas lanjutan", "Advanced tasks"}), "advanced", ""})
 		return nil
 	case "advanced":
 		m.remember()
 		m.screenState = screenState{screen: taskQuestion, page: Page{Found: []string{m.tr(Words{"Apa yang ingin ditinjau?", "What would you like to review?"})}}}
-		for _, id := range []assistant.Intent{assistant.GPU, assistant.Firmware, assistant.Filesystem, assistant.Benchmark} {
+		for _, id := range []assistant.Intent{assistant.GPU, assistant.Firmware, assistant.Filesystem, assistant.Benchmark, assistant.Daemon} {
 			m.page.Choices = append(m.page.Choices, Choice{m.tr(menuNames[id]), "navigate", string(id)})
 		}
 		return nil
@@ -418,13 +418,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if wasAction {
 			m.screen = outcome
 		}
-		if m.active == assistant.Storage && len(m.page.Findings) > 0 {
-			if m.page.Pose == mascot.Critical {
-				m.critical = true
-			} else if m.page.Availability == domain.Available {
-				m.critical = false
-			}
-		}
+		m.updateCritical()
 		m.showReply()
 		if m.quitPending {
 			cmd = m.quit()
@@ -450,6 +444,31 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	}
 	return m, cmd
+}
+
+func (m *Model) updateCritical() {
+	for _, check := range m.page.Coverage {
+		if check.Status != domain.Available {
+			continue
+		}
+		switch check.ID {
+		case workflow.SSDCheck:
+			m.criticalSSD = false
+		case workflow.DiskCheck:
+			m.criticalDisk = false
+		}
+	}
+	for _, f := range m.page.Findings {
+		if f.Severity != diagnostics.Critical {
+			continue
+		}
+		switch f.Category {
+		case "ssd":
+			m.criticalSSD = true
+		case "disk":
+			m.criticalDisk = true
+		}
+	}
 }
 
 func (m *Model) key(msg tea.KeyPressMsg) tea.Cmd {

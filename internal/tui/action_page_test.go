@@ -87,7 +87,7 @@ func TestPikoCelebratesOnlyVerifiedProfileAndPreservesCriticalNotice(t *testing.
 	}
 	m := New(ctx, platform.Demo{}, nil, Options{Language: "en"})
 	m = step(m, overviewMsg{platform.Demo{}.Overview(ctx)})
-	m.critical, m.page = true, page
+	m.criticalSSD, m.page = true, page
 	m.showReply()
 	if !strings.Contains(m.View().Content, "CRITICAL") {
 		t.Fatal("verification hid an unrelated critical finding")

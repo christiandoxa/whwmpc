@@ -15,6 +15,7 @@ func (w Words) Text(lang string) string {
 }
 
 var menuNames = map[assistant.Intent]Words{
+	assistant.Daemon:     {"Observasi terjadwal", "Scheduled observations"},
 	assistant.Firmware:   {"Firmware", "Firmware"},
 	assistant.Filesystem: {"Pemeriksaan filesystem", "Filesystem checks"},
 	assistant.GPU:        {"GPU dan tuning", "GPU and tuning"},
