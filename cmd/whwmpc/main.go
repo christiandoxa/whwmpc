@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"flag"
 	"fmt"
 	"io"
@@ -42,7 +41,7 @@ func run(ctx context.Context, args []string, stdin *os.File, stdout *os.File, st
 	reduced := flags.Bool("reduced-motion", false, "kurangi animasi")
 	showVersion := flags.Bool("version", false, "tampilkan versi")
 	flags.Usage = func() {
-		fmt.Fprintln(stderr, "whwmpc [opsi] [check --json | doctor | clean | power | trim | apply | restore | demo animations]")
+		fmt.Fprintln(stderr, "whwmpc [opsi] [check --json | doctor | clean | power | trim | apply | restore | report | history | demo animations]")
 		flags.PrintDefaults()
 	}
 	if err := flags.Parse(args); err == flag.ErrHelp {
@@ -80,18 +79,10 @@ func run(ctx context.Context, args []string, stdin *os.File, stdout *os.File, st
 	source := inspection.New(options.Demo)
 	store, stateErr := state.Default()
 	maintenance := workflow.NewMaintenance(store, options.Demo)
-	if len(args) == 2 && args[0] == "check" && args[1] == "--json" {
-		data := struct {
-			Demo     bool `json:"demo"`
-			Overview any  `json:"overview"`
-		}{options.Demo, source.Overview(ctx)}
-		if err := json.NewEncoder(stdout).Encode(data); err != nil {
-			fmt.Fprintln(stderr, err)
-			return 1
-		}
-		return 0
+	if status, handled := reportCommand(ctx, args, source, store, options.Demo, options.Language, stdout, stderr); handled {
+		return status
 	}
-	if status, handled := readCommand(ctx, args, source, options.Demo, stdout, stderr); handled {
+	if status, handled := readCommand(ctx, args, source, maintenance, stdout, stderr); handled {
 		return status
 	}
 	if status, handled := actionCommand(ctx, args, maintenance, stdin, stdout, stderr); handled {
@@ -107,6 +98,9 @@ func run(ctx context.Context, args []string, stdin *os.File, stdout *os.File, st
 			return 0
 		}
 		o := source.Overview(ctx)
+		if options.Demo {
+			fmt.Fprintln(stdout, "DEMO")
+		}
 		fmt.Fprintf(stdout, "whwmpc · %s %s · %s\n", o.OS, o.Arch, o.Availability)
 		return 0
 	}

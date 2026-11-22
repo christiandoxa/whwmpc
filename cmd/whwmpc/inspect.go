@@ -3,27 +3,50 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"maps"
 	"slices"
 	"strings"
 
+	"github.com/christiandoxa/whwmpc/internal/actions"
 	"github.com/christiandoxa/whwmpc/internal/domain"
 	"github.com/christiandoxa/whwmpc/internal/inspection"
+	"github.com/christiandoxa/whwmpc/internal/workflow"
 )
 
-func readCommand(ctx context.Context, args []string, source *inspection.Scanner, demo bool, out, stderr io.Writer) (int, bool) {
+func readCommand(ctx context.Context, args []string, source *inspection.Scanner, maintenance *workflow.Maintenance, out, stderr io.Writer) (int, bool) {
 	if len(args) == 0 || len(args) > 2 || (len(args) == 2 && args[1] != "--json") {
 		return 0, false
 	}
 	asJSON := len(args) == 2
+	demo := maintenance.Demo
 	if demo && !asJSON && slices.Contains([]string{"doctor", "power", "trim"}, args[0]) {
 		fmt.Fprintln(out, "DEMO")
 	}
 	switch args[0] {
 	case "doctor":
 		d := source.Doctor(ctx)
+		cleanup, _ := maintenance.Cleanup(ctx)
+		d.Capabilities["apt_cache_cleanup"] = cleanup.Availability
+		switch {
+		case demo || d.Overview.OS != "linux":
+			d.Capabilities["trim_manual_action"] = domain.Unsupported
+		default:
+			_, err := actions.New().TrimTargets(ctx)
+			switch {
+			case err == nil:
+				d.Capabilities["trim_manual_action"] = domain.Available
+			case errors.Is(err, fs.ErrNotExist):
+				d.Capabilities["trim_manual_action"] = domain.DependencyMissing
+			case errors.Is(err, fs.ErrPermission):
+				d.Capabilities["trim_manual_action"] = domain.PermissionRequired
+			default:
+				d.Capabilities["trim_manual_action"] = domain.Unknown
+			}
+		}
 		if asJSON {
 			return printJSON(out, stderr, d), true
 		}

@@ -50,6 +50,17 @@ type ShutdownMsg struct{}
 func (m *Model) launch(req Request, pose mascot.Pose) tea.Cmd {
 	m.busy, m.cancelling, m.workName = true, false, ""
 	m.activity = pose
+	switch req.Choice.Kind {
+	case "export":
+		m.runningAction = true // retain the file result if cancellation arrives after the write
+		m.workName = m.tr(Words{"Mengumpulkan bukti laporan", "Collecting report evidence"})
+	case "save-scan":
+		m.runningAction = true
+		m.workName = m.tr(Words{"Menyimpan ringkasan lokal", "Saving local summary"})
+	}
+	if req.Intent == assistant.History && req.Choice.Kind == "" {
+		m.workName = m.tr(Words{"Membaca riwayat lokal", "Reading local history"})
+	}
 	if req.Choice.Kind == "apply" {
 		m.actionPose = pose
 		m.activity = mascot.Confirm
@@ -63,6 +74,7 @@ func (m *Model) launch(req Request, pose mascot.Pose) tea.Cmd {
 	sender := m.options.Send
 	if sender != nil {
 		req.Progress = func(stage actions.Stage) { sender(stageMsg{job, stage}) }
+		req.Printing = func() { sender(printingMsg{job}) }
 	}
 	if req.Choice.Kind == "apply" {
 		m.runningAction = true

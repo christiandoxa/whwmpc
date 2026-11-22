@@ -50,6 +50,9 @@ type Page struct {
 }
 
 type Request struct {
+	Output   string
+	Printing func()
+	Findings []diagnostics.Finding
 	Plan     *actions.Plan
 	Progress func(actions.Stage)
 	Intent   assistant.Intent
@@ -70,48 +73,50 @@ const (
 )
 
 type Model struct {
-	ctx           context.Context
-	source        platform.Provider
-	inspect       Inspect
-	options       Options
-	palette       palette
-	input         textinput.Model
-	spinner       spinner.Model
-	meterModel    progress.Model
-	width         int
-	height        int
-	focus         focus
-	selected      int
-	active        assistant.Intent
-	queued        assistant.Intent
-	page          Page
-	overview      domain.Overview
-	busy          bool
-	help          bool
-	detail        bool
-	palSearch     bool
-	scroll        int
-	choice        int
-	now           func() time.Time
-	scheduler     *motion.Scheduler
-	visual        presentation
-	activity      mascot.Pose
-	refreshing    bool
-	question      string
-	toast         string
-	stage         int
-	scenario      string
-	narrow        bool
-	motionSaving  bool
-	motionPending motion.Mode
-	critical      bool
-	job           uint64
-	cancelJob     context.CancelFunc
-	workName      string
-	runningAction bool
-	actionPose    mascot.Pose
-	cancelling    bool
-	quitPending   bool
+	ctx              context.Context
+	source           platform.Provider
+	inspect          Inspect
+	options          Options
+	palette          palette
+	input            textinput.Model
+	spinner          spinner.Model
+	meterModel       progress.Model
+	width            int
+	height           int
+	focus            focus
+	selected         int
+	active           assistant.Intent
+	queued           assistant.Intent
+	page             Page
+	overview         domain.Overview
+	busy             bool
+	help             bool
+	detail           bool
+	palSearch        bool
+	scroll           int
+	choice           int
+	now              func() time.Time
+	scheduler        *motion.Scheduler
+	visual           presentation
+	activity         mascot.Pose
+	refreshing       bool
+	question         string
+	toast            string
+	stage            int
+	scenario         string
+	narrow           bool
+	motionSaving     bool
+	motionPending    motion.Mode
+	critical         bool
+	job              uint64
+	cancelJob        context.CancelFunc
+	workName         string
+	runningAction    bool
+	actionPose       mascot.Pose
+	cancelling       bool
+	quitPending      bool
+	exportType       string
+	criticalOverview bool
 }
 
 func New(ctx context.Context, source platform.Provider, inspect Inspect, opts Options) Model {
@@ -181,6 +186,10 @@ func (m Model) nextRefresh() tea.Cmd {
 func (m Model) tr(w Words) string { return w.Text(m.options.Language) }
 
 func (m *Model) setFocus(f focus) tea.Cmd {
+	if f != inputFocus && m.exportType != "" {
+		m.exportType = ""
+		m.input.Reset()
+	}
 	m.focus = f
 	m.showingFocus()
 	if f == inputFocus {
@@ -211,6 +220,17 @@ func (m *Model) start(intent assistant.Intent, choice Choice) tea.Cmd {
 		m.confirmPage()
 		return nil
 	}
+	if choice.Kind == "export-select" && !m.options.Gallery {
+		m.exportType = choice.Value
+		name := "whwmpc-report.md"
+		if choice.Value == "json" {
+			name = "whwmpc-report.json"
+		}
+		m.input.SetValue(name)
+		m.input.CursorEnd()
+		m.input.Placeholder = m.tr(Words{"Jalur file baru", "New file path"})
+		return m.setFocus(inputFocus)
+	}
 	if choice.Kind == "motion" {
 		return m.setMotion(motion.Mode(choice.Value))
 	}
@@ -224,7 +244,7 @@ func (m *Model) start(intent assistant.Intent, choice Choice) tea.Cmd {
 	if choice.Kind == "apply" && (plan == nil || !m.page.Confirm || choice.Value != plan.ID || m.options.Demo) {
 		return nil
 	}
-	m.active, m.scroll, m.choice, m.detail = intent, 0, 0, false
+	m.active, m.scroll, m.choice, m.detail, m.help = intent, 0, 0, false, false
 	if i := slices.Index(assistant.Menu, intent); i >= 0 {
 		m.selected = i
 	}
@@ -242,6 +262,12 @@ func (m *Model) start(intent assistant.Intent, choice Choice) tea.Cmd {
 		m.settingsPage()
 		return nil
 	}
+	if choice.Kind == "" && intent == assistant.Report && !m.options.Gallery {
+		m.page = reportPage(m.options.Language)
+		m.setFocus(pageFocus)
+		m.showReply()
+		return nil
+	}
 	if m.inspect == nil {
 		m.page = Page{Availability: domain.Unsupported, Found: []string{m.tr(copy.needsData)}}
 		m.showReply()
@@ -253,7 +279,7 @@ func (m *Model) start(intent assistant.Intent, choice Choice) tea.Cmd {
 			m.options.Workload = workload
 		}
 	}
-	request := Request{Intent: intent, Choice: choice, Overview: m.overview, Language: m.options.Language, Workload: m.options.Workload, Plan: plan}
+	request := Request{Intent: intent, Choice: choice, Overview: m.overview, Language: m.options.Language, Workload: m.options.Workload, Plan: plan, Findings: m.page.Findings}
 	return m.launch(request, aimFor(intent, choice, plan))
 }
 
@@ -264,6 +290,7 @@ func (m *Model) updateOverview(data domain.Overview) tea.Cmd {
 	if wasRefreshing {
 		if m.active == assistant.Overview && !m.busy && m.page.Availability != domain.Unknown {
 			m.page = m.overviewFindingPage(data)
+			m.updateOverviewCritical(m.page)
 		}
 		return nil
 	}
@@ -284,6 +311,7 @@ func (m *Model) updateOverview(data domain.Overview) tea.Cmd {
 	}
 	if (wasInitial || m.active == assistant.Overview) && m.page.Availability != domain.Unknown {
 		m.page = m.overviewFindingPage(data)
+		m.updateOverviewCritical(m.page)
 	}
 	return nil
 }
@@ -313,6 +341,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	case stageMsg:
 		m.updateStage(msg)
+	case printingMsg:
+		if m.busy && m.job == msg.job && !m.cancelling {
+			m.activity = mascot.Printing
+			m.show(m.activity, "", true)
+		}
 	case ShutdownMsg:
 		if m.cancelCurrent() {
 			m.quitPending = true
@@ -335,10 +368,15 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.setFocus(pageFocus)
 			m.choice, m.scroll = 0, 0
 		}
-		if m.active == assistant.Storage && msg.page.Availability == domain.Available {
-			m.critical = msg.page.Pose == mascot.Critical
-		} else if msg.page.Pose == mascot.Critical {
-			m.critical = true
+		if m.active == assistant.Storage && len(msg.page.Findings) > 0 {
+			if msg.page.Pose == mascot.Critical {
+				m.critical = true
+			} else if msg.page.Availability == domain.Available {
+				m.critical = false
+			}
+		}
+		if m.active == assistant.Slow && len(msg.page.Findings) > 0 {
+			m.updateOverviewCritical(msg.page)
 		}
 		m.showReply()
 		if m.quitPending {
@@ -428,6 +466,9 @@ func (m *Model) key(msg tea.KeyPressMsg) tea.Cmd {
 	case "?":
 		m.help, m.scroll = !m.help, 0
 		m.accent(false, true)
+		if m.help {
+			return m.setFocus(pageFocus)
+		}
 	case "m":
 		return m.setMotion(m.options.Motion.Next())
 	case "n":
@@ -445,6 +486,17 @@ func (m *Model) key(msg tea.KeyPressMsg) tea.Cmd {
 	case "d":
 		m.detail, m.scroll = !m.detail, 0
 		m.accent(false, true)
+		if m.detail {
+			return m.setFocus(pageFocus)
+		}
+	case "e":
+		if !m.options.Gallery && m.page.Plan == nil {
+			return m.start(assistant.Report, Choice{})
+		}
+	case "s":
+		if !m.options.Demo && len(m.page.Findings) != 0 && m.page.Plan == nil {
+			return m.start(m.active, Choice{Kind: "save-scan"})
+		}
 	case "r":
 		if m.active == assistant.Overview && !m.busy && !m.refreshing {
 			m.busy = true
@@ -510,8 +562,16 @@ func (m *Model) submit() tea.Cmd {
 	if value == "" {
 		return nil
 	}
+	format := m.exportType
+	m.exportType = ""
 	m.input.Reset()
 	m.setFocus(pageFocus)
+	if format != "" && !m.options.Gallery && !m.busy && m.inspect != nil {
+		req := Request{Intent: assistant.Report, Choice: Choice{Kind: "export", Value: format}, Output: value,
+			Overview: m.overview, Language: m.options.Language}
+		m.question = ""
+		return m.launch(req, mascot.Scanning)
+	}
 	m.question = domain.SafeText(value)
 	if m.options.Gallery {
 		for _, choice := range m.page.Choices {
@@ -625,5 +685,14 @@ func (m Model) overviewFindingPage(data domain.Overview) Page {
 	}
 	a := diagnostics.Analyzer{Language: m.options.Language, Now: at}
 	page = withFindings(page, a.Overview(data), m.options.Language)
+	if !m.options.Demo {
+		page.Choices = appendChoice(page.Choices, saveScanChoice(m.options.Language))
+	}
 	return page
+}
+
+func (m *Model) updateOverviewCritical(page Page) {
+	m.criticalOverview = slices.ContainsFunc(page.Findings, func(f diagnostics.Finding) bool {
+		return f.Severity == diagnostics.Critical
+	})
 }

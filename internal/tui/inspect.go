@@ -20,9 +20,20 @@ import (
 )
 
 func Inspector(scanner *inspection.Scanner, store state.Store, maintenance *workflow.Maintenance) Inspect {
-	return func(ctx context.Context, req Request) Page {
+	return func(ctx context.Context, req Request) (page Page) {
+		defer func() {
+			if !maintenance.Demo && len(page.Findings) > 0 {
+				page.Choices = appendChoice(page.Choices, saveScanChoice(req.Language))
+			}
+		}()
 		if page, handled := previewAction(ctx, maintenance, req); handled {
 			return page
+		}
+		if req.Choice.Kind == "export" {
+			return exportReport(ctx, scanner, store, req, maintenance.Demo)
+		}
+		if req.Choice.Kind == "save-scan" {
+			return saveScan(scanner, store, req, maintenance.Demo)
 		}
 		allowActions := maintenance.Available() == nil
 		a := diagnostics.Analyzer{Language: req.Language, Now: scanner.Now()}
@@ -44,6 +55,8 @@ func Inspector(scanner *inspection.Scanner, store state.Store, maintenance *work
 				page.Choices = actionChoices(page.Choices, page.Findings, nil)
 			}
 			return page
+		case assistant.History:
+			return historyPage(store, maintenance, req.Language)
 		case assistant.Cleanup:
 			return cleanupPage(ctx, maintenance, req.Language)
 		case assistant.Slow:

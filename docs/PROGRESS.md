@@ -44,3 +44,11 @@
 - Piko memakai aktivitas aktual untuk revalidasi, eksekusi, verifikasi, pembatalan, dan hasil. Konfirmasi diblokir jika terminal terlalu kecil untuk menampilkan rencana.
 - Fixture mencakup penggantian target, expiry, replay, sudo/permission, cancel/partial, dan restore. Preview baca-saja pada Linux amd64 untuk APT, profil daya, dan TRIM manual. Mutasi perangkat nyata tidak dijalankan.
 - Berikutnya riwayat dan laporan untuk pengguna, distribusi, serta bukti visual final.
+
+## 6 · Riwayat dan laporan
+
+- Riwayat lokal berbatas 100 entri, ringkasan scan opt-in, status tindakan, dan pemilihan pemulihan dari bukti privat. Kunci dan penerbitan catatan diuji dengan penulis paralel.
+- Ekspor JSON skema 1 serta Markdown memakai proyeksi redaksi yang sama. Piko menampilkan tahap penulisan dan lokasi hanya setelah file berhasil dipublikasikan. File yang sudah ada dipertahankan.
+- TUI dan CLI mendukung laporan fixture yang tidak membaca history host. `doctor` membedakan tool TRIM, eligibility aksi manual, dan dukungan cache APT.
+- Gate lokal mencakup gofmt, vet, test, race, build, smoke demo CLI, dan smoke PTY. Pemeriksaan dependency mengembalikan semua modul terverifikasi dan tanpa kerentanan yang terdeteksi oleh govulncheck.
+- Berikutnya artefak PTY final, paket snapshot, dan audit dokumentasi.

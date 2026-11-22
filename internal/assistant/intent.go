@@ -17,9 +17,10 @@ const (
 	Recommend Intent = "recommend"
 	History   Intent = "history"
 	Settings  Intent = "settings"
+	Report    Intent = "report"
 )
 
-var Menu = []Intent{Overview, Slow, Storage, Trim, Power, Cleanup, Recommend, History, Settings}
+var Menu = []Intent{Overview, Slow, Storage, Trim, Power, Cleanup, Recommend, History, Report, Settings}
 
 var phrases = map[Intent][]string{
 	Overview:  {"overview", "check everything", "system status", "health check", "keseluruhan", "ringkasan", "kondisi komputer"},
@@ -31,6 +32,7 @@ var phrases = map[Intent][]string{
 	Recommend: {"recommend", "recommendation", "suggestions", "rekomendasi", "saran", "profil cocok"},
 	History:   {"history", "riwayat", "audit log"},
 	Settings:  {"settings", "motion", "pengaturan", "animasi"},
+	Report:    {"report", "export", "laporan", "ekspor"},
 }
 
 func Route(input string) []Intent {

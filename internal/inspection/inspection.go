@@ -82,7 +82,7 @@ type Doctor struct {
 func (s *Scanner) Doctor(ctx context.Context) Doctor {
 	o := s.Overview(ctx)
 	d := Doctor{Demo: s.demo, Overview: o, Tools: map[string]domain.Availability{}, Capabilities: map[string]domain.Availability{}}
-	for _, tool := range []string{"smartctl", "fstrim", "systemctl", "journalctl", "busctl", "apt-get", "apt-config", "sudo"} {
+	for _, tool := range []string{"smartctl", "fstrim", "busybox", "systemctl", "journalctl", "busctl", "apt-get", "apt-config", "sudo"} {
 		status := domain.DependencyMissing
 		switch {
 		case s.demo:

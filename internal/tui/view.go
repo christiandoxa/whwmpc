@@ -175,7 +175,7 @@ func (m Model) header(w int) []string {
 	if !m.overview.CapturedAt.IsZero() {
 		status += "  " + m.palette.muted.Render(m.overview.CapturedAt.Format("15:04:05"))
 	}
-	if m.critical {
+	if m.critical || m.criticalOverview {
 		status = m.palette.alert.Render(m.tr(Words{"KRITIS", "CRITICAL"})) + "  " + status
 	}
 	sub := m.palette.muted.Render(m.tr(copy.tagline))
@@ -301,7 +301,10 @@ func (m Model) box(width, height int, title string, lines []string, focus bool) 
 
 func (m Model) navPanel(width int) string {
 	var lines []string
-	for i, intent := range assistant.Menu {
+	visible := min(len(assistant.Menu), m.panelHeight()-3)
+	start := max(0, m.selected-visible+1)
+	for index, intent := range assistant.Menu[start : start+visible] {
+		i := start + index
 		name := m.tr(menuNames[intent])
 		line := "  " + name
 		if m.selected == i {
@@ -327,7 +330,7 @@ func (m Model) sessionPanel(width int) string {
 	action := m.palette.muted.Render(m.tr(menuNames[m.active]))
 	if len(m.page.Choices) > 0 && !m.help && !m.detail && !m.busy {
 		choice := m.page.Choices[m.choice]
-		action = m.palette.secondary.Render(fmt.Sprintf("%s %s %s", m.symbol("‹", "<"), choice.Label, m.symbol("›", ">")))
+		action = m.palette.secondary.Render(fmt.Sprintf("%s %d/%d %s %s", m.symbol("‹", "<"), m.choice+1, len(m.page.Choices), choice.Label, m.symbol("›", ">")))
 	} else if len(all) > room {
 		action = m.palette.muted.Render(fmt.Sprintf("↕ %d–%d / %d", at+1, min(at+room, len(all)), len(all)))
 	}
@@ -362,6 +365,8 @@ func (m Model) sessionLines(w int) []string {
 			"Tab / Shift+Tab · " + m.tr(Words{"pindah fokus", "change focus"}),
 			"Enter · " + m.tr(Words{"buka atau lanjut", "open or continue"}),
 			"/ · " + m.tr(copy.palette),
+			"e · " + m.tr(Words{"ekspor laporan", "export report"}),
+			"s · " + m.tr(Words{"simpan ringkasan", "save summary"}),
 			"m · " + m.tr(Words{"atur mode gerak", "change motion mode"}),
 			"d · " + m.tr(copy.details),
 			"r · " + m.tr(Words{"periksa ulang", "scan again"}),
@@ -388,6 +393,9 @@ func (m Model) sessionLines(w int) []string {
 		}
 		if m.busy && m.page.Availability == "" {
 			stage := m.workName
+			if m.activity == mascot.Printing && !m.cancelling {
+				stage = displayStage(mascot.Printing, m.options.Language)
+			}
 			if stage == "" {
 				stage = displayStage(m.activity, m.options.Language)
 			}
@@ -429,10 +437,14 @@ func (m Model) evidencePanel(width int) string {
 
 func (m Model) prompt(width int) string {
 	tag := m.palette.muted
+	label := m.tr(copy.ask)
+	if m.exportType != "" {
+		label = m.tr(Words{"FILE", "FILE"})
+	}
 	if m.focus == inputFocus {
 		tag = m.palette.accent
 	}
-	return ansi.Truncate(tag.Render(m.tr(copy.ask))+"  "+tag.Render(m.symbol("›", ">"))+"  "+m.input.View(), width, "")
+	return ansi.Truncate(tag.Render(label)+"  "+tag.Render(m.symbol("›", ">"))+"  "+m.input.View(), width, "")
 }
 
 func (m Model) footer(w int) string {
@@ -445,7 +457,11 @@ func (m Model) footer(w int) string {
 	}
 	switch m.focus {
 	case inputFocus:
-		text = m.tr(Words{"Enter kirim   Esc kembali   Tab fokus", "Enter send   Esc back   Tab focus"})
+		if m.exportType != "" {
+			text = m.tr(Words{"Jalur file baru · Enter ekspor   Esc batal", "New file path · Enter export   Esc cancel"})
+		} else {
+			text = m.tr(Words{"Enter kirim   Esc kembali   Tab fokus", "Enter send   Esc back   Tab focus"})
+		}
 	case pageFocus:
 		text = m.tr(Words{"↑↓ gulir   ←→ tindakan   Enter pilih   d bukti   Tab fokus   ?", "↑↓ scroll   ←→ actions   Enter select   d evidence   Tab focus   ?"})
 	default:

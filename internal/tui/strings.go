@@ -24,6 +24,7 @@ var menuNames = map[assistant.Intent]Words{
 	assistant.Recommend: {"Rekomendasi", "Recommendations"},
 	assistant.History:   {"Riwayat", "History"},
 	assistant.Settings:  {"Pengaturan", "Settings"},
+	assistant.Report:    {"Laporan", "Report"},
 }
 
 var statusNames = map[domain.Availability]Words{
