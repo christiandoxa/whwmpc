@@ -25,10 +25,10 @@ Gunakan `~/.local/bin/whwmpc --demo` untuk mencoba data simulasi. Jika `~/.local
 Untuk memasang versi tertentu, sertakan tag rilis.
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/christiandoxa/whwmpc/main/install.sh | sh -s -- v0.4.0
+curl -fsSL https://raw.githubusercontent.com/christiandoxa/whwmpc/main/install.sh | sh -s -- v0.5.0
 ```
 
-Jika sudah punya checkout repo, jalankan `./install.sh` atau `./install.sh v0.4.0` dari direktori repo. [Skrip installer](install.sh)
+Jika sudah punya checkout repo, jalankan `./install.sh` atau `./install.sh v0.5.0` dari direktori repo. [Skrip installer](install.sh)
 
 ### Windows
 
@@ -47,10 +47,10 @@ Gunakan `& $exe --demo` untuk mencoba data simulasi. Jalankan ulang `& $installe
 Untuk memasang versi tertentu yang menyediakan arsip Windows, sertakan tag rilis.
 
 ```powershell
-& $installer -Version v0.4.0
+& $installer -Version v0.5.0
 ```
 
-Jika sudah punya checkout repo, jalankan `.\install.ps1` atau `.\install.ps1 -Version v0.4.0` dari direktori repo. [Skrip PowerShell](install.ps1)
+Jika sudah punya checkout repo, jalankan `.\install.ps1` atau `.\install.ps1 -Version v0.5.0` dari direktori repo. [Skrip PowerShell](install.ps1)
 
 ### Instalasi manual
 
@@ -58,7 +58,7 @@ Untuk instalasi dari arsip di Linux, macOS, atau Windows, pilih paket yang cocok
 
 ### Navigasi
 
-Pada build `main`, pilih tujuan lebih dulu. Layar akses muncul sebelum pemeriksaan pertama dengan **Mulai tanpa administrator** sebagai pilihan awal. Pilihan administrator memakai prompt sistem operasi dan melanjutkan tujuan yang sudah dipilih. Ganti tingkat akses dari Pengaturan. [Cakupan Linux, macOS, dan Windows](docs/PRIVILEGE.md)
+Pilih tujuan lebih dulu. Layar akses muncul sebelum pemeriksaan pertama dengan **Mulai tanpa administrator** sebagai pilihan awal. Pilihan administrator memakai prompt sistem operasi dan melanjutkan tujuan yang sudah dipilih. Ganti tingkat akses dari Pengaturan. [Cakupan Linux, macOS, dan Windows](docs/PRIVILEGE.md)
 
 Beranda menyediakan **Cek kondisi PC**, **Cari penyebab PC lambat**, dan **Bersihkan ruang**. Gunakan **Pemeriksaan lain** untuk SSD, TRIM, daya, riwayat, laporan, pengaturan, dan pertanyaan bebas. **Tugas lanjutan** membuka GPU, firmware, filesystem, benchmark, dan status observasi terjadwal.
 

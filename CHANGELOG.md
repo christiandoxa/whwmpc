@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.5.0
+
+- Beranda menawarkan Cek kondisi PC, Cari penyebab PC lambat, dan Bersihkan ruang. Pemeriksaan lain tetap dapat dibuka dari beranda.
+- Pilih tujuan sebelum mengatur akses. Pilihan awal tanpa administrator langsung menjalankan pemeriksaan yang dipilih. Jika autentikasi ditolak atau dibatalkan, pemeriksaan berlanjut dengan akses biasa dan alasannya tampil pada hasil.
+- Layar akses menampilkan cakupan baca administrator untuk tugas yang dipilih. Ringkasan mengutamakan temuan pemeriksaan, dengan tingkat akses dan cakupan ditampilkan terpisah.
+
 ## 0.4.0
 
 - Piko menawarkan Pemeriksaan Biasa atau Mendalam saat startup. Mendalam memakai helper baca terbatas melalui `sudo` di Linux dan macOS atau UAC di Windows. Pengguna bisa mengganti mode di Pengaturan. CLI menyediakan `--privileged-read` untuk otorisasi yang sudah tersedia.
