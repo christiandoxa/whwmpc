@@ -17,6 +17,7 @@ import (
 	"github.com/christiandoxa/whwmpc/internal/diagnostics"
 	"github.com/christiandoxa/whwmpc/internal/domain"
 	"github.com/christiandoxa/whwmpc/internal/platform"
+	"github.com/christiandoxa/whwmpc/internal/privread"
 	"github.com/christiandoxa/whwmpc/internal/tui/mascot"
 	"github.com/christiandoxa/whwmpc/internal/tui/motion"
 	"github.com/christiandoxa/whwmpc/internal/workflow"
@@ -29,6 +30,7 @@ type Options struct {
 	Scheduler            *motion.Scheduler
 	SaveMotion           func(motion.Mode) error
 	Authenticate         Authenticator
+	Privilege            *privread.Session
 	Send                 func(tea.Msg)
 	Workload             assistant.Workload
 }
@@ -116,6 +118,7 @@ type Model struct {
 	visual                                       presentation
 	activity, actionPose                         mascot.Pose
 	overview                                     domain.Overview
+	readStart                                    uint64
 	lastChecked                                  time.Time
 	lastCoverage                                 string
 	toast                                        string
@@ -149,6 +152,8 @@ func New(ctx context.Context, source platform.Provider, inspect Inspect, opts Op
 	if opts.Gallery {
 		m.screen = gallery
 		m.galleryPage()
+	} else if opts.Privilege != nil {
+		m.privilegeChoices()
 	}
 	m.accent(false, true)
 	return m
@@ -221,6 +226,20 @@ func (m *Model) start(intent assistant.Intent, choice Choice) tea.Cmd {
 	}
 	plan := m.page.Plan
 	switch choice.Kind {
+	case "check-level":
+		m.remember()
+		m.privilegeChoices()
+		return nil
+	case "ordinary":
+		m.options.Privilege.Disable()
+		m.privilegeHome()
+		return nil
+	case "deep-scope":
+		m.remember()
+		m.privilegeScope()
+		return nil
+	case "deep-authorize":
+		return m.authorizeReads()
 	case "back", "cancel-plan":
 		return m.returnTo()
 	case "more":
@@ -360,6 +379,19 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.input.SetWidth(max(1, w-4))
 	case overviewMsg:
 		m.overview = msg.data
+	case privilegeMsg:
+		if m.job == msg.job && m.busy {
+			m.cancelJob()
+			m.cancelJob = nil
+			m.busy, m.cancelling, m.workName = false, false, ""
+			m.privilegeHome()
+			if msg.err != nil && !m.options.Privilege.State().Requested {
+				m.toast = privilegeReason(privread.State{Err: msg.err}, m.options.Language)
+			}
+			if m.quitPending {
+				cmd = m.quit()
+			}
+		}
 	case authMsg:
 		if msg.job == m.job && m.busy {
 			if msg.err != nil || msg.ctx.Err() != nil {
@@ -424,6 +456,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		if m.screen == results || m.screen == outcome {
 			summary := summarize(m.page, m.active, m.options.Language)
+			m.summarizeReads(&summary)
 			m.page.Summary = &summary
 		}
 		m.updateCritical()
@@ -682,6 +715,9 @@ func (m *Model) settingsPage() {
 	})}}
 	for _, mode := range []motion.Mode{motion.Full, motion.Reduced, motion.Off} {
 		m.page.Choices = append(m.page.Choices, Choice{Label: string(mode), Kind: "motion", Value: string(mode)})
+	}
+	if m.options.Privilege != nil {
+		m.page.Choices = append(m.page.Choices, Choice{Label: m.tr(Words{"Tingkat pemeriksaan", "Inspection level"}), Kind: "check-level"})
 	}
 	m.showReply()
 }

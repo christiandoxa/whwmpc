@@ -125,6 +125,21 @@ def press(terminal, key):
     terminal.hold(0.22)
 
 
+def choose_level(terminal, deep):
+    terminal.expect("Pemeriksaan biasa")
+    if deep:
+        press(terminal, b"\x1b[A")
+        press(terminal, b"\r")
+        terminal.expect("Izinkan pemeriksaan mendalam?")
+        terminal.expect("SSD / SMART")
+        press(terminal, b"\x1b[B")
+    press(terminal, b"\r")
+    terminal.expect("Mau dibantu apa?")
+    terminal.expect("Mendalam" if deep else "Biasa")
+    if deep and (terminal.output.count(ENTER_ALT) < 2 or LEAVE_ALT not in terminal.output):
+        raise RuntimeError("authorization did not release and restore the alternate screen")
+
+
 def task_flow(terminal, flow, resize=False):
     terminal.expect("Mau dibantu apa?")
     index = ("condition", "slow", "cleanup").index(flow)
@@ -194,6 +209,7 @@ def main():
     parser.add_argument("--gallery", action="store_true", help="record the normal fixture flow in the Piko gallery")
     parser.add_argument("--app-arg", action="append", default=[], help="extra demo flag in a recording")
     parser.add_argument("--flow", choices=("condition", "slow", "cleanup"))
+    parser.add_argument("--deep", action="store_true", help="choose deep inspection using fixtures")
     args = parser.parse_args()
     if not 80 <= args.width <= 240 or not 24 <= args.height <= 80 or not 0.5 <= args.duration <= 30:
         parser.error("use 80–240 columns, 24–80 rows and 0.5–30 seconds")
@@ -212,8 +228,12 @@ def main():
         )
         try:
             terminal.expect("DEMO")
+            if not args.gallery:
+                choose_level(terminal, args.deep)
             if args.flow:
                 task_flow(terminal, args.flow, resize=args.record is None)
+                if args.deep and args.flow == "condition":
+                    terminal.expect("Pemeriksaan mendalam selesai")
                 if args.record is not None:
                     terminal.hold(1)
                     recording = terminal.events[:]

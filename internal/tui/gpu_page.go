@@ -9,17 +9,17 @@ import (
 	"github.com/christiandoxa/whwmpc/internal/diagnostics"
 	"github.com/christiandoxa/whwmpc/internal/domain"
 	"github.com/christiandoxa/whwmpc/internal/hardware"
+	"github.com/christiandoxa/whwmpc/internal/inspection"
 	"github.com/christiandoxa/whwmpc/internal/report"
-	"github.com/christiandoxa/whwmpc/internal/sysrun"
 	"github.com/christiandoxa/whwmpc/internal/workflow"
 )
 
-func gpuPage(ctx context.Context, m *workflow.Maintenance, lang string) Page {
+func gpuPage(ctx context.Context, scanner *inspection.Scanner, m *workflow.Maintenance, lang string) Page {
 	l := translator(lang)
 	if m.Demo {
 		return Page{Availability: domain.Unsupported, Found: []string{l("DEMO · akses GPU terkunci", "DEMO · GPU access locked")}}
 	}
-	return gpuInventoryPage(hardware.Scan(ctx, sysrun.Native{}), m.Available() == nil, lang)
+	return gpuInventoryPage(scanner.GPU(ctx), m.Available() == nil, lang)
 }
 
 func gpuInventoryPage(snapshot hardware.Snapshot, canTune bool, lang string) Page {

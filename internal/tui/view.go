@@ -66,7 +66,9 @@ func (m Model) choices() []Choice {
 	if (m.screen == results || m.screen == outcome) && m.page.Summary != nil {
 		primary := m.page.Summary.Primary
 		choices := []Choice{primary}
-		if primary.Kind == "details" && m.page.Snapshot != nil {
+		if primary.Kind == "details" && m.page.Summary.RetryRead {
+			choices = append(choices, m.retryReadChoice())
+		} else if primary.Kind == "details" && m.page.Snapshot != nil {
 			choices = append(choices, Choice{m.tr(Words{"Simpan hasil ini", "Save these results"}), "save-snapshot", ""})
 		}
 		if primary.Kind != "details" {
@@ -128,6 +130,11 @@ func (m Model) body(w int) []string {
 			text(l("Belum diperiksa", "No checks yet"), m.palette.muted)
 		} else {
 			text(l("Pemeriksaan terakhir", "Last check")+" · "+m.lastChecked.Local().Format("02 Jan 15:04")+" · "+m.lastCoverage, m.palette.muted)
+		}
+		if m.options.Privilege != nil {
+			if st := m.options.Privilege.State(); st.Requested && !st.Active {
+				text(privilegeReason(st, m.options.Language), m.palette.alert)
+			}
 		}
 	case more:
 		title(l("Apa yang ingin dibuka?", "What would you like to open?"))
@@ -250,6 +257,13 @@ func (m Model) View() tea.View {
 	}
 	if context != "" {
 		label += "  /  " + context
+	}
+	if m.options.Privilege != nil && !m.options.Gallery {
+		if m.options.Privilege.State().Active {
+			label += "  /  " + m.tr(Words{"Mendalam", "Deep"})
+		} else {
+			label += "  /  " + m.tr(Words{"Biasa", "Ordinary"})
+		}
 	}
 	header := m.palette.secondary.Render(label)
 	const mascotGap = 2

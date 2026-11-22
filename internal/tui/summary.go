@@ -20,6 +20,7 @@ type ResultSummary struct {
 	Statuses           []resultStatus
 	Highlights         []string
 	Primary            Choice
+	RetryRead          bool
 }
 
 type resultMetric struct {

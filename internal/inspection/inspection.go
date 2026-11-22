@@ -4,22 +4,43 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sync"
 	"time"
 
 	"github.com/christiandoxa/whwmpc/internal/domain"
+	"github.com/christiandoxa/whwmpc/internal/filesystem"
+	"github.com/christiandoxa/whwmpc/internal/firmware"
+	"github.com/christiandoxa/whwmpc/internal/hardware"
 	"github.com/christiandoxa/whwmpc/internal/platform"
 	"github.com/christiandoxa/whwmpc/internal/power"
+	"github.com/christiandoxa/whwmpc/internal/privread"
 	"github.com/christiandoxa/whwmpc/internal/storage"
 	"github.com/christiandoxa/whwmpc/internal/sysrun"
 )
 
 type Scanner struct {
 	platform.Provider
-	runner sysrun.Runner
-	demo   bool
-	cache  sync.Mutex
-	smart  storage.SMARTAudit
+	Privilege *privread.Session
+	runner    sysrun.Runner
+	demo      bool
+	cache     sync.Mutex
+	smart     storage.SMARTAudit
+}
+
+func (s *Scanner) Overview(ctx context.Context) domain.Overview {
+	o := s.Provider.Overview(ctx)
+	if o.Temperature.Celsius == nil || o.Temperature.Availability != domain.Available {
+		var t domain.Temperature
+		if s.read(ctx, privread.Temperature, &t) && (t.Celsius != nil || o.Temperature.Celsius == nil) {
+			o.Temperature = t
+		}
+	}
+	return o
+}
+
+func (s *Scanner) read(ctx context.Context, op privread.Operation, out any) bool {
+	return !s.demo && s.Privilege != nil && ctx.Err() == nil && s.Privilege.Read(ctx, op, out)
 }
 
 func New(demo bool) *Scanner {
@@ -51,6 +72,10 @@ func (s *Scanner) SMART(ctx context.Context, fresh bool) storage.SMARTAudit {
 	if s.demo {
 		return demoSMART()
 	}
+	var privileged storage.SMARTAudit
+	if s.read(ctx, privread.SMART, &privileged) {
+		return privileged
+	}
 	s.cache.Lock()
 	defer s.cache.Unlock()
 	const smartInterval = 2 * time.Minute
@@ -68,6 +93,14 @@ func (s *Scanner) TRIM(ctx context.Context) storage.TrimAudit {
 	if s.demo {
 		return demoTrim()
 	}
+	var privileged privread.TrimReading
+	if s.read(ctx, privread.TRIM, &privileged) {
+		for i, path := range privileged.Paths {
+			m := &privileged.Audit.Mounts[i]
+			m.Point, m.Source, m.Root, m.MountOptions = path.Point, path.Source, path.Root, path.Options
+		}
+		return privileged.Audit
+	}
 	timeout, cancel := context.WithTimeout(ctx, 12*time.Second)
 	defer cancel()
 	return (storage.Collector{Runner: s.runner}).InspectTrim(timeout)
@@ -77,9 +110,42 @@ func (s *Scanner) Power(ctx context.Context) power.Snapshot {
 	if s.demo {
 		return demoPower()
 	}
+	var privileged privread.PowerReading
+	if s.read(ctx, privread.Power, &privileged) {
+		privileged.Snapshot.OS = runtime.GOOS
+		privileged.Snapshot.Profiles.Target, privileged.Snapshot.Profiles.API = privileged.Target, privileged.API
+		return privileged.Snapshot
+	}
 	timeout, cancel := context.WithTimeout(ctx, 12*time.Second)
 	defer cancel()
 	return power.Scan(timeout, os.DirFS("/"), s.runner)
+}
+
+func (s *Scanner) GPU(ctx context.Context) hardware.Snapshot {
+	var privileged privread.GPUReading
+	if s.read(ctx, privread.GPU, &privileged) {
+		for i, id := range privileged.IDs {
+			privileged.Snapshot.Devices[i].ID = id
+		}
+		return privileged.Snapshot
+	}
+	return hardware.Scan(ctx, s.runner)
+}
+
+func (s *Scanner) Firmware(ctx context.Context, localUpdates bool) firmware.Snapshot {
+	var privileged firmware.Snapshot
+	if !localUpdates && s.read(ctx, privread.Firmware, &privileged) {
+		return privileged
+	}
+	return firmware.Collect(ctx, s.runner, localUpdates)
+}
+
+func (s *Scanner) Filesystem(ctx context.Context) filesystem.Snapshot {
+	var privileged filesystem.Snapshot
+	if s.read(ctx, privread.Filesystem, &privileged) {
+		return privileged
+	}
+	return filesystem.Discover(ctx, s.runner)
 }
 
 type Doctor struct {

@@ -25,6 +25,7 @@ jobs:
         run: python3 scripts/tui_pty.py ./whwmpc --width 120 --height 36
       - run: python3 scripts/tui_pty.py ./whwmpc --width 80 --height 24 --flow slow
       - run: python3 scripts/tui_pty.py ./whwmpc --width 80 --height 24 --flow cleanup
+      - run: python3 scripts/tui_pty.py ./whwmpc --width 80 --height 24 --flow condition --deep
 
   compile:
     runs-on: ubuntu-24.04

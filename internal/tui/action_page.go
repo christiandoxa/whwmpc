@@ -79,6 +79,9 @@ func (m *Model) launch(req Request, pose mascot.Pose) tea.Cmd {
 	}
 	m.job++
 	job := m.job
+	if m.options.Privilege != nil {
+		m.readStart = m.options.Privilege.State().Reads
+	}
 	ctx, cancel := context.WithCancel(m.ctx)
 	m.cancelJob = cancel
 	m.show(m.activity, "", req.Choice.Kind != "apply")

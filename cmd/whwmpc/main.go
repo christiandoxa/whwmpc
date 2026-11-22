@@ -7,6 +7,8 @@ import (
 	"io"
 	"os"
 	"os/signal"
+	"slices"
+	"sync/atomic"
 	"syscall"
 
 	tea "charm.land/bubbletea/v2"
@@ -14,6 +16,7 @@ import (
 
 	"github.com/christiandoxa/whwmpc/internal/assistant"
 	"github.com/christiandoxa/whwmpc/internal/inspection"
+	"github.com/christiandoxa/whwmpc/internal/privread"
 	"github.com/christiandoxa/whwmpc/internal/state"
 	"github.com/christiandoxa/whwmpc/internal/tui"
 	"github.com/christiandoxa/whwmpc/internal/tui/motion"
@@ -22,10 +25,28 @@ import (
 
 var version = "dev"
 
+type interruptAccess struct{}
+
 func main() {
-	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	args := os.Args[1:]
+	if len(args) > 0 && args[0] == privread.HelperFlag {
+		os.Exit(privread.RunHelper(args[1:]))
+	}
+	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	os.Exit(run(ctx, os.Args[1:], os.Stdin, os.Stdout, os.Stderr))
+	var access atomic.Pointer[privread.Session]
+	signals := make(chan os.Signal, 1)
+	signal.Notify(signals, os.Interrupt, syscall.SIGTERM)
+	go func() {
+		for sig := range signals {
+			if current := access.Load(); sig == os.Interrupt && current != nil && current.Interrupt() {
+				continue
+			}
+			cancel()
+			return
+		}
+	}()
+	os.Exit(run(context.WithValue(ctx, interruptAccess{}, &access), args, os.Stdin, os.Stdout, os.Stderr))
 }
 
 func run(ctx context.Context, args []string, stdin *os.File, stdout *os.File, stderr io.Writer) int {
@@ -40,6 +61,7 @@ func run(ctx context.Context, args []string, stdin *os.File, stdout *os.File, st
 	noMotion := flags.Bool("no-animations", false, "matikan animasi")
 	reduced := flags.Bool("reduced-motion", false, "kurangi animasi")
 	showVersion := flags.Bool("version", false, "tampilkan versi")
+	privileged := flags.Bool("privileged-read", false, "izinkan pembacaan tambahan pada check, doctor, power, atau trim tanpa prompt")
 	flags.Usage = func() {
 		fmt.Fprintln(stderr, "whwmpc [opsi] [check --json | doctor | clean | power | trim | apply | restore | report | history | gpu | firmware | filesystem | daemon | benchmark | demo animations]")
 		flags.PrintDefaults()
@@ -77,6 +99,22 @@ func run(ctx context.Context, args []string, stdin *os.File, stdout *os.File, st
 		options.Motion = motion.Reduced
 	}
 	source := inspection.New(options.Demo)
+	access := privread.New(privread.Native(), options.Demo)
+	source.Privilege = access
+	defer access.Disable()
+	if active, ok := ctx.Value(interruptAccess{}).(*atomic.Pointer[privread.Session]); ok {
+		active.Store(access)
+		defer active.Store(nil)
+	}
+	if *privileged {
+		if !privilegedCommand(args) {
+			fmt.Fprintln(stderr, "--privileged-read mendukung check, doctor, power, dan trim dengan opsi --json.")
+			return 2
+		}
+		if err := access.Enable(ctx, privread.Check, nil, stderr); err != nil {
+			return printError(stderr, err)
+		}
+	}
 	store, stateErr := state.Default()
 	maintenance := workflow.NewMaintenance(store, options.Demo)
 	if status, handled := storageActionCommand(ctx, args, maintenance, stdout, stderr); handled {
@@ -92,9 +130,15 @@ func run(ctx context.Context, args []string, stdin *os.File, stdout *os.File, st
 		return status
 	}
 	if status, handled := reportCommand(ctx, args, source, store, options.Demo, options.Language, stdout, stderr); handled {
+		if status == 0 && *privileged && !access.State().Active {
+			return printError(stderr, access.State().Err)
+		}
 		return status
 	}
 	if status, handled := readCommand(ctx, args, source, maintenance, stdout, stderr); handled {
+		if status == 0 && *privileged && !access.State().Active {
+			return printError(stderr, access.State().Err)
+		}
 		return status
 	}
 	if status, handled := actionCommand(ctx, args, maintenance, stdin, stdout, stderr); handled {
@@ -116,7 +160,7 @@ func run(ctx context.Context, args []string, stdin *os.File, stdout *os.File, st
 		fmt.Fprintf(stdout, "whwmpc · %s %s · %s\n", o.OS, o.Arch, o.Availability)
 		return 0
 	}
-	if os.Geteuid() == 0 && !options.Demo {
+	if privread.Elevated() && !options.Demo {
 		fmt.Fprintln(stderr, "Jalankan TUI whwmpc sebagai user biasa.")
 		return 1
 	}
@@ -136,6 +180,7 @@ func run(ctx context.Context, args []string, stdin *os.File, stdout *os.File, st
 	scheduler := motion.NewScheduler()
 	options.Scheduler = scheduler
 	options.Authenticate = maintenance.Authenticate
+	options.Privilege = access
 	var p *tea.Program
 	options.Send = func(msg tea.Msg) { p.Send(msg) }
 	// Keep the event loop available for a verification result after cancellation.
@@ -158,4 +203,9 @@ func run(ctx context.Context, args []string, stdin *os.File, stdout *os.File, st
 		return 1
 	}
 	return 0
+}
+
+func privilegedCommand(args []string) bool {
+	return (len(args) == 1 || len(args) == 2 && args[1] == "--json") &&
+		slices.Contains([]string{"check", "doctor", "power", "trim"}, args[0])
 }

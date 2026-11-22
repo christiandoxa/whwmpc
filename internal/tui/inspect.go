@@ -48,11 +48,11 @@ func Inspector(scanner *inspection.Scanner, store state.Store, maintenance *work
 		case assistant.Daemon:
 			return daemonPage(ctx, store, scanner.Now, maintenance.Demo, req.Language)
 		case assistant.Firmware:
-			return firmwarePage(ctx, maintenance, req)
+			return firmwarePage(ctx, scanner, maintenance, req)
 		case assistant.Filesystem:
-			return filesystemPage(ctx, maintenance, req)
+			return filesystemPage(ctx, scanner, maintenance, req)
 		case assistant.GPU:
-			return gpuPage(ctx, maintenance, req.Language)
+			return gpuPage(ctx, scanner, maintenance, req.Language)
 		case assistant.Storage:
 			snapshot := scanner.SMART(ctx, req.Choice.Kind == "rescan")
 			page := withFindings(storagePage(snapshot, req.Language), a.SMART(snapshot), req.Language)
@@ -84,7 +84,7 @@ func Inspector(scanner *inspection.Scanner, store state.Store, maintenance *work
 			return page
 		case assistant.History:
 			if req.Choice.Kind == "firmware-resume" {
-				return firmwarePage(ctx, maintenance, req)
+				return firmwarePage(ctx, scanner, maintenance, req)
 			}
 			return historyPage(store, maintenance, req.Language)
 		case assistant.Cleanup:

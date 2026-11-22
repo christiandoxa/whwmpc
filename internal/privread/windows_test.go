@@ -31,6 +31,11 @@ func TestWindowsLocalPipeValidatesItsPeer(t *testing.T) {
 	}()
 	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
 	defer cancel()
+	process, err := windows.OpenProcess(windows.SYNCHRONIZE, false, uint32(os.Getpid()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer windows.CloseHandle(process)
 	connected := make(chan error, 1)
 	release := make(chan struct{})
 	go func() {
@@ -51,7 +56,7 @@ func TestWindowsLocalPipeValidatesItsPeer(t *testing.T) {
 		}
 		connected <- err
 	}()
-	if err := acceptWindowsPipe(ctx, pipe, windows.CurrentProcess()); err != nil {
+	if err := acceptWindowsPipe(ctx, pipe, process); err != nil {
 		t.Fatal(err)
 	}
 	var pid uint32

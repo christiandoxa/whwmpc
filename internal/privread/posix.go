@@ -24,10 +24,17 @@ func nativeCapability() error {
 	if elevated() {
 		return nil
 	}
-	if _, err := protectedExecutable("/usr/bin/sudo", 0); err != nil {
-		return errors.Join(ErrUnavailable, err)
+	_, err := systemSudo()
+	return err
+}
+
+func systemSudo() (string, error) {
+	for _, path := range []string{"/usr/bin/sudo", "/bin/sudo"} {
+		if executable, err := protectedExecutable(path, 0); err == nil {
+			return executable, nil
+		}
 	}
-	return nil
+	return "", errors.Join(ErrUnavailable, errors.New("a trusted system sudo executable is missing"))
 }
 
 func nativeStart(ctx context.Context, scope Scope, terminal *os.File, stderr io.Writer) (io.ReadWriteCloser, error) {
@@ -48,9 +55,9 @@ func nativeStart(ctx context.Context, scope Scope, terminal *os.File, stderr io.
 	}
 	executable, args := self, []string{HelperFlag, string(scope)}
 	if !elevated() {
-		executable, err = protectedExecutable("/usr/bin/sudo", 0)
+		executable, err = systemSudo()
 		if err != nil {
-			return nil, errors.Join(ErrUnavailable, err)
+			return nil, err
 		}
 		mode := "--non-interactive"
 		if terminal != nil {

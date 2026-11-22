@@ -91,10 +91,10 @@ func (s *Session) Enable(ctx context.Context, scope Scope, terminal *os.File, st
 	if scope != All && scope != Check {
 		return ErrProtocol
 	}
-	s.Disable()
 	ctx, cancel := context.WithTimeout(ctx, 90*time.Second)
 	defer cancel()
 	s.mu.Lock()
+	s.reset()
 	epoch := s.epoch
 	s.cancel = cancel
 	s.mu.Unlock()
@@ -148,6 +148,10 @@ func (s *Session) Interrupt() bool {
 func (s *Session) Disable() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	s.reset()
+}
+
+func (s *Session) reset() {
 	s.epoch++
 	if s.cancel != nil {
 		s.cancel()

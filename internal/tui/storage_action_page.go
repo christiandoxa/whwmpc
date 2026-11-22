@@ -13,13 +13,14 @@ import (
 	"github.com/christiandoxa/whwmpc/internal/domain"
 	"github.com/christiandoxa/whwmpc/internal/filesystem"
 	"github.com/christiandoxa/whwmpc/internal/firmware"
+	"github.com/christiandoxa/whwmpc/internal/inspection"
 	"github.com/christiandoxa/whwmpc/internal/report"
 	"github.com/christiandoxa/whwmpc/internal/sysrun"
 	"github.com/christiandoxa/whwmpc/internal/tui/mascot"
 	"github.com/christiandoxa/whwmpc/internal/workflow"
 )
 
-func firmwarePage(ctx context.Context, m *workflow.Maintenance, req Request) Page {
+func firmwarePage(ctx context.Context, scanner *inspection.Scanner, m *workflow.Maintenance, req Request) Page {
 	l := translator(req.Language)
 	if m.Demo {
 		return Page{Availability: domain.Unsupported, Found: []string{l("DEMO · akses firmware terkunci", "DEMO · firmware access locked")}}
@@ -46,7 +47,7 @@ func firmwarePage(ctx context.Context, m *workflow.Maintenance, req Request) Pag
 		return firmwareVerificationPage(firmware.Outcome(ctx, sysrun.Native{}, req.Choice.Value), req.Language)
 	}
 	updates := req.Choice.Kind == "firmware-cache"
-	return firmwareInventoryPage(firmware.Collect(ctx, sysrun.Native{}, updates), req.Language, updates, m.Available() == nil)
+	return firmwareInventoryPage(scanner.Firmware(ctx, updates), req.Language, updates, m.Available() == nil)
 }
 
 func firmwareInventoryPage(snap firmware.Snapshot, lang string, updates, canPlan bool) Page {
@@ -137,7 +138,7 @@ func firmwareVerificationPage(v firmware.Verification, lang string) Page {
 	return page
 }
 
-func filesystemPage(ctx context.Context, m *workflow.Maintenance, req Request) Page {
+func filesystemPage(ctx context.Context, scanner *inspection.Scanner, m *workflow.Maintenance, req Request) Page {
 	l := translator(req.Language)
 	if m.Demo {
 		return Page{Availability: domain.Unsupported, Found: []string{l("DEMO · akses filesystem terkunci", "DEMO · filesystem access locked")}}
@@ -160,7 +161,7 @@ func filesystemPage(ctx context.Context, m *workflow.Maintenance, req Request) P
 		page.Snapshot = maintenanceSnapshot(r.Availability, "filesystem", "Filesystem checker", fmt.Sprintf("%s · exit %d", r.State, r.ExitCode))
 		return page
 	}
-	snap := filesystem.Discover(ctx, sysrun.Native{})
+	snap := scanner.Filesystem(ctx)
 	page := Page{Availability: snap.Availability, Found: []string{l("Volume yang terlihat", "Detected volumes"), statusNames[snap.Availability].Text(req.Language)}}
 	s := &ResultSummary{Headline: page.Found[0], Statuses: []resultStatus{{Label: l("Backend", "Backend"), Value: snap.Backend, Availability: snap.Availability}}}
 	page.Summary = s

@@ -12,6 +12,7 @@ import (
 	"github.com/christiandoxa/whwmpc/internal/assistant"
 	"github.com/christiandoxa/whwmpc/internal/domain"
 	"github.com/christiandoxa/whwmpc/internal/firmware"
+	"github.com/christiandoxa/whwmpc/internal/inspection"
 	"github.com/christiandoxa/whwmpc/internal/platform"
 	"github.com/christiandoxa/whwmpc/internal/tui/mascot"
 	"github.com/christiandoxa/whwmpc/internal/workflow"
@@ -158,7 +159,7 @@ func TestFirmwareResumeReturnsToUpdatedHistory(t *testing.T) {
 func TestCancelledFirmwareResumeShowsCancellation(t *testing.T) {
 	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
-	page := firmwarePage(ctx, &workflow.Maintenance{}, Request{Language: "en", Choice: Choice{Kind: "firmware-resume"}})
+	page := firmwarePage(ctx, inspection.New(false), &workflow.Maintenance{}, Request{Language: "en", Choice: Choice{Kind: "firmware-resume"}})
 	if page.Pose != mascot.Cancelled || page.Availability != domain.Unknown || page.refreshHistory {
 		t.Fatalf("unexpected cancellation result: %+v", page)
 	}
