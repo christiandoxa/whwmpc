@@ -29,10 +29,7 @@ for target in linux/amd64 linux/arm64 darwin/amd64 darwin/arm64 windows/amd64 wi
     mkdir -p "$package/LICENSES"
     go build -mod=readonly -trimpath -buildvcs=false -ldflags="-s -w -X main.version=$version" \
         -o "$package/$executable" ./cmd/whwmpc
-    install -m 0644 README.md "$package/"
-    if [[ -f LICENSE ]]; then
-        install -m 0644 LICENSE "$package/"
-    fi
+    install -m 0644 README.md LICENSE NOTICE "$package/"
     install -m 0644 "$(go env GOROOT)/LICENSE" "$package/LICENSES/Go"
 
     go list -mod=readonly -deps -f '{{with .Module}}{{if not .Main}}{{printf "%s\t%s" .Path .Dir}}{{end}}{{end}}' ./cmd/whwmpc \

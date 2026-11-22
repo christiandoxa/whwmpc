@@ -100,3 +100,7 @@ Tool opsional di Linux mencakup `smartctl` (smartmontools), util-linux dan syste
 Preferensi Linux mengikuti `XDG_CONFIG_HOME` (default `~/.config/whwmpc`), sedangkan state mengikuti `XDG_STATE_HOME` (default `~/.local/state/whwmpc`). macOS dan Windows memakai direktori konfigurasi pengguna dari OS. Aplikasi membuat file konfigurasi ketika preferensi disimpan.
 
 [Arsitektur](docs/ARCHITECTURE.md) · [Aturan diagnosis](docs/DIAGNOSTICS.md) · [Pengembangan dan tes](docs/DEVELOPMENT.md) · [Progres](docs/PROGRESS.md) · [Changelog](CHANGELOG.md)
+
+## Lisensi
+
+whwmpc menggunakan Apache License 2.0. Hak cipta © 2026 Christian Doxa Hamasiah. [LICENSE](LICENSE) · [NOTICE](NOTICE)

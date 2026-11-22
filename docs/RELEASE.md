@@ -1,6 +1,6 @@
 # Build dan rilis
 
-Jalankan dari checkout lokal menggunakan versi Go yang tercantum di `go.mod`. Workflow dan skrip paket memakai Ubuntu dengan GNU tar, GNU coreutils, dan Python 3. Arsip berisi executable, README, dan pemberitahuan lisensi untuk Go serta dependensi yang masuk ke executable. Build lintas platform memakai `CGO_ENABLED=0`. Arsip memakai urutan serta timestamp stabil, dengan mode `0644` untuk dokumen dan lisensi.
+Jalankan dari checkout lokal menggunakan versi Go yang tercantum di `go.mod`. Workflow dan skrip paket memakai Ubuntu dengan GNU tar, GNU coreutils, dan Python 3. Arsip berisi executable, README, `LICENSE`, `NOTICE`, serta lisensi Go dan dependensi yang masuk ke executable. Build lintas platform memakai `CGO_ENABLED=0`. Arsip memakai urutan serta timestamp stabil, dengan mode `0644` untuk dokumen dan lisensi.
 
 ```sh
 bash scripts/release.sh snapshot

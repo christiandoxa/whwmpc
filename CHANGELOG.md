@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.3.8
+
+- Proyek menggunakan Apache License 2.0 dengan hak cipta Christian Doxa Hamasiah. Paket standalone menyertakan `LICENSE` dan `NOTICE`.
+
 ## 0.3.7
 
 - Katalog fwupd mempertahankan kandidat UEFI capsule saat perangkat lain memakai versi alfanumerik seperti `MU05.1`. Versi dengan format di luar token rencana tetap dapat diperiksa sebagai metadata.
