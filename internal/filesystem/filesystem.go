@@ -1,13 +1,11 @@
-// Package filesystem discovers offline candidates for Linux e2fsprogs.
+// Package filesystem discovers volumes and checks them with the platform's native tools.
 package filesystem
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"os"
 	"regexp"
-	"runtime"
 	"strings"
 
 	"github.com/christiandoxa/whwmpc/internal/domain"
@@ -35,6 +33,7 @@ type Volume struct {
 	Filesystem string   `json:"fstype"`
 	UUID       string   `json:"uuid,omitempty"`
 	ReadOnly   bool     `json:"ro"`
+	Locked     bool     `json:"locked,omitempty"`
 	Mounts     []string `json:"mountpoints,omitempty"`
 	Size       uint64   `json:"size"`
 }
@@ -79,43 +78,10 @@ func availability(r sysrun.Result) domain.Availability {
 }
 
 func Discover(ctx context.Context, runner sysrun.Runner) Snapshot {
-	if runtime.GOOS != "linux" {
-		return Snapshot{Availability: domain.Unsupported}
-	}
 	if runner == nil {
 		runner = sysrun.Native{}
 	}
-	path, err := runner.LookPath("lsblk")
-	if err != nil {
-		return Snapshot{Availability: domain.DependencyMissing, Detail: "lsblk dari util-linux tidak tersedia."}
-	}
-	got := runner.Run(ctx, path, "--json", "--paths", "--list", "--bytes", "--output", "NAME,MAJ:MIN,TYPE,FSTYPE,UUID,RO,MOUNTPOINTS,SIZE")
-	s := Snapshot{Availability: availability(got), Backend: "e2fsprogs"}
-	if s.Availability != domain.Available {
-		s.Detail = "Inventaris volume lsblk tidak tersedia."
-		return s
-	}
-	var data struct {
-		Volumes *[]Volume `json:"blockdevices"`
-	}
-	if err := json.Unmarshal(got.Output, &data); err != nil || data.Volumes == nil {
-		s.Availability, s.Detail = domain.Error, "JSON inventaris volume lsblk tidak lengkap."
-		return s
-	}
-	seen := make(map[string]bool)
-	for _, v := range *data.Volumes {
-		if !devicePath.MatchString(v.Device) || !numericID.MatchString(v.ID) || seen[v.ID] {
-			s.Availability = domain.Partial
-			continue
-		}
-		seen[v.ID] = true
-		v.Kind, v.Filesystem = domain.SafeText(v.Kind), domain.SafeText(v.Filesystem)
-		for i, mount := range v.Mounts {
-			v.Mounts[i] = domain.SafeText(mount)
-		}
-		s.Volumes = append(s.Volumes, v)
-	}
-	return s
+	return discover(ctx, runner)
 }
 
 func (s Snapshot) Select(target string) (Volume, error) {

@@ -79,14 +79,17 @@ func filesystemPage(ctx context.Context, m *workflow.Maintenance, req Request) P
 	page := Page{Availability: snap.Availability, Found: []string{l("Volume yang terlihat", "Detected volumes"), statusNames[snap.Availability].Text(req.Language)}}
 	page.Advice = []string{l("Perbaikan ext memerlukan volume offline dan cadangan. Gunakan lingkungan pemulihan bila volume sedang terpasang.",
 		"Ext repair requires an offline volume and backup. Use a recovery environment when the volume is mounted.")}
+	if snap.Backend != "e2fsprogs" && snap.Detail != "" {
+		page.Advice = []string{snap.Detail}
+	}
 	page.Evidence = append(page.Evidence, snap.Detail)
 	page.Snapshot = maintenanceSnapshot(snap.Availability, "filesystem", "Filesystem inventory", fmt.Sprintf("%d volumes detected", len(snap.Volumes)))
 	for _, v := range snap.Volumes {
 		target := domain.SafeText(v.Device)
 		page.Evidence = append(page.Evidence, fmt.Sprintf("%s · %s · mounted=%t", target, v.Filesystem, v.Mounted()))
-		if v.OfflineCandidate() {
+		if v.CheckCandidate() {
 			page.Choices = append(page.Choices, Choice{l("Periksa baca-saja", "Check read-only") + " " + target, "filesystem-check", v.Device})
-			if !v.ReadOnly && m.Available() == nil {
+			if v.OfflineCandidate() && !v.ReadOnly && m.Available() == nil {
 				page.Choices = append(page.Choices, Choice{l("Tinjau perbaikan", "Review repair") + " " + target, actions.FilesystemRepair, v.Device})
 			}
 		}

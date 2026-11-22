@@ -48,6 +48,27 @@ func TestDirectProbeRejectsChangedIdentity(t *testing.T) {
 	}
 }
 
+func TestOfflineInterpretationOnlyIgnoresOwnExclusiveReadClaim(t *testing.T) {
+	const operand = "/proc/42/fd/8"
+	const ownLock = "Warning!  " + operand + " is in use.\n"
+	for _, tt := range []struct {
+		output string
+		state  string
+	}{
+		{ownLock + "Pass 1: Checking inodes\n", "clean"},
+		{"label\n" + ownLock, "clean"},
+		{ownLock + "Fix? no\n", "errors_detected"},
+		{ownLock + "Warning!  /dev/vdb1 is mounted.\n", "mount_changed"},
+		{"Warning!  /proc/42/fd/9 is in use.\n", "mount_changed"},
+		{ownLock + ownLock, "mount_changed"},
+	} {
+		got := InterpretExclusive(sysrun.Result{Output: []byte(tt.output)}, "/dev/vdb1", operand)
+		if got.State != tt.state {
+			t.Fatalf("interpret %q = %s, want %s", tt.output, got.State, tt.state)
+		}
+	}
+}
+
 // Only the disposable regular file created here is formatted or modified.
 func TestOfflineToolsOnTemporaryExt4Image(t *testing.T) {
 	native := sysrun.Native{}

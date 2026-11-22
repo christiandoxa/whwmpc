@@ -116,3 +116,7 @@ Verifikasi firmware pascarestart mengikuti format riwayat fwupd 2.0.20. Versi ya
 ## Backlog H · Cache Fedora dan Arch
 
 Flow Bersihkan ruang memilih DNF5 atau pacman dari konfigurasi distro dan inventaris backend. Tes pada kedua image kontainer amd64 memeriksa lock native, penolakan rencana stale, kandidat terhapus, sentinel tetap utuh, dan klaim satu kali. CLI dry-run diuji sebagai user biasa di kedua kontainer. [Cakupan backend](PACKAGE-CACHE.md)
+
+## Backlog E dan I · Pemeriksaan APFS dan NTFS
+
+CLI dan TUI menampilkan inventaris APFS atau NTFS serta cek read-only sesuai privilege dan identitas volume. Fixture memeriksa bentuk argumen, klasifikasi output, perubahan mount dan identitas, serta pembatalan. CI native mencakup inventaris aktual. Pada Linux, tes menjaga agar peringatan dari klaim eksklusif milik pemeriksa tidak menutupi peringatan mount yang sebenarnya. [Filesystem](FILESYSTEM.md)

@@ -1,6 +1,6 @@
 # Pembersihan cache paket
 
-Buka **Bersihkan ruang** di Home atau jalankan `whwmpc clean --dry-run`. Keduanya membaca konfigurasi package manager, menampilkan cakupan yang diperiksa, dan menghitung ukuran file yang bisa dibaca. `whwmpc clean --dry-run --write-plan cache.json` menyimpan pratinjau untuk `whwmpc apply --file cache.json --confirm ID`. Periksa ID, cakupan, dan dampak rencana sebelum mengonfirmasi. Unduhan dapat diperlukan lagi setelah cache dihapus.
+Buka **Bersihkan ruang** di Home atau jalankan `whwmpc clean --dry-run`. Keduanya membaca konfigurasi package manager, menampilkan cakupan, dan menjumlahkan ukuran file dari metadata yang bisa diperiksa. `whwmpc clean --dry-run --write-plan cache.json` menyimpan pratinjau untuk `whwmpc apply --file cache.json --confirm ID`. Periksa ID, cakupan, dan dampak rencana sebelum mengonfirmasi. Unduhan dapat diperlukan lagi setelah cache dihapus.
 
 | Distro | Backend yang diuji | Cakupan |
 | --- | --- | --- |

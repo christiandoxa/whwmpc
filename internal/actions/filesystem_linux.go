@@ -124,7 +124,7 @@ func (p linuxPlatform) filesystemRepair(ctx context.Context, target string) (pre
 			}
 			defer locked.Close()
 			outcome, stderr, code := run(ctx, 12*time.Minute, inv.exe.path, filesystem.E2fsckArgs(tool.path, operand, false))
-			check := filesystem.Interpret(sysrun.Result{Output: outcome.output, Stderr: stderr, ExitCode: code, Err: outcome.err}, target)
+			check := filesystem.InterpretExclusive(sysrun.Result{Output: outcome.output, Stderr: stderr, ExitCode: code, Err: outcome.err}, target, operand)
 			return filesystemResult(exitCode, check, step)
 		},
 	}, nil

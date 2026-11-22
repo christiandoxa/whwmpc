@@ -2,6 +2,7 @@ package filesystem
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -89,6 +90,18 @@ func Operand(f *os.File) string {
 // ExclusiveRead refuses a block volume claimed by a mount in any namespace.
 func ExclusiveRead(file *os.File) (*os.File, error) {
 	return os.OpenFile(Operand(file), os.O_RDONLY|unix.O_NONBLOCK|unix.O_EXCL, 0)
+}
+
+// InterpretExclusive handles the warning from e2fsck's own exclusive-open probe.
+// The caller must still hold our read claim on operand while interpreting this result.
+func InterpretExclusive(r sysrun.Result, target, operand string) CheckResult {
+	line := []byte("Warning!  " + operand + " is in use.\n")
+	if bytes.HasPrefix(r.Output, line) {
+		r.Output = r.Output[len(line):]
+	} else {
+		r.Output = bytes.Replace(r.Output, append([]byte{'\n'}, line...), []byte{'\n'}, 1)
+	}
+	return Interpret(r, target)
 }
 
 func requireOffline(id string) error {
@@ -218,7 +231,7 @@ func Check(ctx context.Context, runner sysrun.Runner, target string) CheckResult
 	if native, ok := runner.(sysrun.Native); ok && native.Timeout == 0 {
 		checker = sysrun.Native{Timeout: 2 * time.Minute}
 	}
-	result := Interpret(checker.Run(ctx, env, E2fsckArgs(tool, operand, false)...), target)
+	result := InterpretExclusive(checker.Run(ctx, env, E2fsckArgs(tool, operand, false)...), target, operand)
 	if err := requireOffline(v.ID); err != nil {
 		return CheckResult{Availability: domain.Unknown, State: "mount_changed", Device: target, ExitCode: result.ExitCode, Detail: "Mount berubah selama pemeriksaan."}
 	}
