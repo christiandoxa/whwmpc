@@ -175,6 +175,9 @@ func (m Model) header(w int) []string {
 	if !m.overview.CapturedAt.IsZero() {
 		status += "  " + m.palette.muted.Render(m.overview.CapturedAt.Format("15:04:05"))
 	}
+	if !m.options.Demo && !m.overview.CapturedAt.IsZero() && m.now().Sub(m.overview.CapturedAt) > 30*time.Second {
+		status = m.palette.alert.Render(m.tr(statusNames[domain.Stale])) + "  " + status
+	}
 	if m.critical || m.criticalOverview {
 		status = m.palette.alert.Render(m.tr(Words{"KRITIS", "CRITICAL"})) + "  " + status
 	}
@@ -219,7 +222,7 @@ func (m Model) cards(w int) string {
 	}
 	diskTrail := m.tr(copy.missing)
 	if diskOK {
-		diskTrail = fmt.Sprintf("%s %s", bytesText(disk.FreeBytes), m.tr(Words{"bebas", "free"}))
+		diskTrail = fmt.Sprintf("%s %s", bytesText(disk.FreeBytes), m.tr(Words{"sisa", "free"}))
 	}
 	labels := []string{"CPU", m.tr(copy.memory), m.tr(copy.disk), m.tr(copy.temp)}
 	values := []string{percent(cpu, cpuOK), percent(mem, memOK), percent(disk.UsedPercent, diskOK), temp}
@@ -401,6 +404,9 @@ func (m Model) sessionLines(w int) []string {
 			}
 			add(m.palette.secondary.Render(stage))
 		}
+		if m.stalePage() {
+			add(m.palette.alert.Render(m.tr(Words{"Data kedaluwarsa · r periksa ulang", "Stale data · r to rescan"})))
+		}
 		if m.page.Priority != "" {
 			add(m.palette.alert.Render(domain.SafeText(m.page.Priority)))
 		}
@@ -415,7 +421,10 @@ func (m Model) sessionLines(w int) []string {
 }
 
 func (m Model) evidencePanel(width int) string {
-	override := m.page.Evidence
+	override := m.page.Sidebar
+	if len(override) == 0 {
+		override = m.page.Evidence
+	}
 	if len(override) == 0 {
 		override = overviewPage(m.overview, m.options.Language).Evidence
 	}
@@ -425,12 +434,15 @@ func (m Model) evidencePanel(width int) string {
 	if m.visual.pose == mascot.Critical || m.visual.pose == mascot.Warning || m.visual.pose == mascot.Error {
 		style = m.palette.alert
 	}
+	padding := strings.Repeat(" ", max(0, (width-4-mascot.Width)/2))
 	for _, line := range mascot.Render(m.visual.pose, m.visual.frame, m.options.ASCII) {
-		lines = append(lines, "  "+style.Render(line))
+		lines = append(lines, padding+style.Render(line))
 	}
 	lines = append(lines, "")
 	for _, evidence := range override {
-		lines = append(lines, strings.Split(ansi.Wrap(m.palette.muted.Render(domain.SafeText(evidence)), width-4, ""), "\n")...)
+		for _, line := range strings.Split(ansi.Wrap(domain.SafeText(evidence), width-4, ""), "\n") {
+			lines = append(lines, m.palette.muted.Render(line))
+		}
 	}
 	return m.box(width, m.panelHeight(), m.tr(copy.evidence), lines, false)
 }
@@ -498,6 +510,9 @@ func overviewPage(o domain.Overview, lang string) Page {
 		fmt.Sprintf("%s: %s", l("CPU", "CPU"), o.CPUModel),
 		fmt.Sprintf("%s: %s", copy.memory.Text(lang), status(o.Memory.Availability)),
 		fmt.Sprintf("%s: %s", l("Suhu", "Temperature"), status(o.Temperature.Availability)),
+	}
+	if o.Memory.SwapStatus == domain.Available {
+		page.Evidence = append(page.Evidence, fmt.Sprintf("Swap · %s / %s", bytesText(o.Memory.SwapUsed), bytesText(o.Memory.SwapBytes)))
 	}
 	if o.UptimeSeconds != nil {
 		up := (time.Duration(*o.UptimeSeconds) * time.Second).Truncate(time.Minute)

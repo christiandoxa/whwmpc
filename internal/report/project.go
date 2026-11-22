@@ -101,7 +101,7 @@ func projectOverview(o domain.Overview, private map[string]bool) *domain.Overvie
 		Environment: allowed(o.Environment, "physical", "container", "wsl", "virtual_machine", "undetermined"), Systemd: o.Systemd,
 		UptimeSeconds: numeric(o.UptimeSeconds, 0, math.MaxFloat64), LogicalCPUs: o.LogicalCPUs, CPU: percent(o.CPU),
 		Memory: domain.Memory{Availability: availability(o.Memory.Availability), TotalBytes: o.Memory.TotalBytes,
-			FreeBytes: o.Memory.FreeBytes, SwapBytes: o.Memory.SwapBytes, SwapUsed: o.Memory.SwapUsed, Use: percent(o.Memory.Use)},
+			FreeBytes: o.Memory.FreeBytes, SwapStatus: availability(o.Memory.SwapStatus), SwapBytes: o.Memory.SwapBytes, SwapUsed: o.Memory.SwapUsed, Use: percent(o.Memory.Use)},
 		DiskStatus: availability(o.DiskStatus),
 		Temperature: domain.Temperature{Availability: availability(o.Temperature.Availability), Celsius: numeric(o.Temperature.Celsius, -30, 150),
 			Source: allowed(o.Temperature.Source, "coretemp", "k10temp", "zenpower", "k8temp", "cpu_thermal", "x86_pkg_temp", "soc_thermal")},

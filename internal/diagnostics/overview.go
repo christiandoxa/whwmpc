@@ -75,11 +75,19 @@ func (a Analyzer) memory(o domain.Overview) Finding {
 		return a.unavailable(f, component)
 	}
 	f.Observation = a.textf("RAM tersedia %.1f / %.1f GiB", "RAM available %.1f / %.1f GiB", gib(m.FreeBytes), gib(m.TotalBytes))
-	if m.SwapBytes > 0 && m.SwapUsed <= m.SwapBytes {
-		f.Observation += a.textf(" · swap terpakai %.1f / %.1f GiB", " · swap used %.1f / %.1f GiB", gib(m.SwapUsed), gib(m.SwapBytes))
+	if m.SwapStatus == domain.Available && m.SwapUsed <= m.SwapBytes {
+		if m.SwapBytes > 0 {
+			f.Observation += a.textf(" · swap terpakai %.1f / %.1f GiB", " · swap used %.1f / %.1f GiB", gib(m.SwapUsed), gib(m.SwapBytes))
+		} else {
+			f.Observation += a.text(" · tanpa swap terkonfigurasi", " · no swap configured")
+		}
+	} else {
+		f.Limits = a.text("Cakupan swap belum tersedia.", "Swap data is unavailable.")
 	}
 	f.Meaning = a.text("MemAvailable memperkirakan ruang bagi beban baru, termasuk cache yang dapat direklamasi.", "MemAvailable estimates headroom for new work and includes reclaimable cache.")
-	f.Limits = a.text("Swap terpakai menunjukkan isi swap. Laju paging dan waktu tunggu perlu pengukuran terpisah.", "Swap occupancy shows what is in swap. Paging rate and stall time require separate measurements.")
+	if f.Limits == "" {
+		f.Limits = a.text("Swap terpakai menunjukkan isi swap. Laju paging dan waktu tunggu perlu pengukuran terpisah.", "Swap occupancy shows what is in swap. Paging rate and stall time require separate measurements.")
+	}
 	f.Recommendation = a.text("Bandingkan ruang RAM dan swap saat menjalankan pekerjaan yang terasa lambat.", "Compare RAM headroom and swap occupancy during the workload that feels slow.")
 	f.Actions = []Action{a.rescan()}
 	if usable(a.status(m.Use.Availability, m.Use.CapturedAt, overviewAge)) && underLoad(m.Use.Samples, memoryWarning) {

@@ -26,6 +26,7 @@ type Memory struct {
 	Availability Availability `json:"availability"`
 	TotalBytes   uint64       `json:"total_bytes,omitempty"`
 	FreeBytes    uint64       `json:"available_bytes,omitempty"`
+	SwapStatus   Availability `json:"swap_availability"`
 	SwapBytes    uint64       `json:"swap_total_bytes,omitempty"`
 	SwapUsed     uint64       `json:"swap_used_bytes,omitempty"`
 	Use          Percent      `json:"use"`

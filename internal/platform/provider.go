@@ -16,7 +16,7 @@ func baseOverview(now time.Time, status domain.Availability) domain.Overview {
 	return domain.Overview{
 		Availability: status, CapturedAt: now.UTC(), OS: runtime.GOOS, Arch: runtime.GOARCH,
 		LogicalCPUs: runtime.NumCPU(), CPU: domain.Percent{Availability: status},
-		Memory:      domain.Memory{Availability: status, Use: domain.Percent{Availability: status}},
+		Memory:      domain.Memory{Availability: status, SwapStatus: status, Use: domain.Percent{Availability: status}},
 		Temperature: domain.Temperature{Availability: status}, DiskStatus: status,
 		ProcessStatus: status, PowerStatus: status,
 	}
@@ -35,7 +35,7 @@ func (Demo) Overview(context.Context) domain.Overview {
 	o.CPU = domain.Percent{Availability: domain.Available, StartedAt: DemoTime.Add(-800 * time.Millisecond),
 		CapturedAt: DemoTime, Samples: []float64{13, 17, 15, 26, 22, 38, 34, 24}}
 	o.Memory = domain.Memory{Availability: domain.Available, TotalBytes: 16 << 30, FreeBytes: 7 << 30,
-		SwapBytes: 4 << 30, Use: domain.Percent{Availability: domain.Available, StartedAt: o.CPU.StartedAt,
+		SwapStatus: domain.Available, SwapBytes: 4 << 30, Use: domain.Percent{Availability: domain.Available, StartedAt: o.CPU.StartedAt,
 			CapturedAt: DemoTime, Samples: []float64{54, 55, 56}}}
 	o.Disks = []domain.Disk{{Mount: "/", Root: true, FSType: "ext4", Availability: domain.Available,
 		TotalBytes: 512 << 30, FreeBytes: 148 << 30, UsedPercent: 71}}

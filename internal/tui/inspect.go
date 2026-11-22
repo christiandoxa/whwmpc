@@ -95,6 +95,7 @@ func withFindings(page Page, findings []diagnostics.Finding, lang string) Page {
 	page.Findings = findings
 	base := page.Found
 	evidence := page.Evidence
+	page.Sidebar = evidence
 	page.Found, page.Meaning, page.Advice, page.Evidence = nil, nil, nil, nil
 	if page.Availability == "" && len(findings) > 0 {
 		page.Availability = findings[0].Availability

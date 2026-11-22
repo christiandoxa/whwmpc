@@ -38,15 +38,15 @@ type Choice struct {
 }
 
 type Page struct {
-	Availability     domain.Availability
-	Pose             mascot.Pose
-	Findings         []diagnostics.Finding
-	Priority         string
-	Plan             *actions.Plan
-	Confirm          bool
-	Found, Meaning   []string
-	Advice, Evidence []string
-	Choices          []Choice
+	Availability              domain.Availability
+	Pose                      mascot.Pose
+	Findings                  []diagnostics.Finding
+	Priority                  string
+	Plan                      *actions.Plan
+	Confirm                   bool
+	Found, Meaning            []string
+	Advice, Evidence, Sidebar []string
+	Choices                   []Choice
 }
 
 type Request struct {
@@ -695,4 +695,29 @@ func (m *Model) updateOverviewCritical(page Page) {
 	m.criticalOverview = slices.ContainsFunc(page.Findings, func(f diagnostics.Finding) bool {
 		return f.Severity == diagnostics.Critical
 	})
+}
+
+func (m Model) stalePage() bool {
+	if m.options.Demo || m.busy || len(m.page.Findings) == 0 {
+		return false
+	}
+	var stamp time.Time
+	for _, finding := range m.page.Findings {
+		if finding.At.After(stamp) {
+			stamp = finding.At
+		}
+	}
+	if stamp.IsZero() {
+		return false
+	}
+	age := 30 * time.Second
+	switch m.active {
+	case assistant.Power, assistant.Recommend:
+		age = time.Minute
+	case assistant.Storage:
+		age = 30 * time.Minute
+	case assistant.Trim:
+		age = 15 * time.Minute
+	}
+	return m.now().Sub(stamp) > age
 }

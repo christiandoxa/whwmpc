@@ -55,6 +55,12 @@ func (m *Model) accent(focus, panel bool) {
 func (m *Model) scheduleMotion(at time.Time) {
 	p := &m.visual
 	p.generation++
+	if !p.focusUntil.After(at) {
+		p.focusUntil = time.Time{}
+	}
+	if !p.panelUntil.After(at) {
+		p.panelUntil = time.Time{}
+	}
 	next := time.Time{}
 	if m.options.Motion == motion.Full {
 		take := func(candidate time.Time) {

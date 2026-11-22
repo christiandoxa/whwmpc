@@ -17,3 +17,18 @@ go test ./...
 go test -race ./...
 go build ./cmd/whwmpc
 ```
+
+## Bukti pengujian
+
+CI menjalankan format, vet, race detector, build, dan smoke PTY Bubble Tea v2 pada Ubuntu 24.04. Smoke memakai ukuran 120×36, 60×18, dan 80×24. Ia menguji fokus masukan, bantuan, klarifikasi, resize, dan pemulihan mode terminal. Linux arm64, macOS arm64, dan Windows amd64 adalah target compile-only di CI.
+
+```sh
+python3 scripts/tui_pty.py ./whwmpc --width 120 --height 36
+go mod verify
+go run golang.org/x/vuln/cmd/govulncheck@v1.10.0 ./...
+bash scripts/release.sh snapshot dist
+```
+
+Fixture dan fake runner meliputi parsing SMART, diagnosis, stale data, kondisi aksi, privacy report, serta preferensi/klaim lintas proses. Tes rutin tidak menjadwalkan TRIM, mengubah profil, atau membersihkan komputer. Probe native yang dicoba hanya membaca data dan membuat preview. Uji mutasi perangkat milik sendiri bersifat opt-in melalui preview/confirm normal, dengan backup dan kondisi yang bisa diperiksa kembali.
+
+[Screenshot 120×36](assets/overview.png) · [Screenshot 80×24](assets/compact.png) · [Rekaman galeri PTY](assets/piko-demo.cast). Aplikasi demo berjalan dalam PTY Linux, lalu event asciicast v2 dirender dengan agg v1.9.0 dan DejaVu Sans Mono. [Cara merekam ulang](RELEASE.md)

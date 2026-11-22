@@ -11,6 +11,7 @@ import (
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/christiandoxa/whwmpc/internal/assistant"
+	"github.com/christiandoxa/whwmpc/internal/diagnostics"
 	"github.com/christiandoxa/whwmpc/internal/platform"
 	"github.com/christiandoxa/whwmpc/internal/tui/mascot"
 	"github.com/christiandoxa/whwmpc/internal/tui/motion"
@@ -147,5 +148,26 @@ func TestMotionPreferencesCoalesceRepeatedPresses(t *testing.T) {
 	m = step(m, last())
 	if !slices.Equal(saved, []motion.Mode{motion.Reduced, motion.Full}) || m.options.Motion != motion.Full || m.motionSaving {
 		t.Fatalf("saved modes = %v, state = %s", saved, m.options.Motion)
+	}
+}
+
+func TestStalePageShowsAgeWithoutChangingData(t *testing.T) {
+	ctx := context.Background()
+	o := platform.Demo{}.Overview(ctx)
+	m := New(ctx, platform.Demo{}, nil, Options{Language: "en", Motion: "off"})
+	now := o.CapturedAt
+	m.now = func() time.Time { return now }
+	m = step(m, overviewMsg{o})
+	m.active = assistant.Storage
+	m.page = Page{Findings: []diagnostics.Finding{{At: o.CapturedAt}}, Found: []string{"SSD fixture"}}
+	if m.stalePage() {
+		t.Fatal("fresh result was marked stale")
+	}
+	now = now.Add(31 * time.Minute)
+	if !m.stalePage() || !strings.Contains(m.View().Content, "Stale data") {
+		t.Fatal("retained findings did not show staleness")
+	}
+	if m.page.Found[0] != "SSD fixture" {
+		t.Fatal("actual measurement was changed to animate its age")
 	}
 }

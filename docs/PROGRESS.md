@@ -52,3 +52,13 @@
 - TUI dan CLI mendukung laporan fixture yang tidak membaca history host. `doctor` membedakan tool TRIM, eligibility aksi manual, dan dukungan cache APT.
 - Gate lokal mencakup gofmt, vet, test, race, build, smoke demo CLI, dan smoke PTY. Pemeriksaan dependency mengembalikan semua modul terverifikasi dan tanpa kerentanan yang terdeteksi oleh govulncheck.
 - Berikutnya artefak PTY final, paket snapshot, dan audit dokumentasi.
+
+## 7 · Distribusi dan review visual
+
+- PTY aplikasi yang berjalan direview pada 120×36 dan 80×24. Navigasi, input, bantuan, resize, dan pemulihan terminal diuji dengan smoke PTY. Rekaman galeri memuat sesi fixture dari pertanyaan sampai hasil terverifikasi.
+- Paket snapshot Linux amd64/arm64 dibangun dan checksum diperiksa. Binari amd64 hasil ekstraksi dipakai untuk smoke. macOS arm64 dan Windows amd64 diperiksa melalui kompilasi.
+- Gate lokal menjalankan gofmt, vet, unit/integration test, race, build, PTY, verifikasi modul, dan govulncheck.
+- Diagnosis native Linux amd64 baca-saja. SMART pada host pengembangan memerlukan izin, PPD memakai driver `fake`, dan sebagian inventaris APT privat. Preview manual TRIM terikat descriptor terverifikasi. Perubahan daya, TRIM, dan cleanup pada perangkat nyata masih memerlukan pengujian opt-in.
+- Workflow tag siap. Paket yang diperiksa adalah snapshot lokal.
+
+Checkpoint awal di `main` mencakup `db4f687` (fondasi), `01f01ca` (asisten), `a5f0342` (motion), `854f9b3` (collector), `675c36b` (diagnostik), `8a478ab` (tindakan), dan `038667f` (laporan).

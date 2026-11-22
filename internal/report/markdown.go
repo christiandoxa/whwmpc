@@ -34,8 +34,12 @@ func markdown(report Report) string {
 		}
 		memory := string(o.Memory.Availability)
 		if o.Memory.Availability == domain.Available || o.Memory.Availability == domain.Partial {
-			memory += fmt.Sprintf(" · RAM %d/%d byte tersedia · swap %d/%d byte terpakai",
-				o.Memory.FreeBytes, o.Memory.TotalBytes, o.Memory.SwapUsed, o.Memory.SwapBytes)
+			memory += fmt.Sprintf(" · RAM %d/%d byte tersedia", o.Memory.FreeBytes, o.Memory.TotalBytes)
+		}
+		if o.Memory.SwapStatus == domain.Available {
+			memory += fmt.Sprintf(" · swap %d/%d byte terpakai", o.Memory.SwapUsed, o.Memory.SwapBytes)
+		} else {
+			memory += " · swap " + string(o.Memory.SwapStatus)
 		}
 		bullet(&out, "RAM dan swap", memory)
 		bullet(&out, "Suhu", nonempty(optional(o.Temperature.Celsius, "%.1f °C"), string(o.Temperature.Availability)))

@@ -21,3 +21,28 @@ jobs:
       - run: go vet ./...
       - run: go test -race ./...
       - run: go build ./cmd/whwmpc
+      - name: Exercise the terminal
+        run: python3 scripts/tui_pty.py ./whwmpc --width 120 --height 36
+
+  compile:
+    runs-on: ubuntu-24.04
+    strategy:
+      matrix:
+        include:
+          - goos: linux
+            goarch: arm64
+          - goos: darwin
+            goarch: arm64
+          - goos: windows
+            goarch: amd64
+    env:
+      GOTOOLCHAIN: local
+      CGO_ENABLED: '0'
+      GOOS: ${{ matrix.goos }}
+      GOARCH: ${{ matrix.goarch }}
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-go@v7.1.0
+        with:
+          go-version: '1.27.4'
+      - run: go build -trimpath ./cmd/whwmpc

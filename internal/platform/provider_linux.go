@@ -105,10 +105,8 @@ func (p linuxProvider) collect(ctx context.Context) domain.Overview {
 	if totalDelta > 0 {
 		if records := p.processes(ctx); len(records) > 0 && len(procs) > 0 {
 			o.Processes = topProcesses(procs, records, totalDelta)
-			if len(o.CPU.Samples) == 3 {
-				o.ProcessStatus = domain.Available
-			} else {
-				o.ProcessStatus = domain.Partial
+			if len(o.Processes) != 0 {
+				o.ProcessStatus = sampleStatus(len(o.CPU.Samples))
 			}
 		}
 	}
@@ -220,11 +218,11 @@ func (p linuxProvider) memory() domain.Memory {
 	swap, swapOK := kib("SwapTotal")
 	swapFree, swapFreeOK := kib("SwapFree")
 	if !totalOK || !freeOK || total == 0 || free > total {
-		return domain.Memory{Availability: domain.Unknown}
+		return domain.Memory{Availability: domain.Unknown, SwapStatus: domain.Unknown}
 	}
-	m := domain.Memory{Availability: domain.Available, TotalBytes: total, FreeBytes: free}
+	m := domain.Memory{Availability: domain.Available, SwapStatus: domain.Unknown, TotalBytes: total, FreeBytes: free}
 	if swapOK && swapFreeOK && swapFree <= swap {
-		m.SwapBytes, m.SwapUsed = swap, swap-swapFree
+		m.SwapStatus, m.SwapBytes, m.SwapUsed = domain.Available, swap, swap-swapFree
 	}
 	return m
 }

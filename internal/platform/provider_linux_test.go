@@ -44,7 +44,7 @@ func TestLinuxOverviewUsesSamplesAndReportsMissingData(t *testing.T) {
 	cpu, hasCPU := got.CPU.Latest()
 	if got.Distro != "Fixture Ubuntu" || got.Environment != "wsl" || !hasCPU || math.Abs(cpu-100.0/3) > 0.0001 ||
 		len(got.CPU.Samples) != 3 || len(got.Memory.Use.Samples) != 3 || len(got.Disks) != 1 ||
-		got.Disks[0].FreeBytes != 40*4096 || got.Memory.SwapUsed != 256*1024 {
+		got.Disks[0].FreeBytes != 40*4096 || got.Memory.SwapStatus != domain.Available || got.Memory.SwapUsed != 256*1024 {
 		t.Fatalf("overview = %+v", got)
 	}
 	if got.Temperature.Availability != domain.Unknown || got.PowerStatus != domain.Unknown || got.Systemd {
@@ -58,5 +58,16 @@ func TestProcessMatchingAvoidsReusedPID(t *testing.T) {
 	got := topProcesses(before, after, 50)
 	if len(got) != 1 || got[0].Name != "stable" || got[0].CPU != 20 {
 		t.Fatalf("matched processes = %+v", got)
+	}
+}
+
+func TestMemorySeparatesUnreadableSwapFromNoSwap(t *testing.T) {
+	p := linuxProvider{fs: fstest.MapFS{"proc/meminfo": {Data: []byte("MemTotal: 1000 kB\nMemAvailable: 250 kB")}}}
+	if m := p.memory(); m.Availability != domain.Available || m.SwapStatus != domain.Unknown {
+		t.Fatalf("incomplete sample = %+v", m)
+	}
+	p.fs = fstest.MapFS{"proc/meminfo": {Data: []byte("MemTotal: 1000 kB\nMemAvailable: 250 kB\nSwapTotal: 0 kB\nSwapFree: 0 kB")}}
+	if m := p.memory(); m.SwapStatus != domain.Available || m.SwapBytes != 0 {
+		t.Fatalf("no swap sample = %+v", m)
 	}
 }
